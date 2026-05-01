@@ -3,7 +3,7 @@ import { Sparkles, Check, CalendarDays } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "หน้าหลัก",
 };
 
 export default async function DashboardPage() {

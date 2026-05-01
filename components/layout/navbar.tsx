@@ -32,10 +32,10 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
     : "?";
 
   const roleLabel: Record<string, string> = {
-    admin: "Admin",
-    hr: "HR Admin",
-    manager: "Manager",
-    employee: "Employee",
+    admin: "ผู้ดูแลระบบ",
+    hr: "เจ้าหน้าที่ฝ่ายบุคคล",
+    manager: "ผู้จัดการ",
+    employee: "พนักงาน",
   };
 
   return (

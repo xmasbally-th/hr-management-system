@@ -25,10 +25,10 @@ export interface NavGroup {
  */
 export const navigationGroups: NavGroup[] = [
   {
-    label: "Overview",
+    label: "ภาพรวม",
     items: [
       {
-        title: "Dashboard",
+        title: "หน้าหลัก",
         href: "/dashboard",
         icon: "LayoutDashboard",
         roles: ["admin", "hr", "manager", "employee"],
@@ -36,28 +36,28 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Self-Service",
+    label: "บริการส่วนบุคคล",
     items: [
       {
-        title: "My Leaves",
+        title: "ประวัติการลา",
         href: "/dashboard/leaves",
         icon: "CalendarDays",
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
-        title: "My Travel",
+        title: "ประวัติการเดินทาง",
         href: "/dashboard/travel",
         icon: "Plane",
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
-        title: "My Trainings",
+        title: "ประวัติการอบรม",
         href: "/dashboard/trainings",
         icon: "GraduationCap",
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
-        title: "My Documents",
+        title: "เอกสารของฉัน",
         href: "/dashboard/documents",
         icon: "FileText",
         roles: ["admin", "hr", "manager", "employee"],
@@ -65,16 +65,16 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Approvals",
+    label: "การอนุมัติ",
     items: [
       {
-        title: "Leave Approvals",
+        title: "อนุมัติการลา",
         href: "/dashboard/approvals/leaves",
         icon: "ClipboardCheck",
         roles: ["admin", "hr", "manager"],
       },
       {
-        title: "Travel Approvals",
+        title: "อนุมัติการเดินทาง",
         href: "/dashboard/approvals/travel",
         icon: "ClipboardList",
         roles: ["admin", "hr", "manager"],
@@ -82,34 +82,34 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "HR Management",
+    label: "การจัดการบุคลากร",
     items: [
       {
-        title: "Employees",
+        title: "รายชื่อพนักงาน",
         href: "/dashboard/hr/employees",
         icon: "Users",
         roles: ["admin", "hr"],
       },
       {
-        title: "Departments",
+        title: "แผนก",
         href: "/dashboard/hr/departments",
         icon: "Building2",
         roles: ["admin", "hr"],
       },
       {
-        title: "Leave Management",
+        title: "จัดการการลา",
         href: "/dashboard/hr/leaves",
         icon: "CalendarRange",
         roles: ["admin", "hr"],
       },
       {
-        title: "Training Management",
+        title: "จัดการการอบรม",
         href: "/dashboard/hr/trainings",
         icon: "BookOpen",
         roles: ["admin", "hr"],
       },
       {
-        title: "Document Tracking",
+        title: "ติดตามเอกสาร",
         href: "/dashboard/hr/documents",
         icon: "FolderSearch",
         roles: ["admin", "hr"],
@@ -117,16 +117,16 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "System",
+    label: "ระบบ",
     items: [
       {
-        title: "Reports",
+        title: "รายงาน",
         href: "/dashboard/reports",
         icon: "BarChart3",
         roles: ["admin", "hr"],
       },
       {
-        title: "Settings",
+        title: "ตั้งค่าระบบ",
         href: "/dashboard/settings",
         icon: "Settings",
         roles: ["admin"],
