@@ -49,6 +49,7 @@ export interface Database {
           email: string;
           full_name: string;
           role: "admin" | "hr" | "manager" | "employee";
+          status: "active" | "pending" | "inactive";
           department_id: string | null;
           avatar_url: string | null;
           phone: string | null;
@@ -60,6 +61,7 @@ export interface Database {
           email: string;
           full_name: string;
           role?: "admin" | "hr" | "manager" | "employee";
+          status?: "active" | "pending" | "inactive";
           department_id?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
@@ -71,6 +73,7 @@ export interface Database {
           email?: string;
           full_name?: string;
           role?: "admin" | "hr" | "manager" | "employee";
+          status?: "active" | "pending" | "inactive";
           department_id?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
@@ -558,6 +561,7 @@ export interface Database {
     };
     Enums: {
       user_role: "admin" | "hr" | "manager" | "employee";
+      profile_status: "active" | "pending" | "inactive";
       request_status: "pending" | "approved" | "rejected" | "cancelled";
       document_status: "draft" | "in_progress" | "completed" | "cancelled";
       document_priority: "low" | "medium" | "high" | "urgent";
@@ -595,3 +599,4 @@ export type Notification = Tables<"notifications">;
 
 // ─── Role type ───────────────────────────────────────────────────────
 export type UserRole = Profile["role"];
+export type ProfileStatus = Profile["status"];
