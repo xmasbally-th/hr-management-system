@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
 
@@ -87,4 +88,81 @@ export async function updateUserRole(userId: string, role: UserRole) {
   }
 
   revalidatePath("/dashboard/hr/users");
+}
+
+/**
+ * Creates a new user account + profile by Admin/HR.
+ * Bypasses normal sign-up using the service role key.
+ */
+export async function createUserByAdmin(data: {
+  email: string;
+  fullName: string;
+  role: UserRole;
+  departmentId: string | null;
+  positionId: string | null;
+}) {
+  const supabase = await createClient();
+  await checkHrAdminRole(supabase); // Ensure caller is admin or hr
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
+  }
+
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+
+  // 1. Create auth user with random password (user will reset it or use SSO later)
+  const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
+  
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email: data.email,
+    password: tempPassword,
+    email_confirm: true, // Auto-confirm email
+    user_metadata: {
+      full_name: data.fullName,
+    },
+  });
+
+  if (authError) {
+    console.error("[user-actions] Failed to create auth user:", authError);
+    // Handle specific errors like email already exists
+    if (authError.message.includes("already registered") || authError.status === 422) {
+      throw new Error("อีเมลนี้มีอยู่ในระบบแล้ว (Email already registered)");
+    }
+    throw new Error("ไม่สามารถสร้างบัญชีผู้ใช้งานได้: " + authError.message);
+  }
+
+  if (!authData.user) {
+    throw new Error("Failed to create auth user (No user returned)");
+  }
+
+  // 2. Insert into profiles with 'approved' status
+  const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+    id: authData.user.id,
+    email: data.email,
+    full_name: data.fullName,
+    role: data.role,
+    status: "approved",
+    department_id: data.departmentId,
+    position_id: data.positionId,
+  });
+
+  if (profileError) {
+    console.error("[user-actions] Failed to create profile, rolling back:", profileError);
+    // Try to rollback the auth user creation since profile failed
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    throw new Error("บันทึกข้อมูลพนักงานไม่สำเร็จ กรุณาลองใหม่: " + profileError.message);
+  }
+
+  revalidatePath("/dashboard/hr/users");
+  
+  return { success: true };
 }

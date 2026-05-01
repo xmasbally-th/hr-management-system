@@ -90,6 +90,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           role: "employee",
           status: "pending",
           department_id: null,
+          position_id: null,
           avatar_url: null,
           phone: null,
           created_at: new Date().toISOString(),

@@ -51,6 +51,7 @@ export interface Database {
           role: "admin" | "hr" | "manager" | "employee";
           status: "pending" | "approved" | "rejected";
           department_id: string | null;
+          position_id: string | null;
           avatar_url: string | null;
           phone: string | null;
           created_at: string;
@@ -63,6 +64,7 @@ export interface Database {
           role?: "admin" | "hr" | "manager" | "employee";
           status?: "pending" | "approved" | "rejected";
           department_id?: string | null;
+          position_id?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
           created_at?: string;
@@ -75,6 +77,7 @@ export interface Database {
           role?: "admin" | "hr" | "manager" | "employee";
           status?: "pending" | "approved" | "rejected";
           department_id?: string | null;
+          position_id?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
           created_at?: string;
@@ -83,6 +86,41 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "profiles_department_id_fkey";
+            columns: ["department_id"];
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profiles_position_id_fkey";
+            columns: ["position_id"];
+            referencedRelation: "positions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      positions: {
+        Row: {
+          id: string;
+          name: string;
+          department_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          department_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          department_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "positions_department_id_fkey";
             columns: ["department_id"];
             referencedRelation: "departments";
             referencedColumns: ["id"];
@@ -586,6 +624,7 @@ export type UpdateDto<T extends keyof Database["public"]["Tables"]> =
 
 // ─── Shorthand row types ─────────────────────────────────────────────
 export type Department = Tables<"departments">;
+export type Position = Tables<"positions">;
 export type Profile = Tables<"profiles">;
 export type LeaveType = Tables<"leave_types">;
 export type LeaveBalance = Tables<"leave_balances">;

@@ -126,6 +126,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
+        title: "ตั้งค่าองค์กร (Master Data)",
+        href: "/dashboard/hr/master-data",
+        icon: "Building",
+        roles: ["admin", "hr"],
+      },
+      {
         title: "ตั้งค่าระบบ",
         href: "/dashboard/settings",
         icon: "Settings",

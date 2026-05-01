@@ -10,6 +10,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserActionsMenu } from "./user-actions-menu";
 
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+
 export const metadata = {
   title: "จัดการผู้ใช้งาน",
 };
@@ -19,9 +23,15 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">จัดการผู้ใช้งาน</h1>
-        <p className="text-muted-foreground">รายชื่อพนักงาน สถานะ และสิทธิ์การเข้าถึงระบบ</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">จัดการผู้ใช้งาน</h1>
+          <p className="text-muted-foreground">รายชื่อพนักงาน สถานะ และสิทธิ์การเข้าถึงระบบ</p>
+        </div>
+        <Link href="/dashboard/hr/users/add" className={buttonVariants({ variant: "default" })}>
+          <Plus className="mr-2 h-4 w-4" />
+          เพิ่มพนักงาน
+        </Link>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
