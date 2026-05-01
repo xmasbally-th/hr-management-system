@@ -160,16 +160,9 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
   return (
     <TooltipProvider delay={0}>
-      <div className="relative min-h-screen bg-background">
-        {/* Top navigation */}
-        <Navbar
-          profile={profile}
-          onMenuClick={handleMobileMenuClick}
-          onSignOut={handleSignOut}
-        />
-
+      <div className="min-h-screen flex bg-background">
         {/* Desktop sidebar — hidden on mobile */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block shrink-0">
           <Sidebar
             role={profile?.role ?? "employee"}
             collapsed={sidebarCollapsed}
@@ -184,18 +177,20 @@ export function DashboardShell({ children }: DashboardShellProps) {
           onOpenChange={setMobileOpen}
         />
 
-        {/* Main content area */}
-        <main
-          className={cn(
-            "min-h-[calc(100vh-4rem)] pt-16 transition-all duration-300 ease-in-out",
-            "lg:pl-[260px]",
-            sidebarCollapsed && "lg:pl-[68px]"
-          )}
-        >
-          <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-            {children}
-          </div>
-        </main>
+        {/* Main content wrapper */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <Navbar
+            profile={profile}
+            onMenuClick={handleMobileMenuClick}
+            onSignOut={handleSignOut}
+          />
+
+          <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+            <div className="max-w-7xl mx-auto space-y-6">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </TooltipProvider>
   );

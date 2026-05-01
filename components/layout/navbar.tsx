@@ -1,19 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { Menu, Bell, LogOut, User, Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { useState } from "react";
+import { Menu, Bell, LogOut, User, Settings, Search, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -26,6 +19,9 @@ interface NavbarProps {
 }
 
 export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [query, setQuery] = useState("");
+
   const initials = profile?.full_name
     ? profile.full_name
         .split(" ")
@@ -36,117 +32,139 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
     : "?";
 
   const roleLabel: Record<string, string> = {
-    admin: "Administrator",
-    hr: "HR Officer",
+    admin: "Admin",
+    hr: "HR Admin",
     manager: "Manager",
     employee: "Employee",
   };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="flex w-full items-center gap-4 px-4">
+    <header className="sticky top-0 z-30 bg-background border-b border-border">
+      <div className="h-16 px-4 sm:px-6 flex items-center gap-3">
         {/* Mobile menu toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
+        <button
           onClick={onMenuClick}
-          aria-label="Toggle menu"
+          className="lg:hidden p-2 -ml-2 rounded-lg text-foreground/70 hover:bg-muted"
+          aria-label="Open menu"
         >
           <Menu className="size-5" />
-        </Button>
+        </button>
 
-        {/* Logo / brand */}
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm">
-            <span className="text-sm font-bold text-primary-foreground">
-              HR
-            </span>
+        {/* Search */}
+        <div className="flex-1 max-w-xl relative">
+          <div
+            className={cn(
+              "flex items-center gap-2 h-10 px-3 rounded-lg border bg-muted/50 transition-all",
+              searchFocused ? "border-primary bg-background ring-4 ring-primary/10" : "border-border"
+            )}
+          >
+            <Search className="size-[17px] text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              placeholder="ค้นหาพนักงาน คำขอ หรือเอกสาร..."
+              className="flex-1 bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground"
+            />
+            <kbd className="hidden md:inline-flex items-center px-1.5 h-5 rounded border border-border bg-background text-[10px] text-muted-foreground font-mono">
+              ⌘K
+            </kbd>
           </div>
-          <span className="hidden text-lg font-semibold tracking-tight sm:inline-block">
-            HR Management
-          </span>
-        </Link>
+        </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 lg:flex-none"></div>
 
-        {/* Notifications */}
-        <Link
-          href="/dashboard/notifications"
-          aria-label="Notifications"
-          className="relative inline-flex size-8 items-center justify-center rounded-lg text-sm font-medium transition-colors hover:bg-muted"
-        >
-          <Bell className="size-[18px]" />
-          {/* Unread indicator — controlled by real data in future */}
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
-        </Link>
+        {/* Right cluster */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Notifications */}
+          <button
+            className="relative w-10 h-10 rounded-lg text-foreground/70 hover:bg-muted grid place-items-center"
+            aria-label="Notifications"
+          >
+            <Bell className="size-[19px]" />
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-destructive ring-2 ring-background animate-notif-pulse"></span>
+          </button>
 
-        {/* User menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="relative flex h-9 items-center gap-2 rounded-full pl-1.5 pr-3 text-sm font-medium transition-colors hover:bg-muted focus:outline-none">
-            <Avatar className="size-7">
-              <AvatarImage
-                src={profile?.avatar_url ?? undefined}
-                alt={profile?.full_name ?? "User"}
-              />
-              <AvatarFallback className="text-xs font-medium">
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-6 bg-border mx-1"></div>
+
+          {/* User dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-2.5 sm:pl-1 sm:pr-2 py-1 rounded-lg hover:bg-muted focus:outline-none">
+              {/* Avatar */}
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-[13px] font-semibold shadow-sm">
                 {initials}
-              </AvatarFallback>
-            </Avatar>
-            <span className="hidden text-sm font-medium md:inline-block">
-              {profile?.full_name ?? "Loading…"}
-            </span>
-          </DropdownMenuTrigger>
+              </div>
+              <div className="hidden sm:flex flex-col items-start min-w-0">
+                <div className="text-[13px] font-semibold text-foreground leading-tight truncate max-w-[140px]">
+                  {profile?.full_name ?? "Loading…"}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-1.5 py-px rounded">
+                    {profile?.role ? roleLabel[profile.role] : "—"}
+                  </span>
+                </div>
+              </div>
+              <ChevronDown className="hidden sm:block size-[15px] text-muted-foreground transition-transform data-[state=open]:rotate-180" />
+            </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
-              <span className="text-sm font-medium">
-                {profile?.full_name ?? "—"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {profile?.email ?? "—"}
-              </span>
-              {profile?.role && (
-                <Badge variant="secondary" className="mt-1 w-fit text-[10px]">
-                  {roleLabel[profile.role] ?? profile.role}
-                </Badge>
-              )}
-            </DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-64 rounded-xl p-0 overflow-hidden shadow-lg border border-border animate-fade-in">
+              <div className="px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-[14px] font-semibold">
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-foreground truncate">
+                      {profile?.full_name ?? "Loading…"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {profile?.email ?? "—"}
+                    </div>
+                  </div>
+                </div>
+                {profile?.role && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                    {roleLabel[profile.role]}
+                  </div>
+                )}
+              </div>
+              
+              <div className="py-1.5">
+                <DropdownMenuItem
+                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] cursor-pointer"
+                  onClick={() => { window.location.href = "/dashboard/profile"; }}
+                >
+                  <User className="size-4 text-muted-foreground" />
+                  <span>โปรไฟล์ของฉัน</span>
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem
+                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] cursor-pointer"
+                  onClick={() => { window.location.href = "/dashboard/settings"; }}
+                >
+                  <Settings className="size-4 text-muted-foreground" />
+                  <span>ตั้งค่าบัญชี</span>
+                </DropdownMenuItem>
+              </div>
 
-            <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="m-0" />
 
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                window.location.href = "/dashboard/profile";
-              }}
-            >
-              <User className="mr-2 size-4" />
-              Profile
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                window.location.href = "/dashboard/settings";
-              }}
-            >
-              <Settings className="mr-2 size-4" />
-              Settings
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              onClick={onSignOut}
-              className="cursor-pointer text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2 size-4" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <div className="py-1.5">
+                <DropdownMenuItem
+                  onClick={onSignOut}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                >
+                  <LogOut className="size-4" />
+                  <span>ออกจากระบบ</span>
+                </DropdownMenuItem>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );
