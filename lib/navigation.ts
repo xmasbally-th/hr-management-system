@@ -85,8 +85,8 @@ export const navigationGroups: NavGroup[] = [
     label: "การจัดการบุคลากร",
     items: [
       {
-        title: "รายชื่อพนักงาน",
-        href: "/dashboard/hr/employees",
+        title: "จัดการผู้ใช้งาน",
+        href: "/dashboard/hr/users",
         icon: "Users",
         roles: ["admin", "hr"],
       },

@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getNavigationForRole, type NavGroup } from "@/lib/navigation";
+import { navigationGroups, getNavigationForRole, type NavItem } from "@/lib/navigation";
 import type { UserRole } from "@/types/supabase";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -96,7 +96,7 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3">
           <ul className="space-y-6">
-            {groups.map((group, groupIdx) => (
+            {groups.map((group) => (
               <li key={group.label} className="flex flex-col gap-1">
                 {!collapsed && (
                   <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/50 font-semibold">

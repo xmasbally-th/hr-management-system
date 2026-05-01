@@ -51,18 +51,12 @@ export async function GET(request: Request) {
       user.email?.split("@")[0] ||
       "New User";
 
-    const avatarUrl =
-      user.user_metadata?.avatar_url ||
-      user.user_metadata?.picture ||
-      null;
-
     const { error: insertError } = await supabase.from("profiles").insert({
       id: user.id,
       email: user.email!,
       full_name: fullName,
       role: "employee",    // default role for new users
       status: "pending",   // pending until admin activates
-      avatar_url: avatarUrl,
     });
 
     if (insertError) {

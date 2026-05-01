@@ -7,7 +7,6 @@ import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/supabase";
 
 interface DashboardShellProps {
@@ -69,11 +68,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
         user.email?.split("@")[0] ||
         "New User";
 
-      const avatarUrl =
-        user.user_metadata?.avatar_url ||
-        user.user_metadata?.picture ||
-        null;
-
       const { data: newProfile, error: insertError } = await supabase
         .from("profiles")
         .insert({
@@ -82,7 +76,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
           full_name: fullName,
           role: "employee" as const,
           status: "pending" as const,
-          avatar_url: avatarUrl,
         })
         .select()
         .single();
@@ -97,7 +90,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           role: "employee",
           status: "pending",
           department_id: null,
-          avatar_url: avatarUrl,
+          avatar_url: null,
           phone: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
