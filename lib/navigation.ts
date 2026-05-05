@@ -103,6 +103,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
+        title: "จัดการเดินทางราชการ",
+        href: "/dashboard/hr/travel",
+        icon: "MapPin",
+        roles: ["admin", "hr"],
+      },
+      {
         title: "จัดการการอบรม",
         href: "/dashboard/hr/trainings",
         icon: "BookOpen",
