@@ -44,13 +44,13 @@ export async function getPositions() {
   return data;
 }
 
-export async function createDepartment(name: string, description: string | null) {
+export async function createDepartment(name: string) {
   const supabase = await createClient();
   await checkHrAdminRole(supabase);
 
   const { error } = await supabase
     .from("departments")
-    .insert({ name, description });
+    .insert({ name });
 
   if (error) throw new Error("Failed to create department");
   revalidatePath("/dashboard/hr/master-data");

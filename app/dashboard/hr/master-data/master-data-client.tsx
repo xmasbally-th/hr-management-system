@@ -9,13 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2, Plus, Loader2 } from "lucide-react";
 
-export function MasterDataClient({ initialDepartments, initialPositions }: { initialDepartments: { id: string; name: string; description?: string | null }[], initialPositions: { id: string; name: string; department?: { name: string } | null; department_id: string }[] }) {
+export function MasterDataClient({ initialDepartments, initialPositions }: { initialDepartments: { id: string; name: string }[], initialPositions: { id: string; name: string; department?: { name: string } | null; department_id: string }[] }) {
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<"departments" | "positions">("departments");
 
   // Dept Form
   const [deptName, setDeptName] = useState("");
-  const [deptDesc, setDeptDesc] = useState("");
 
   // Pos Form
   const [posName, setPosName] = useState("");
@@ -26,9 +25,8 @@ export function MasterDataClient({ initialDepartments, initialPositions }: { ini
     if (!deptName) return;
     startTransition(async () => {
       try {
-        await createDepartment(deptName, deptDesc);
+        await createDepartment(deptName);
         setDeptName("");
-        setDeptDesc("");
       } catch (err: unknown) {
         if (err instanceof Error) alert(err.message);
       }
@@ -97,10 +95,6 @@ export function MasterDataClient({ initialDepartments, initialPositions }: { ini
                 <Label htmlFor="deptName">ชื่อแผนก</Label>
                 <Input id="deptName" value={deptName} onChange={(e) => setDeptName(e.target.value)} required disabled={isPending} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="deptDesc">รายละเอียด (ถ้ามี)</Label>
-                <Input id="deptDesc" value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} disabled={isPending} />
-              </div>
               <Button type="submit" className="w-full" disabled={isPending || !deptName}>
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 เพิ่มแผนก
@@ -113,7 +107,6 @@ export function MasterDataClient({ initialDepartments, initialPositions }: { ini
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead>ชื่อแผนก</TableHead>
-                  <TableHead>รายละเอียด</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -121,7 +114,6 @@ export function MasterDataClient({ initialDepartments, initialPositions }: { ini
                 {initialDepartments.map((dept) => (
                   <TableRow key={dept.id}>
                     <TableCell className="font-medium">{dept.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{dept.description || "-"}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteDept(dept.id)} disabled={isPending} className="text-destructive hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-4 w-4" />
@@ -131,7 +123,7 @@ export function MasterDataClient({ initialDepartments, initialPositions }: { ini
                 ))}
                 {initialDepartments.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">ไม่มีข้อมูลแผนก</TableCell>
+                    <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">ไม่มีข้อมูลแผนก</TableCell>
                   </TableRow>
                 )}
               </TableBody>

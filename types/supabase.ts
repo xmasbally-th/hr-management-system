@@ -1,11 +1,9 @@
 /**
  * Supabase Database Type Definitions
  *
- * These types mirror the tables created in Supabase.
+ * These types mirror the actual Supabase schema (verified 2026-05-05).
  * For full auto-generated types, run:
  *   npx supabase gen types typescript --project-id <your-project-id> > types/supabase.ts
- *
- * Manual definitions are maintained here until the CLI is configured.
  */
 
 export type Json =
@@ -19,84 +17,26 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      // ─── Step 1 Tables ───────────────────────────────────────────
-
       departments: {
         Row: {
           id: string;
           name: string;
-          description: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          description?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          description?: string | null;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-
-      profiles: {
-        Row: {
-          id: string;
-          email: string;
-          full_name: string;
-          role: "admin" | "hr" | "manager" | "employee";
-          status: "pending" | "approved" | "rejected";
-          department_id: string | null;
-          position_id: string | null;
-          avatar_url: string | null;
-          phone: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
-          id: string; // FK → auth.users.id, required on insert
-          email: string;
-          full_name: string;
-          role?: "admin" | "hr" | "manager" | "employee";
-          status?: "pending" | "approved" | "rejected";
-          department_id?: string | null;
-          position_id?: string | null;
-          avatar_url?: string | null;
-          phone?: string | null;
+          id?: string;
+          name: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          email?: string;
-          full_name?: string;
-          role?: "admin" | "hr" | "manager" | "employee";
-          status?: "pending" | "approved" | "rejected";
-          department_id?: string | null;
-          position_id?: string | null;
-          avatar_url?: string | null;
-          phone?: string | null;
+          name?: string;
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "profiles_department_id_fkey";
-            columns: ["department_id"];
-            referencedRelation: "departments";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "profiles_position_id_fkey";
-            columns: ["position_id"];
-            referencedRelation: "positions";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
 
       positions: {
@@ -128,26 +68,130 @@ export interface Database {
         ];
       };
 
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          title_th: string | null;
+          title_en: string | null;
+          first_name_th: string | null;
+          first_name_en: string | null;
+          last_name_th: string | null;
+          last_name_en: string | null;
+          position_number: string | null;
+          position_title: string | null;
+          employee_type: string | null;
+          department_id: string | null;
+          position_id: string | null;
+          birth_date: string | null;
+          hire_date: string | null;
+          gender: string | null;
+          religion: string | null;
+          blood_type: string | null;
+          current_address: string | null;
+          phone: string | null;
+          avatar_url: string | null;
+          role: "admin" | "hr" | "manager" | "employee";
+          status: "pending" | "approved" | "rejected";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name: string;
+          title_th?: string | null;
+          title_en?: string | null;
+          first_name_th?: string | null;
+          first_name_en?: string | null;
+          last_name_th?: string | null;
+          last_name_en?: string | null;
+          position_number?: string | null;
+          position_title?: string | null;
+          employee_type?: string | null;
+          department_id?: string | null;
+          position_id?: string | null;
+          birth_date?: string | null;
+          hire_date?: string | null;
+          gender?: string | null;
+          religion?: string | null;
+          blood_type?: string | null;
+          current_address?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          role?: "admin" | "hr" | "manager" | "employee";
+          status?: "pending" | "approved" | "rejected";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string;
+          title_th?: string | null;
+          title_en?: string | null;
+          first_name_th?: string | null;
+          first_name_en?: string | null;
+          last_name_th?: string | null;
+          last_name_en?: string | null;
+          position_number?: string | null;
+          position_title?: string | null;
+          employee_type?: string | null;
+          department_id?: string | null;
+          position_id?: string | null;
+          birth_date?: string | null;
+          hire_date?: string | null;
+          gender?: string | null;
+          religion?: string | null;
+          blood_type?: string | null;
+          current_address?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          role?: "admin" | "hr" | "manager" | "employee";
+          status?: "pending" | "approved" | "rejected";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey";
+            columns: ["department_id"];
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profiles_position_id_fkey";
+            columns: ["position_id"];
+            referencedRelation: "positions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       leave_types: {
         Row: {
           id: string;
           name: string;
-          description: string | null;
-          max_days: number;
+          max_days_per_year: number;
+          is_accumulative: boolean;
+          conditions: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
-          description?: string | null;
-          max_days: number;
+          max_days_per_year: number;
+          is_accumulative?: boolean;
+          conditions?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
-          description?: string | null;
-          max_days?: number;
+          max_days_per_year?: number;
+          is_accumulative?: boolean;
+          conditions?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -156,35 +200,44 @@ export interface Database {
       leave_balances: {
         Row: {
           id: string;
-          user_id: string;
+          employee_id: string;
           leave_type_id: string;
-          year: number;
+          fiscal_year: number;
           total_days: number;
           used_days: number;
+          remaining_days: number;
+          accumulated_days: number;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
-          user_id: string;
+          employee_id: string;
           leave_type_id: string;
-          year: number;
+          fiscal_year: number;
           total_days: number;
           used_days?: number;
+          remaining_days?: number;
+          accumulated_days?: number;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          employee_id?: string;
           leave_type_id?: string;
-          year?: number;
+          fiscal_year?: number;
           total_days?: number;
           used_days?: number;
+          remaining_days?: number;
+          accumulated_days?: number;
           created_at?: string;
+          updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "leave_balances_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "leave_balances_employee_id_fkey";
+            columns: ["employee_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -197,58 +250,62 @@ export interface Database {
         ];
       };
 
-      // ─── Step 3 Tables ───────────────────────────────────────────
-
       leave_requests: {
         Row: {
           id: string;
-          user_id: string;
+          employee_id: string;
           leave_type_id: string;
           start_date: string;
           end_date: string;
           total_days: number;
           reason: string | null;
+          contact_number: string | null;
+          medical_cert_url: string | null;
+          expected_delivery_date: string | null;
+          submission_channel: string | null;
           status: "pending" | "approved" | "rejected" | "cancelled";
-          approved_by: string | null;
-          approved_at: string | null;
-          rejection_reason: string | null;
+          approver_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          user_id: string;
+          employee_id: string;
           leave_type_id: string;
           start_date: string;
           end_date: string;
           total_days: number;
           reason?: string | null;
+          contact_number?: string | null;
+          medical_cert_url?: string | null;
+          expected_delivery_date?: string | null;
+          submission_channel?: string | null;
           status?: "pending" | "approved" | "rejected" | "cancelled";
-          approved_by?: string | null;
-          approved_at?: string | null;
-          rejection_reason?: string | null;
+          approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          employee_id?: string;
           leave_type_id?: string;
           start_date?: string;
           end_date?: string;
           total_days?: number;
           reason?: string | null;
+          contact_number?: string | null;
+          medical_cert_url?: string | null;
+          expected_delivery_date?: string | null;
+          submission_channel?: string | null;
           status?: "pending" | "approved" | "rejected" | "cancelled";
-          approved_by?: string | null;
-          approved_at?: string | null;
-          rejection_reason?: string | null;
+          approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "leave_requests_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "leave_requests_employee_id_fkey";
+            columns: ["employee_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -259,8 +316,8 @@ export interface Database {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "leave_requests_approved_by_fkey";
-            columns: ["approved_by"];
+            foreignKeyName: "leave_requests_approver_id_fkey";
+            columns: ["approver_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -269,42 +326,54 @@ export interface Database {
 
       leave_vacation_details: {
         Row: {
-          id: string;
-          leave_request_id: string;
-          destination: string | null;
-          contact_number: string | null;
-          emergency_contact: string | null;
-          delegation_to: string | null;
-          created_at: string;
+          request_id: string;
+          accumulated_days: number;
+          annual_days: number;
+          substitute_1_id: string | null;
+          substitute_2_id: string | null;
+          substitute_3_id: string | null;
+          branch_head_opinion: string | null;
         };
         Insert: {
-          id?: string;
-          leave_request_id: string;
-          destination?: string | null;
-          contact_number?: string | null;
-          emergency_contact?: string | null;
-          delegation_to?: string | null;
-          created_at?: string;
+          request_id: string;
+          accumulated_days: number;
+          annual_days: number;
+          substitute_1_id?: string | null;
+          substitute_2_id?: string | null;
+          substitute_3_id?: string | null;
+          branch_head_opinion?: string | null;
         };
         Update: {
-          id?: string;
-          leave_request_id?: string;
-          destination?: string | null;
-          contact_number?: string | null;
-          emergency_contact?: string | null;
-          delegation_to?: string | null;
-          created_at?: string;
+          request_id?: string;
+          accumulated_days?: number;
+          annual_days?: number;
+          substitute_1_id?: string | null;
+          substitute_2_id?: string | null;
+          substitute_3_id?: string | null;
+          branch_head_opinion?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "leave_vacation_details_leave_request_id_fkey";
-            columns: ["leave_request_id"];
+            foreignKeyName: "leave_vacation_details_request_id_fkey";
+            columns: ["request_id"];
             referencedRelation: "leave_requests";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "leave_vacation_details_delegation_to_fkey";
-            columns: ["delegation_to"];
+            foreignKeyName: "leave_vacation_details_substitute_1_id_fkey";
+            columns: ["substitute_1_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leave_vacation_details_substitute_2_id_fkey";
+            columns: ["substitute_2_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leave_vacation_details_substitute_3_id_fkey";
+            columns: ["substitute_3_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -314,59 +383,62 @@ export interface Database {
       travel_requests: {
         Row: {
           id: string;
-          user_id: string;
-          destination: string;
-          purpose: string;
+          employee_id: string;
+          travel_type: string;
+          title: string;
+          location: string;
           start_date: string;
           end_date: string;
+          total_days: number;
+          submission_channel: string | null;
           status: "pending" | "approved" | "rejected" | "cancelled" | "completed";
-          approved_by: string | null;
-          approved_at: string | null;
-          rejection_reason: string | null;
-          notes: string | null;
+          approver_id: string | null;
+          order_document_url: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
-          user_id: string;
-          destination: string;
-          purpose: string;
+          employee_id: string;
+          travel_type: string;
+          title: string;
+          location: string;
           start_date: string;
           end_date: string;
+          total_days: number;
+          submission_channel?: string | null;
           status?: "pending" | "approved" | "rejected" | "cancelled" | "completed";
-          approved_by?: string | null;
-          approved_at?: string | null;
-          rejection_reason?: string | null;
-          notes?: string | null;
+          approver_id?: string | null;
+          order_document_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
-          destination?: string;
-          purpose?: string;
+          employee_id?: string;
+          travel_type?: string;
+          title?: string;
+          location?: string;
           start_date?: string;
           end_date?: string;
+          total_days?: number;
+          submission_channel?: string | null;
           status?: "pending" | "approved" | "rejected" | "cancelled" | "completed";
-          approved_by?: string | null;
-          approved_at?: string | null;
-          rejection_reason?: string | null;
-          notes?: string | null;
+          approver_id?: string | null;
+          order_document_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "travel_requests_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "travel_requests_employee_id_fkey";
+            columns: ["employee_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "travel_requests_approved_by_fkey";
-            columns: ["approved_by"];
+            foreignKeyName: "travel_requests_approver_id_fkey";
+            columns: ["approver_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -377,35 +449,26 @@ export interface Database {
         Row: {
           id: string;
           travel_request_id: string;
-          category: string;
-          description: string | null;
+          expense_category: string;
           estimated_amount: number;
           actual_amount: number | null;
-          receipt_url: string | null;
           created_at: string;
-          updated_at: string;
         };
         Insert: {
           id?: string;
           travel_request_id: string;
-          category: string;
-          description?: string | null;
+          expense_category: string;
           estimated_amount: number;
           actual_amount?: number | null;
-          receipt_url?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
         Update: {
           id?: string;
           travel_request_id?: string;
-          category?: string;
-          description?: string | null;
+          expense_category?: string;
           estimated_amount?: number;
           actual_amount?: number | null;
-          receipt_url?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
         Relationships: [
           {
@@ -420,130 +483,78 @@ export interface Database {
       document_tracking: {
         Row: {
           id: string;
-          title: string;
-          document_number: string;
-          from_department_id: string | null;
-          to_department_id: string | null;
-          status: "draft" | "in_progress" | "completed" | "cancelled";
-          priority: "low" | "medium" | "high" | "urgent";
-          created_by: string;
-          assigned_to: string | null;
-          due_date: string | null;
+          reference_id: string;
+          document_type: string;
+          sent_for_signature_date: string | null;
+          returned_date: string | null;
+          scanned_upload_date: string | null;
+          sent_to_agency_date: string | null;
           notes: string | null;
-          file_url: string | null;
-          created_at: string;
-          updated_at: string;
         };
         Insert: {
           id?: string;
-          title: string;
-          document_number: string;
-          from_department_id?: string | null;
-          to_department_id?: string | null;
-          status?: "draft" | "in_progress" | "completed" | "cancelled";
-          priority?: "low" | "medium" | "high" | "urgent";
-          created_by: string;
-          assigned_to?: string | null;
-          due_date?: string | null;
+          reference_id: string;
+          document_type: string;
+          sent_for_signature_date?: string | null;
+          returned_date?: string | null;
+          scanned_upload_date?: string | null;
+          sent_to_agency_date?: string | null;
           notes?: string | null;
-          file_url?: string | null;
-          created_at?: string;
-          updated_at?: string;
         };
         Update: {
           id?: string;
-          title?: string;
-          document_number?: string;
-          from_department_id?: string | null;
-          to_department_id?: string | null;
-          status?: "draft" | "in_progress" | "completed" | "cancelled";
-          priority?: "low" | "medium" | "high" | "urgent";
-          created_by?: string;
-          assigned_to?: string | null;
-          due_date?: string | null;
+          reference_id?: string;
+          document_type?: string;
+          sent_for_signature_date?: string | null;
+          returned_date?: string | null;
+          scanned_upload_date?: string | null;
+          sent_to_agency_date?: string | null;
           notes?: string | null;
-          file_url?: string | null;
-          created_at?: string;
-          updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "document_tracking_from_department_id_fkey";
-            columns: ["from_department_id"];
-            referencedRelation: "departments";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "document_tracking_to_department_id_fkey";
-            columns: ["to_department_id"];
-            referencedRelation: "departments";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "document_tracking_created_by_fkey";
-            columns: ["created_by"];
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "document_tracking_assigned_to_fkey";
-            columns: ["assigned_to"];
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
 
       employee_trainings: {
         Row: {
           id: string;
-          user_id: string;
-          training_name: string;
-          provider: string | null;
+          employee_id: string;
+          course_name: string;
+          training_type: string;
+          location: string | null;
           start_date: string;
           end_date: string;
-          status: "planned" | "in_progress" | "completed" | "cancelled";
-          certificate_url: string | null;
-          hours: number | null;
-          cost: number | null;
-          notes: string | null;
+          total_hours: number | null;
+          total_cost: number | null;
           created_at: string;
-          updated_at: string;
         };
         Insert: {
           id?: string;
-          user_id: string;
-          training_name: string;
-          provider?: string | null;
+          employee_id: string;
+          course_name: string;
+          training_type: string;
+          location?: string | null;
           start_date: string;
           end_date: string;
-          status?: "planned" | "in_progress" | "completed" | "cancelled";
-          certificate_url?: string | null;
-          hours?: number | null;
-          cost?: number | null;
-          notes?: string | null;
+          total_hours?: number | null;
+          total_cost?: number | null;
           created_at?: string;
-          updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
-          training_name?: string;
-          provider?: string | null;
+          employee_id?: string;
+          course_name?: string;
+          training_type?: string;
+          location?: string | null;
           start_date?: string;
           end_date?: string;
-          status?: "planned" | "in_progress" | "completed" | "cancelled";
-          certificate_url?: string | null;
-          hours?: number | null;
-          cost?: number | null;
-          notes?: string | null;
+          total_hours?: number | null;
+          total_cost?: number | null;
           created_at?: string;
-          updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "employee_trainings_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "employee_trainings_employee_id_fkey";
+            columns: ["employee_id"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -554,31 +565,25 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          title: string;
+          type: string;
           message: string;
-          type: "info" | "success" | "warning" | "error";
           is_read: boolean;
-          link: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          title: string;
+          type?: string;
           message: string;
-          type?: "info" | "success" | "warning" | "error";
           is_read?: boolean;
-          link?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          title?: string;
+          type?: string;
           message?: string;
-          type?: "info" | "success" | "warning" | "error";
           is_read?: boolean;
-          link?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -595,16 +600,23 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      get_my_role: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      is_hr_or_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_manager_or_above: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
     };
     Enums: {
       user_role: "admin" | "hr" | "manager" | "employee";
       profile_status: "pending" | "approved" | "rejected";
       request_status: "pending" | "approved" | "rejected" | "cancelled";
-      document_status: "draft" | "in_progress" | "completed" | "cancelled";
-      document_priority: "low" | "medium" | "high" | "urgent";
-      training_status: "planned" | "in_progress" | "completed" | "cancelled";
-      notification_type: "info" | "success" | "warning" | "error";
     };
     CompositeTypes: {
       [_ in never]: never;
