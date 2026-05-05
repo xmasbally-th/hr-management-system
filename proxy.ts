@@ -1,23 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "@/types/supabase";
 
-/**
- * Proxy refreshes the Supabase auth session on every request.
- *
- * Without this, a user's session token may expire while they have
- * tabs open, resulting in unexpected sign-outs. The proxy
- * reads the current session cookie, refreshes it with Supabase if
- * needed, and writes the updated cookie to the response.
- *
- * Important: This proxy does NOT protect routes — route
- * protection is handled by AuthGuard / layout-level checks.
- */
+const PUBLIC_ROUTES = ["/login", "/auth/callback"];
+const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/reports", "/dashboard/settings"];
+const MANAGER_ROUTES = ["/dashboard/approvals"];
+
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(
+  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    return NextResponse.next({ request });
+  }
+
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -29,9 +27,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -40,23 +36,59 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refresh the session — this is the primary purpose of this proxy.
-  // Do NOT remove this line. `getUser()` refreshes the session cookie
-  // if it has expired, ensuring the user stays logged in.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Not authenticated → redirect to login
+  if (!user && pathname.startsWith("/dashboard")) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Authenticated user on /login → redirect to dashboard
+  if (user && pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // RBAC route protection for dashboard routes
+  if (user && pathname.startsWith("/dashboard")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) return supabaseResponse;
+
+    // Rejected accounts
+    if (profile.status === "rejected") {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("error", "account_rejected");
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // HR/Admin-only routes
+    if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
+      if (profile.role !== "hr" && profile.role !== "admin") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
+
+    // Manager+ routes
+    if (MANAGER_ROUTES.some((route) => pathname.startsWith(route))) {
+      if (profile.role === "employee") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
+  }
 
   return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - Public assets (svg, png, jpg, etc.)
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
