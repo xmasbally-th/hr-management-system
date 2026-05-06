@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Bell, LogOut, User, Settings, Search, ChevronDown } from "lucide-react";
+import { Menu, LogOut, User, Settings, Search, ChevronDown } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -79,13 +80,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
         {/* Right cluster */}
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Notifications */}
-          <button
-            className="relative w-10 h-10 rounded-lg text-foreground/70 hover:bg-muted grid place-items-center"
-            aria-label="Notifications"
-          >
-            <Bell className="size-[19px]" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-destructive ring-2 ring-background animate-notif-pulse"></span>
-          </button>
+          <NotificationBell />
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-6 bg-border mx-1"></div>

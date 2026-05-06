@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { createNotification } from "./notification-actions";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -155,6 +156,17 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     }
   }
 
+  // Notify HR/Manager about new leave request
+  const { data: hrUsers } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("role", ["hr", "admin"]);
+  if (hrUsers) {
+    for (const hr of hrUsers) {
+      await createNotification(hr.id, "new_leave_request", "มีคำขอลาใหม่รอการอนุมัติ");
+    }
+  }
+
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
   revalidatePath("/dashboard/approvals/leaves");
@@ -229,6 +241,12 @@ export async function approveLeaveRequest(requestId: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
+  const { data: requestData } = await supabase
+    .from("leave_requests")
+    .select("employee_id")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("leave_requests")
     .update({
@@ -238,6 +256,10 @@ export async function approveLeaveRequest(requestId: string) {
     .eq("id", requestId);
 
   if (error) throw new Error("ไม่สามารถอนุมัติคำขอลาได้");
+
+  if (requestData) {
+    await createNotification(requestData.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
+  }
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
@@ -253,6 +275,12 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
+  const { data: requestData } = await supabase
+    .from("leave_requests")
+    .select("employee_id")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("leave_requests")
     .update({
@@ -263,6 +291,10 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
     .eq("id", requestId);
 
   if (error) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้");
+
+  if (requestData) {
+    await createNotification(requestData.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
+  }
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");

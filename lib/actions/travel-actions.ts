@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { createNotification } from "./notification-actions";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -112,6 +113,17 @@ export async function createTravelRequest(input: CreateTravelRequestInput) {
     }
   }
 
+  // Notify HR/Manager about new travel request
+  const { data: hrUsers } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("role", ["hr", "admin"]);
+  if (hrUsers) {
+    for (const hr of hrUsers) {
+      await createNotification(hr.id, "new_travel_request", "มีคำขอเดินทางราชการใหม่รอการอนุมัติ");
+    }
+  }
+
   revalidatePath("/dashboard/travel");
   revalidatePath("/dashboard/hr/travel");
   revalidatePath("/dashboard/approvals/travel");
@@ -182,6 +194,12 @@ export async function approveTravelRequest(requestId: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
+  const { data: requestData } = await supabase
+    .from("travel_requests")
+    .select("employee_id")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("travel_requests")
     .update({
@@ -191,6 +209,10 @@ export async function approveTravelRequest(requestId: string) {
     .eq("id", requestId);
 
   if (error) throw new Error("ไม่สามารถอนุมัติคำขอเดินทางได้");
+
+  if (requestData) {
+    await createNotification(requestData.employee_id, "travel_approved", "คำขอเดินทางราชการของคุณได้รับการอนุมัติแล้ว");
+  }
 
   revalidatePath("/dashboard/travel");
   revalidatePath("/dashboard/hr/travel");
@@ -206,6 +228,12 @@ export async function rejectTravelRequest(requestId: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
+  const { data: requestData } = await supabase
+    .from("travel_requests")
+    .select("employee_id")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("travel_requests")
     .update({
@@ -215,6 +243,10 @@ export async function rejectTravelRequest(requestId: string) {
     .eq("id", requestId);
 
   if (error) throw new Error("ไม่สามารถปฏิเสธคำขอเดินทางได้");
+
+  if (requestData) {
+    await createNotification(requestData.employee_id, "travel_rejected", "คำขอเดินทางราชการของคุณไม่ได้รับการอนุมัติ");
+  }
 
   revalidatePath("/dashboard/travel");
   revalidatePath("/dashboard/hr/travel");
