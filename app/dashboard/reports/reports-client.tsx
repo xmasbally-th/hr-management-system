@@ -26,8 +26,11 @@ import {
   CalendarDays,
   Plane,
   X,
+  Download,
 } from "lucide-react";
 import { getCalendarEvents } from "@/lib/actions/report-actions";
+import { exportLeaveRequests, exportTravelRequests } from "@/lib/actions/export-actions";
+import { downloadCsv } from "@/lib/export-utils";
 
 // ── Types ──
 
@@ -78,6 +81,27 @@ export function ReportsClient({
   initialMonth,
 }: ReportsProps) {
   const [chartMode, setChartMode] = useState<"bar" | "pie">("bar");
+  const [isExporting, startExport] = useTransition();
+
+  function handleExportLeaves() {
+    startExport(async () => {
+      const data = await exportLeaveRequests();
+      downloadCsv("leave-requests.csv",
+        ["ชื่อ-สกุล", "ประเภทลา", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "เหตุผล", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
+        data.map((r) => [r.name, r.leaveType, r.startDate, r.endDate, r.totalDays.toString(), r.reason, r.status, r.channel, r.createdAt])
+      );
+    });
+  }
+
+  function handleExportTravel() {
+    startExport(async () => {
+      const data = await exportTravelRequests();
+      downloadCsv("travel-requests.csv",
+        ["ชื่อ-สกุล", "ประเภท", "เรื่อง", "สถานที่", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "งบประมาณ", "เบิกจ่ายจริง", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
+        data.map((r) => [r.name, r.travelType, r.title, r.location, r.startDate, r.endDate, r.totalDays.toString(), r.estimatedBudget.toString(), r.actualBudget.toString(), r.status, r.channel, r.createdAt])
+      );
+    });
+  }
 
   const totalLeaves = leaveByType.reduce((acc, r) => acc + r.pending + r.approved + r.rejected, 0);
   const pieData = leaveByType.map((r) => ({
@@ -95,11 +119,21 @@ export function ReportsClient({
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <SummaryCard title="คำขอลาทั้งหมด" value={totalLeaves.toString()} sub="รายการ" />
-        <SummaryCard title="งบประมาณเดินทาง (ประมาณ)" value={`฿${formatCurrency(totalEstimated)}`} sub="บาท" />
-        <SummaryCard title="งบเบิกจ่ายจริง" value={`฿${formatCurrency(totalActual)}`} sub="บาท" />
+      {/* Summary cards + export */}
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+          <SummaryCard title="คำขอลาทั้งหมด" value={totalLeaves.toString()} sub="รายการ" />
+          <SummaryCard title="งบประมาณเดินทาง (ประมาณ)" value={`฿${formatCurrency(totalEstimated)}`} sub="บาท" />
+          <SummaryCard title="งบเบิกจ่ายจริง" value={`฿${formatCurrency(totalActual)}`} sub="บาท" />
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExportLeaves} disabled={isExporting}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> ส่งออกลา
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportTravel} disabled={isExporting}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> ส่งออกเดินทาง
+          </Button>
+        </div>
       </div>
 
       {/* Row 1: Leave stats (merged bar+pie) + Monthly trend */}
