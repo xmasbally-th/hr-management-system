@@ -26,7 +26,7 @@ export async function exportEmployees() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, phone, role, status, position_number, position_title, employee_type, department_id, departments(name), hire_date, created_at")
+    .select("full_name, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, phone, status, position_number, position_title, employee_type, department_id, departments(name), hire_date")
     .order("full_name");
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลพนักงานได้");
@@ -41,14 +41,12 @@ export async function exportEmployees() {
     lastNameEn: p.last_name_en ?? "",
     email: p.email ?? "",
     phone: p.phone ?? "",
-    role: p.role,
     status: p.status,
     positionNumber: p.position_number ?? "",
     positionTitle: p.position_title ?? "",
     department: (p.departments as { name: string } | null)?.name ?? "",
     employeeType: p.employee_type ?? "",
     hireDate: p.hire_date ?? "",
-    createdAt: p.created_at,
   }));
 }
 
@@ -59,7 +57,7 @@ export async function exportLeaveRequests() {
 
   const { data, error } = await supabase
     .from("leave_requests")
-    .select("id, start_date, end_date, total_days, reason, status, submission_channel, created_at, leave_types(name), profiles!leave_requests_employee_id_fkey(full_name)")
+    .select("id, start_date, end_date, total_days, status, submission_channel, created_at, leave_types(name), profiles!leave_requests_employee_id_fkey(full_name)")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลการลาได้");
@@ -72,7 +70,6 @@ export async function exportLeaveRequests() {
       startDate: r.start_date,
       endDate: r.end_date,
       totalDays: r.total_days,
-      reason: r.reason ?? "",
       status: r.status,
       channel: r.submission_channel ?? "online",
       createdAt: r.created_at,

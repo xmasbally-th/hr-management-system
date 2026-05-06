@@ -307,12 +307,33 @@ export async function completeTravelRequest(requestId: string) {
 }
 
 export async function updateActualExpense(expenseId: string, actualAmount: number) {
+  if (!UUID_RE.test(expenseId)) throw new Error("รหัสค่าใช้จ่ายไม่ถูกต้อง");
+  if (!Number.isFinite(actualAmount) || actualAmount < 0) {
+    throw new Error("จำนวนเงินต้องเป็นตัวเลขที่ไม่ติดลบ");
+  }
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
     throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  const { data: expense } = await supabase
+    .from("travel_expenses")
+    .select("travel_request_id")
+    .eq("id", expenseId)
+    .single();
+  if (!expense) throw new Error("ไม่พบรายการค่าใช้จ่าย");
+
+  const { data: request } = await supabase
+    .from("travel_requests")
+    .select("status")
+    .eq("id", expense.travel_request_id)
+    .single();
+  if (!request || !["approved", "completed"].includes(request.status)) {
+    throw new Error("ไม่สามารถบันทึกค่าใช้จ่ายจริงได้ (สถานะคำขอไม่เหมาะสม)");
   }
 
   const { error } = await supabase

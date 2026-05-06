@@ -61,7 +61,11 @@ export async function proxy(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (!profile) return supabaseResponse;
+    if (!profile) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("error", "no_profile");
+      return NextResponse.redirect(loginUrl);
+    }
 
     // Rejected accounts
     if (profile.status === "rejected") {

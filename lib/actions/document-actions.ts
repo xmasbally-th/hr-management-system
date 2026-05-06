@@ -62,7 +62,24 @@ export async function getMyDocuments() {
 
 export async function getDocumentsByReference(referenceId: string) {
   const supabase = await createClient();
-  await getAuthUser(supabase);
+  const user = await getAuthUser(supabase);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const isHrOrAdmin = profile?.role === "hr" || profile?.role === "admin";
+
+  if (!isHrOrAdmin) {
+    const [leaveRes, travelRes] = await Promise.all([
+      supabase.from("leave_requests").select("id").eq("id", referenceId).eq("employee_id", user.id),
+      supabase.from("travel_requests").select("id").eq("id", referenceId).eq("employee_id", user.id),
+    ]);
+    const owns = (leaveRes.data?.length ?? 0) > 0 || (travelRes.data?.length ?? 0) > 0;
+    if (!owns) throw new Error("Forbidden: ไม่มีสิทธิ์ดูเอกสารนี้");
+  }
 
   const { data, error } = await supabase
     .from("document_tracking")

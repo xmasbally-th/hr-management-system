@@ -83,14 +83,14 @@ export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, sys
       if (type === "employees") {
         const data = await exportEmployees();
         downloadCsv("employees.csv",
-          ["ชื่อเต็ม", "คำนำหน้า(TH)", "ชื่อ(TH)", "นามสกุล(TH)", "คำนำหน้า(EN)", "ชื่อ(EN)", "นามสกุล(EN)", "อีเมล", "โทรศัพท์", "บทบาท", "สถานะ", "เลขที่ตำแหน่ง", "ตำแหน่ง", "แผนก", "ประเภทพนักงาน", "วันเริ่มงาน", "วันที่สร้าง"],
-          data.map((p) => [p.fullName, p.titleTh, p.firstNameTh, p.lastNameTh, p.titleEn, p.firstNameEn, p.lastNameEn, p.email, p.phone, p.role, p.status, p.positionNumber, p.positionTitle, p.department, p.employeeType, p.hireDate, p.createdAt])
+          ["ชื่อเต็ม", "คำนำหน้า(TH)", "ชื่อ(TH)", "นามสกุล(TH)", "คำนำหน้า(EN)", "ชื่อ(EN)", "นามสกุล(EN)", "อีเมล", "โทรศัพท์", "สถานะ", "เลขที่ตำแหน่ง", "ตำแหน่ง", "แผนก", "ประเภทพนักงาน", "วันเริ่มงาน"],
+          data.map((p) => [p.fullName, p.titleTh, p.firstNameTh, p.lastNameTh, p.titleEn, p.firstNameEn, p.lastNameEn, p.email, p.phone, p.status, p.positionNumber, p.positionTitle, p.department, p.employeeType, p.hireDate])
         );
       } else if (type === "leaves") {
         const data = await exportLeaveRequests();
         downloadCsv("leave-requests.csv",
-          ["ชื่อ-สกุล", "ประเภทลา", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "เหตุผล", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
-          data.map((r) => [r.name, r.leaveType, r.startDate, r.endDate, r.totalDays.toString(), r.reason, r.status, r.channel, r.createdAt])
+          ["ชื่อ-สกุล", "ประเภทลา", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
+          data.map((r) => [r.name, r.leaveType, r.startDate, r.endDate, r.totalDays.toString(), r.status, r.channel, r.createdAt])
         );
       } else {
         const data = await exportTravelRequests();

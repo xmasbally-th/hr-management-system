@@ -87,8 +87,8 @@ export function ReportsClient({
     startExport(async () => {
       const data = await exportLeaveRequests();
       downloadCsv("leave-requests.csv",
-        ["ชื่อ-สกุล", "ประเภทลา", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "เหตุผล", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
-        data.map((r) => [r.name, r.leaveType, r.startDate, r.endDate, r.totalDays.toString(), r.reason, r.status, r.channel, r.createdAt])
+        ["ชื่อ-สกุล", "ประเภทลา", "วันเริ่ม", "วันสิ้นสุด", "จำนวนวัน", "สถานะ", "ช่องทาง", "วันที่ยื่น"],
+        data.map((r) => [r.name, r.leaveType, r.startDate, r.endDate, r.totalDays.toString(), r.status, r.channel, r.createdAt])
       );
     });
   }
