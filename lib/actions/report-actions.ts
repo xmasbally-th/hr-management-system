@@ -188,6 +188,67 @@ export async function getRecentActivity() {
   return activities.slice(0, 10);
 }
 
+export async function getCalendarEvents(year: number, month: number) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endOfMonth = new Date(year, month, 0);
+  const endStr = `${year}-${String(month).padStart(2, "0")}-${String(endOfMonth.getDate()).padStart(2, "0")}`;
+
+  const [leaveRes, travelRes] = await Promise.all([
+    supabase
+      .from("leave_requests")
+      .select("id, start_date, end_date, status, leave_types(name), profiles!leave_requests_employee_id_fkey(first_name_th, last_name_th)")
+      .or(`and(start_date.lte.${endStr},end_date.gte.${startOfMonth})`)
+      .in("status", ["pending", "approved"]),
+    supabase
+      .from("travel_requests")
+      .select("id, start_date, end_date, status, travel_type, location, profiles!travel_requests_employee_id_fkey(first_name_th, last_name_th)")
+      .or(`and(start_date.lte.${endStr},end_date.gte.${startOfMonth})`)
+      .in("status", ["pending", "approved"]),
+  ]);
+
+  const events: {
+    id: string;
+    type: "leave" | "travel";
+    label: string;
+    person: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+  }[] = [];
+
+  for (const r of leaveRes.data ?? []) {
+    const p = r.profiles as { first_name_th: string; last_name_th: string } | null;
+    events.push({
+      id: r.id,
+      type: "leave",
+      label: (r.leave_types as { name: string } | null)?.name ?? "ลา",
+      person: p ? `${p.first_name_th} ${p.last_name_th}` : "",
+      status: r.status,
+      startDate: r.start_date,
+      endDate: r.end_date,
+    });
+  }
+
+  for (const r of travelRes.data ?? []) {
+    const p = r.profiles as { first_name_th: string; last_name_th: string } | null;
+    events.push({
+      id: r.id,
+      type: "travel",
+      label: r.location,
+      person: p ? `${p.first_name_th} ${p.last_name_th}` : "",
+      status: r.status,
+      startDate: r.start_date,
+      endDate: r.end_date,
+    });
+  }
+
+  return events;
+}
+
 async function checkHrAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data: profile } = await supabase
     .from("profiles")
