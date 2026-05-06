@@ -4,6 +4,21 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "./notification-actions";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateRequestDates(startDate: string, endDate: string, totalDays: number) {
+  if (!ISO_DATE_RE.test(startDate) || !ISO_DATE_RE.test(endDate)) {
+    throw new Error("รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)");
+  }
+  if (startDate > endDate) {
+    throw new Error("วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด");
+  }
+  if (!Number.isFinite(totalDays) || totalDays <= 0) {
+    throw new Error("จำนวนวันต้องมากกว่า 0");
+  }
+}
+
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized: Please log in");
@@ -17,6 +32,19 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>, us
     .eq("id", userId)
     .single();
   return profile;
+}
+
+async function validateEmployeeExists(supabase: Awaited<ReturnType<typeof createClient>>, employeeId: string) {
+  if (!UUID_RE.test(employeeId)) {
+    throw new Error("รหัสพนักงานไม่ถูกต้อง");
+  }
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", employeeId)
+    .eq("status", "approved")
+    .single();
+  if (!data) throw new Error("ไม่พบพนักงานในระบบ หรือบัญชียังไม่ได้รับการอนุมัติ");
 }
 
 export async function getLeaveTypes() {
@@ -112,6 +140,11 @@ export interface CreateLeaveRequestInput {
 }
 
 export async function createLeaveRequest(input: CreateLeaveRequestInput) {
+  if (!UUID_RE.test(input.leave_type_id)) {
+    throw new Error("รหัสประเภทลาไม่ถูกต้อง");
+  }
+  validateRequestDates(input.start_date, input.end_date, input.total_days);
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
 
@@ -135,7 +168,7 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
 
   if (error) {
     console.error("[leave-actions] Failed to create leave request:", error);
-    throw new Error("ไม่สามารถส่งคำขอลาได้: " + error.message);
+    throw new Error("ไม่สามารถส่งคำขอลาได้");
   }
 
   if (input.vacation_details && request) {
@@ -177,6 +210,11 @@ export async function createLeaveRequestByHr(
   employeeId: string,
   input: Omit<CreateLeaveRequestInput, "submission_channel">
 ) {
+  if (!UUID_RE.test(input.leave_type_id)) {
+    throw new Error("รหัสประเภทลาไม่ถูกต้อง");
+  }
+  validateRequestDates(input.start_date, input.end_date, input.total_days);
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   const profile = await getProfile(supabase, user.id);
@@ -184,6 +222,8 @@ export async function createLeaveRequestByHr(
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
     throw new Error("Forbidden: Insufficient permissions");
   }
+
+  await validateEmployeeExists(supabase, employeeId);
 
   const { data: request, error } = await supabase
     .from("leave_requests")
@@ -205,7 +245,7 @@ export async function createLeaveRequestByHr(
 
   if (error) {
     console.error("[leave-actions] HR create leave failed:", error);
-    throw new Error("ไม่สามารถส่งคำขอลาแทนพนักงานได้: " + error.message);
+    throw new Error("ไม่สามารถส่งคำขอลาแทนพนักงานได้");
   }
 
   if (input.vacation_details && request) {
@@ -233,6 +273,8 @@ export async function createLeaveRequestByHr(
 }
 
 export async function approveLeaveRequest(requestId: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   const profile = await getProfile(supabase, user.id);
@@ -241,25 +283,20 @@ export async function approveLeaveRequest(requestId: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
-  const { data: requestData } = await supabase
-    .from("leave_requests")
-    .select("employee_id")
-    .eq("id", requestId)
-    .single();
-
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("leave_requests")
     .update({
       status: "approved",
       approver_id: user.id,
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .select("employee_id")
+    .single();
 
-  if (error) throw new Error("ไม่สามารถอนุมัติคำขอลาได้");
+  if (error || !updated) throw new Error("ไม่สามารถอนุมัติคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
 
-  if (requestData) {
-    await createNotificationInternal(supabase, requestData.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
-  }
+  await createNotificationInternal(supabase, updated.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
@@ -267,6 +304,8 @@ export async function approveLeaveRequest(requestId: string) {
 }
 
 export async function rejectLeaveRequest(requestId: string, reason?: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   const profile = await getProfile(supabase, user.id);
@@ -275,26 +314,21 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
-  const { data: requestData } = await supabase
-    .from("leave_requests")
-    .select("employee_id")
-    .eq("id", requestId)
-    .single();
-
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("leave_requests")
     .update({
       status: "rejected" as const,
       approver_id: user.id,
       ...(reason ? { reason } : {}),
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .select("employee_id")
+    .single();
 
-  if (error) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้");
+  if (error || !updated) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
 
-  if (requestData) {
-    await createNotificationInternal(supabase, requestData.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
-  }
+  await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
