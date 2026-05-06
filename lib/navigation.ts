@@ -129,7 +129,7 @@ export const navigationGroups: NavGroup[] = [
         title: "รายงาน",
         href: "/dashboard/reports",
         icon: "BarChart3",
-        roles: ["admin", "hr"],
+        roles: ["admin", "hr", "manager"],
       },
       {
         title: "ตั้งค่าองค์กร (Master Data)",

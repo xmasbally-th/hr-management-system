@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "./notification-actions";
+import { createNotificationInternal } from "./notification-actions";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -163,7 +163,7 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     .in("role", ["hr", "admin"]);
   if (hrUsers) {
     for (const hr of hrUsers) {
-      await createNotification(hr.id, "new_leave_request", "มีคำขอลาใหม่รอการอนุมัติ");
+      await createNotificationInternal(supabase, hr.id, "new_leave_request", "มีคำขอลาใหม่รอการอนุมัติ");
     }
   }
 
@@ -258,7 +258,7 @@ export async function approveLeaveRequest(requestId: string) {
   if (error) throw new Error("ไม่สามารถอนุมัติคำขอลาได้");
 
   if (requestData) {
-    await createNotification(requestData.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
+    await createNotificationInternal(supabase, requestData.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
   }
 
   revalidatePath("/dashboard/leaves");
@@ -293,7 +293,7 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
   if (error) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้");
 
   if (requestData) {
-    await createNotification(requestData.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
+    await createNotificationInternal(supabase, requestData.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
   }
 
   revalidatePath("/dashboard/leaves");

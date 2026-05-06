@@ -35,13 +35,38 @@ export async function getLeaveTypeSettings() {
 }
 
 export async function updateLeaveType(id: string, updates: { name?: string; max_days_per_year?: number }) {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new Error("รหัสประเภทลาไม่ถูกต้อง");
+  }
+
+  const sanitized: { name?: string; max_days_per_year?: number } = {};
+
+  if (updates.name !== undefined) {
+    const trimmed = updates.name.trim();
+    if (trimmed.length === 0 || trimmed.length > 100) {
+      throw new Error("ชื่อประเภทลาต้องมี 1-100 ตัวอักษร");
+    }
+    sanitized.name = trimmed;
+  }
+
+  if (updates.max_days_per_year !== undefined) {
+    if (!Number.isInteger(updates.max_days_per_year) || updates.max_days_per_year < 0 || updates.max_days_per_year > 365) {
+      throw new Error("จำนวนวันต้องเป็นจำนวนเต็ม 0-365");
+    }
+    sanitized.max_days_per_year = updates.max_days_per_year;
+  }
+
+  if (Object.keys(sanitized).length === 0) {
+    throw new Error("ไม่มีข้อมูลที่ต้องอัปเดต");
+  }
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   await checkAdmin(supabase, user.id);
 
   const { error } = await supabase
     .from("leave_types")
-    .update(updates)
+    .update(sanitized)
     .eq("id", id);
 
   if (error) throw new Error("ไม่สามารถอัปเดตประเภทลาได้");

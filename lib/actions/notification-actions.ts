@@ -80,16 +80,34 @@ export async function deleteNotification(notificationId: string) {
   revalidatePath("/dashboard");
 }
 
+const ALLOWED_NOTIFICATION_TYPES = [
+  "new_leave_request",
+  "new_travel_request",
+  "leave_approved",
+  "leave_rejected",
+  "travel_approved",
+  "travel_rejected",
+] as const;
+
 /**
- * Creates a notification for a specific user.
- * Called internally from other server actions (leave/travel approval).
+ * Internal only — NOT exported as a server action.
+ * Called from leave-actions / travel-actions which already have auth context.
+ * Accepts a pre-authenticated supabase client to avoid re-auth round-trip.
  */
-export async function createNotification(
+export async function createNotificationInternal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
   targetUserId: string,
   type: string,
   message: string
 ) {
-  const supabase = await createClient();
+  if (!targetUserId || !ALLOWED_NOTIFICATION_TYPES.includes(type as typeof ALLOWED_NOTIFICATION_TYPES[number])) {
+    console.error("[notification-actions] Invalid notification params:", { targetUserId, type });
+    return;
+  }
+
+  if (message.length > 500) {
+    message = message.slice(0, 500);
+  }
 
   const { error } = await supabase
     .from("notifications")
@@ -101,6 +119,6 @@ export async function createNotification(
     });
 
   if (error) {
-    console.error("[notification-actions] Failed to create notification:", error);
+    console.error("[notification-actions] Failed to create notification:", error.message);
   }
 }

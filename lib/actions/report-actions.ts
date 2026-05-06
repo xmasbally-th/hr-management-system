@@ -9,12 +9,13 @@ async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 async function getRole(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", userId)
     .single();
-  return data?.role ?? "employee";
+  if (error || !data) throw new Error("ไม่พบข้อมูลผู้ใช้");
+  return data.role;
 }
 
 export async function getDashboardStats() {
@@ -77,7 +78,7 @@ export async function getLeaveBalanceSummary() {
 export async function getReportLeaveByType() {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
+  await checkManagerOrAbove(supabase, user.id);
 
   const { data } = await supabase
     .from("leave_requests")
@@ -98,7 +99,7 @@ export async function getReportLeaveByType() {
 export async function getReportTravelBudget() {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
+  await checkManagerOrAbove(supabase, user.id);
 
   const { data } = await supabase
     .from("travel_expenses")
@@ -118,7 +119,7 @@ export async function getReportTravelBudget() {
 export async function getReportMonthlyLeaves() {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
+  await checkManagerOrAbove(supabase, user.id);
 
   const year = new Date().getFullYear();
   const { data } = await supabase
@@ -191,7 +192,7 @@ export async function getRecentActivity() {
 export async function getCalendarEvents(year: number, month: number) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
+  await checkManagerOrAbove(supabase, user.id);
 
   const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
   const endOfMonth = new Date(year, month, 0);
@@ -249,13 +250,14 @@ export async function getCalendarEvents(year: number, month: number) {
   return events;
 }
 
-async function checkHrAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: profile } = await supabase
+async function checkManagerOrAbove(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", userId)
     .single();
-  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+  if (error) throw new Error("ไม่สามารถตรวจสอบสิทธิ์ได้");
+  if (!profile || !["manager", "hr", "admin"].includes(profile.role)) {
     throw new Error("Forbidden");
   }
 }

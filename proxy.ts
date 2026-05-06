@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/supabase";
 
 const PUBLIC_ROUTES = ["/login", "/auth/callback"];
-const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/reports", "/dashboard/settings"];
+const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/settings"];
+const MANAGER_PLUS_ROUTES = ["/dashboard/reports"];
 const MANAGER_ROUTES = ["/dashboard/approvals"];
 
 export async function proxy(request: NextRequest) {
@@ -76,9 +77,9 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    // Manager+ routes
-    if (MANAGER_ROUTES.some((route) => pathname.startsWith(route))) {
-      if (profile.role === "employee") {
+    // Manager+ routes (reports, approvals)
+    if ([...MANAGER_ROUTES, ...MANAGER_PLUS_ROUTES].some((route) => pathname.startsWith(route))) {
+      if (profile.role !== "manager" && profile.role !== "hr" && profile.role !== "admin") {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }

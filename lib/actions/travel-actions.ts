@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { createNotification } from "./notification-actions";
+import { createNotificationInternal } from "./notification-actions";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -120,7 +120,7 @@ export async function createTravelRequest(input: CreateTravelRequestInput) {
     .in("role", ["hr", "admin"]);
   if (hrUsers) {
     for (const hr of hrUsers) {
-      await createNotification(hr.id, "new_travel_request", "มีคำขอเดินทางราชการใหม่รอการอนุมัติ");
+      await createNotificationInternal(supabase, hr.id, "new_travel_request", "มีคำขอเดินทางราชการใหม่รอการอนุมัติ");
     }
   }
 
@@ -211,7 +211,7 @@ export async function approveTravelRequest(requestId: string) {
   if (error) throw new Error("ไม่สามารถอนุมัติคำขอเดินทางได้");
 
   if (requestData) {
-    await createNotification(requestData.employee_id, "travel_approved", "คำขอเดินทางราชการของคุณได้รับการอนุมัติแล้ว");
+    await createNotificationInternal(supabase, requestData.employee_id, "travel_approved", "คำขอเดินทางราชการของคุณได้รับการอนุมัติแล้ว");
   }
 
   revalidatePath("/dashboard/travel");
@@ -245,7 +245,7 @@ export async function rejectTravelRequest(requestId: string) {
   if (error) throw new Error("ไม่สามารถปฏิเสธคำขอเดินทางได้");
 
   if (requestData) {
-    await createNotification(requestData.employee_id, "travel_rejected", "คำขอเดินทางราชการของคุณไม่ได้รับการอนุมัติ");
+    await createNotificationInternal(supabase, requestData.employee_id, "travel_rejected", "คำขอเดินทางราชการของคุณไม่ได้รับการอนุมัติ");
   }
 
   revalidatePath("/dashboard/travel");
