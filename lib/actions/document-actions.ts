@@ -1,0 +1,186 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+
+async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  return user;
+}
+
+async function checkHrAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+}
+
+export async function getAllDocumentTracking() {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { data, error } = await supabase
+    .from("document_tracking")
+    .select("*")
+    .order("sent_for_signature_date", { ascending: false, nullsFirst: false });
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
+  return data;
+}
+
+export async function getMyDocuments() {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  const [leaveRes, travelRes] = await Promise.all([
+    supabase.from("leave_requests").select("id").eq("employee_id", user.id),
+    supabase.from("travel_requests").select("id").eq("employee_id", user.id),
+  ]);
+
+  const myRefIds = [
+    ...(leaveRes.data ?? []).map((r) => r.id),
+    ...(travelRes.data ?? []).map((r) => r.id),
+  ];
+
+  if (myRefIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("document_tracking")
+    .select("*")
+    .in("reference_id", myRefIds)
+    .order("sent_for_signature_date", { ascending: false, nullsFirst: false });
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
+  return data;
+}
+
+export async function getDocumentsByReference(referenceId: string) {
+  const supabase = await createClient();
+  await getAuthUser(supabase);
+
+  const { data, error } = await supabase
+    .from("document_tracking")
+    .select("*")
+    .eq("reference_id", referenceId)
+    .order("sent_for_signature_date", { ascending: false });
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
+  return data;
+}
+
+export interface CreateDocumentTrackingInput {
+  reference_id: string;
+  document_type: string;
+  notes?: string | null;
+}
+
+export async function createDocumentTracking(input: CreateDocumentTrackingInput) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .insert({
+      reference_id: input.reference_id,
+      document_type: input.document_type,
+      notes: input.notes ?? null,
+    });
+
+  if (error) {
+    console.error("[document-actions] Create failed:", error);
+    throw new Error("ไม่สามารถสร้างรายการติดตามเอกสารได้");
+  }
+
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function updateSentForSignature(docId: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .update({ sent_for_signature_date: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกวันที่ส่งลงนามได้");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function updateReturnedDate(docId: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .update({ returned_date: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกวันที่รับคืนได้");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function updateScannedDate(docId: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .update({ scanned_upload_date: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกวันที่สแกนได้");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function updateSentToAgency(docId: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .update({ sent_to_agency_date: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกวันที่ส่งหน่วยงานได้");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function updateDocumentNotes(docId: string, notes: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .update({ notes })
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกหมายเหตุได้");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function deleteDocumentTracking(docId: string) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("document_tracking")
+    .delete()
+    .eq("id", docId);
+
+  if (error) throw new Error("ไม่สามารถลบรายการเอกสารได้");
+  revalidatePath("/dashboard/hr/documents");
+}
