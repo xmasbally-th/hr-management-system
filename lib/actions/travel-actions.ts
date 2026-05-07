@@ -3,21 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "./notification-actions";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function validateRequestDates(startDate: string, endDate: string, totalDays: number) {
-  if (!ISO_DATE_RE.test(startDate) || !ISO_DATE_RE.test(endDate)) {
-    throw new Error("รูปแบบวันที่ไม่ถูกต้อง (ต้องเป็น YYYY-MM-DD)");
-  }
-  if (startDate > endDate) {
-    throw new Error("วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด");
-  }
-  if (!Number.isFinite(totalDays) || totalDays <= 0) {
-    throw new Error("จำนวนวันต้องมากกว่า 0");
-  }
-}
+import { UUID_RE, validateRequestDates, validateEmployeeExists } from "./validators";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -32,19 +18,6 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>, us
     .eq("id", userId)
     .single();
   return profile;
-}
-
-async function validateEmployeeExists(supabase: Awaited<ReturnType<typeof createClient>>, employeeId: string) {
-  if (!UUID_RE.test(employeeId)) {
-    throw new Error("รหัสพนักงานไม่ถูกต้อง");
-  }
-  const { data } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", employeeId)
-    .eq("status", "approved")
-    .single();
-  if (!data) throw new Error("ไม่พบพนักงานในระบบ หรือบัญชียังไม่ได้รับการอนุมัติ");
 }
 
 export async function getMyTravelRequests() {
