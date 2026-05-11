@@ -62,7 +62,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
     }
 
     if (totalDays <= 0) {
-      setError("วันที่สิ้นสุดต���องมากกว่าหรือเท่ากับวันที่เริ่ม");
+      setError("วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่ม");
       return;
     }
 
@@ -101,7 +101,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
         router.push("/dashboard/leaves");
       } catch (err: unknown) {
         if (err instanceof Error) setError(err.message);
-        else setError("เกิดข้อผิดพลาด กรุณาลองให���่");
+        else setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
       }
     });
   }
@@ -114,7 +114,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
 
       {/* Leave Type Selection */}
       <div className="space-y-2">
-        <Label>ป���ะเภทการลา *</Label>
+        <Label>ประเภทการลา *</Label>
         <Select value={leaveTypeId} onValueChange={(v) => setLeaveTypeId(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกประเภทการลา..." />
@@ -149,7 +149,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
         <Input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="ระบุเ���ตุผลการลา..."
+          placeholder="ระบุเหตุผลการลา..."
           disabled={isPending}
           required={isSick || (!isMaternity && !isVacation && !!leaveTypeId)}
         />
@@ -169,7 +169,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
       {/* Maternity-specific: Expected Delivery Date */}
       {isMaternity && (
         <div className="space-y-2">
-          <Label>���ันที่คาดว่าจะคลอด</Label>
+          <Label>วันที่คาดว่าจะคลอด</Label>
           <Input
             type="date"
             value={expectedDeliveryDate}
@@ -186,7 +186,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>วันสะสมจากปีก่อ���</Label>
+              <Label>วันสะสมจากปีก่อน</Label>
               <Input
                 type="number"
                 min="0"
@@ -213,7 +213,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
             <Label>ผู้ปฏิบัติหน้าที่แทนคนที่ 1</Label>
             <Select value={substitute1Id} onValueChange={(v) => setSubstitute1Id(v ?? "")} disabled={isPending}>
               <SelectTrigger>
-                <SelectValue placeholder="เลือกผู���ปฏิบัติแทน..." />
+                <SelectValue placeholder="เลือกผู้ปฏิบัติแทน..." />
               </SelectTrigger>
               <SelectContent>
                 {employees.map((emp) => (
@@ -227,7 +227,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
             <Label>ผู้ปฏิบัติหน้าที่แทนคนที่ 2</Label>
             <Select value={substitute2Id} onValueChange={(v) => setSubstitute2Id(v ?? "")} disabled={isPending}>
               <SelectTrigger>
-                <SelectValue placeholder="��ลือกผู้ปฏิบัติแทน (ถ้ามี)..." />
+                <SelectValue placeholder="เลือกผู้ปฏิบัติแทน (ถ้ามี)..." />
               </SelectTrigger>
               <SelectContent>
                 {employees.map((emp) => (
@@ -256,7 +256,7 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
             <Input
               value={branchHeadOpinion}
               onChange={(e) => setBranchHeadOpinion(e.target.value)}
-              placeholder="ความเห็นของหัว���น้าสาขา (ถ้ามี)"
+              placeholder="ความเห็นของหัวหน้าสาขา (ถ้ามี)"
               disabled={isPending}
             />
           </div>

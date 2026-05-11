@@ -130,8 +130,7 @@ describe("LeaveRequestForm", () => {
     renderForm();
     selectLeaveType("lt-3"); // ลาคลอด
 
-    // Source has encoding corruption on first char, use partial match
-    expect(screen.getByText(/คาดว่าจะคลอด/)).toBeInTheDocument();
+    expect(screen.getByText("วันที่คาดว่าจะคลอด")).toBeInTheDocument();
   });
 
   it("shows vacation fields when vacation type is selected", () => {
@@ -139,8 +138,7 @@ describe("LeaveRequestForm", () => {
     selectLeaveType("lt-4"); // ลาพักผ่อน
 
     expect(screen.getByText("ข้อมูลเพิ่มเติมสำหรับลาพักผ่อน")).toBeInTheDocument();
-    // "วันสะสมจากปีก่อน" has corrupted last char in source
-    expect(screen.getByText(/วันสะสมจากปีก่อ/)).toBeInTheDocument();
+    expect(screen.getByText("วันสะสมจากปีก่อน")).toBeInTheDocument();
     expect(screen.getByText("วันลาพักผ่อนประจำปี")).toBeInTheDocument();
     expect(screen.getByText("ความเห็นหัวหน้าสาขา")).toBeInTheDocument();
   });
