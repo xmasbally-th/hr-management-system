@@ -5,6 +5,8 @@ import {
   validateUUID,
   validateRequestDates,
   validateEmployeeExists,
+  sanitizeText,
+  validateTextField,
 } from "../validators";
 
 /* ================================================================
@@ -257,5 +259,79 @@ describe("validateEmployeeExists", () => {
     await expect(
       validateEmployeeExists(supabase as never, "")
     ).rejects.toThrow("รหัสพนักงานไม่ถูกต้อง");
+  });
+});
+
+/* ================================================================
+ * sanitizeText
+ * ================================================================ */
+describe("sanitizeText", () => {
+  it("strips HTML tags", () => {
+    expect(sanitizeText('<script>alert("xss")</script>Hello')).toBe('alert("xss")Hello');
+  });
+
+  it("strips nested HTML tags", () => {
+    expect(sanitizeText("<div><b>bold</b></div>")).toBe("bold");
+  });
+
+  it("trims whitespace", () => {
+    expect(sanitizeText("  hello world  ")).toBe("hello world");
+  });
+
+  it("handles empty string", () => {
+    expect(sanitizeText("")).toBe("");
+  });
+
+  it("returns plain text unchanged", () => {
+    expect(sanitizeText("ลาป่วย เนื่องจากไม่สบาย")).toBe("ลาป่วย เนื่องจากไม่สบาย");
+  });
+
+  it("strips self-closing tags", () => {
+    expect(sanitizeText("line1<br/>line2")).toBe("line1line2");
+  });
+});
+
+/* ================================================================
+ * validateTextField
+ * ================================================================ */
+describe("validateTextField", () => {
+  it("returns null for null input", () => {
+    expect(validateTextField(null, "test", 100)).toBeNull();
+  });
+
+  it("returns null for undefined input", () => {
+    expect(validateTextField(undefined, "test", 100)).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(validateTextField("", "test", 100)).toBeNull();
+  });
+
+  it("returns null for whitespace-only string", () => {
+    expect(validateTextField("   ", "test", 100)).toBeNull();
+  });
+
+  it("returns sanitized and trimmed string", () => {
+    expect(validateTextField("  hello  ", "test", 100)).toBe("hello");
+  });
+
+  it("strips HTML and returns cleaned text", () => {
+    expect(validateTextField("<b>bold</b> text", "test", 100)).toBe("bold text");
+  });
+
+  it("throws when sanitized text exceeds maxLength", () => {
+    const longText = "a".repeat(201);
+    expect(() => validateTextField(longText, "ชื่อเรื่อง", 200)).toThrow(
+      "ชื่อเรื่องต้องไม่เกิน 200 ตัวอักษร"
+    );
+  });
+
+  it("does not throw when text is exactly maxLength", () => {
+    const exactText = "a".repeat(200);
+    expect(validateTextField(exactText, "test", 200)).toBe(exactText);
+  });
+
+  it("handles Thai text correctly", () => {
+    expect(validateTextField("ลาป่วย เนื่องจากไข้หวัด", "เหตุผล", 1000)).toBe("ลาป่วย เนื่องจากไข้หวัด");
   });
 });

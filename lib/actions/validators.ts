@@ -42,6 +42,31 @@ export function validateRequestDates(
 }
 
 /**
+ * Strips HTML tags and trims whitespace to prevent stored XSS.
+ */
+export function sanitizeText(input: string): string {
+  return input.replace(/<[^>]*>/g, "").trim();
+}
+
+/**
+ * Validates string length and sanitizes input.
+ * Returns the sanitized string, or null if input is empty/null.
+ * Throws if the sanitized result exceeds maxLength.
+ */
+export function validateTextField(
+  value: string | null | undefined,
+  label: string,
+  maxLength: number,
+): string | null {
+  if (value == null || value.trim() === "") return null;
+  const sanitized = sanitizeText(value);
+  if (sanitized.length > maxLength) {
+    throw new Error(`${label}ต้องไม่เกิน ${maxLength} ตัวอักษร`);
+  }
+  return sanitized;
+}
+
+/**
  * Validates that the employee exists in profiles with status "approved".
  * Also validates UUID format before querying.
  */

@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "./notification-actions";
-import { UUID_RE, validateRequestDates, validateEmployeeExists } from "./validators";
+import { UUID_RE, validateRequestDates, validateEmployeeExists, validateTextField, sanitizeText } from "./validators";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit-log";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -76,16 +78,22 @@ export interface CreateTravelRequestInput {
 export async function createTravelRequest(input: CreateTravelRequestInput) {
   validateRequestDates(input.start_date, input.end_date, input.total_days);
 
+  const sanitizedTitle = validateTextField(input.title, "ชื่อเรื่อง", 200);
+  if (!sanitizedTitle) throw new Error("กรุณาระบุชื่อเรื่อง");
+  const sanitizedLocation = validateTextField(input.location, "สถานที่", 200);
+  if (!sanitizedLocation) throw new Error("กรุณาระบุสถานที่");
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
 
   const { data: request, error } = await supabase
     .from("travel_requests")
     .insert({
       employee_id: user.id,
       travel_type: input.travel_type,
-      title: input.title,
-      location: input.location,
+      title: sanitizedTitle,
+      location: sanitizedLocation,
       start_date: input.start_date,
       end_date: input.end_date,
       total_days: input.total_days,
@@ -103,7 +111,7 @@ export async function createTravelRequest(input: CreateTravelRequestInput) {
   if (input.expenses.length > 0 && request) {
     const expenseRows = input.expenses.map((exp) => ({
       travel_request_id: request.id,
-      expense_category: exp.expense_category,
+      expense_category: sanitizeText(exp.expense_category).substring(0, 100),
       estimated_amount: exp.estimated_amount,
     }));
 
@@ -139,8 +147,14 @@ export async function createTravelRequestByHr(
 ) {
   validateRequestDates(input.start_date, input.end_date, input.total_days);
 
+  const sanitizedTitle = validateTextField(input.title, "ชื่อเรื่อง", 200);
+  if (!sanitizedTitle) throw new Error("กรุณาระบุชื่อเรื่อง");
+  const sanitizedLocation = validateTextField(input.location, "สถานที่", 200);
+  if (!sanitizedLocation) throw new Error("กรุณาระบุสถานที่");
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
@@ -154,8 +168,8 @@ export async function createTravelRequestByHr(
     .insert({
       employee_id: employeeId,
       travel_type: input.travel_type,
-      title: input.title,
-      location: input.location,
+      title: sanitizedTitle,
+      location: sanitizedLocation,
       start_date: input.start_date,
       end_date: input.end_date,
       total_days: input.total_days,
@@ -173,7 +187,7 @@ export async function createTravelRequestByHr(
   if (input.expenses.length > 0 && request) {
     const expenseRows = input.expenses.map((exp) => ({
       travel_request_id: request.id,
-      expense_category: exp.expense_category,
+      expense_category: sanitizeText(exp.expense_category).substring(0, 100),
       estimated_amount: exp.estimated_amount,
     }));
 
@@ -197,6 +211,7 @@ export async function approveTravelRequest(requestId: string) {
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
@@ -216,6 +231,7 @@ export async function approveTravelRequest(requestId: string) {
 
   if (error || !updated) throw new Error("ไม่สามารถอนุมัติคำขอเดินทางได้ (อาจถูกดำเนินการแล้ว)");
 
+  await logAudit(supabase, user.id, "approve_travel", "travel_request", requestId);
   await createNotificationInternal(supabase, updated.employee_id, "travel_approved", "คำขอเดินทางราชการของคุณได้รับการอนุมัติแล้ว");
 
   revalidatePath("/dashboard/travel");
@@ -228,6 +244,7 @@ export async function rejectTravelRequest(requestId: string) {
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
@@ -247,6 +264,7 @@ export async function rejectTravelRequest(requestId: string) {
 
   if (error || !updated) throw new Error("ไม่สามารถปฏิเสธคำขอเดินทางได้ (อาจถูกดำเนินการแล้ว)");
 
+  await logAudit(supabase, user.id, "reject_travel", "travel_request", requestId);
   await createNotificationInternal(supabase, updated.employee_id, "travel_rejected", "คำขอเดินทางราชการของคุณไม่ได้รับการอนุมัติ");
 
   revalidatePath("/dashboard/travel");
@@ -259,6 +277,7 @@ export async function completeTravelRequest(requestId: string) {
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
@@ -287,6 +306,7 @@ export async function updateActualExpense(expenseId: string, actualAmount: numbe
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {

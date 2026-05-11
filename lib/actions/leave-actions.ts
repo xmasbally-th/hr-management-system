@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "./notification-actions";
-import { UUID_RE, validateRequestDates, validateEmployeeExists } from "./validators";
+import { UUID_RE, validateRequestDates, validateEmployeeExists, validateTextField } from "./validators";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit-log";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -118,8 +120,12 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
   }
   validateRequestDates(input.start_date, input.end_date, input.total_days);
 
+  const sanitizedReason = validateTextField(input.reason, "เหตุผล", 1000);
+  const sanitizedContact = validateTextField(input.contact_number, "เบอร์ติดต่อ", 20);
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
 
   const { data: request, error } = await supabase
     .from("leave_requests")
@@ -129,8 +135,8 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
       start_date: input.start_date,
       end_date: input.end_date,
       total_days: input.total_days,
-      reason: input.reason,
-      contact_number: input.contact_number,
+      reason: sanitizedReason,
+      contact_number: sanitizedContact,
       medical_cert_url: input.medical_cert_url ?? null,
       expected_delivery_date: input.expected_delivery_date ?? null,
       submission_channel: input.submission_channel,
@@ -145,6 +151,7 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
   }
 
   if (input.vacation_details && request) {
+    const sanitizedOpinion = validateTextField(input.vacation_details.branch_head_opinion, "ความเห็นหัวหน้า", 500);
     const { error: vacError } = await supabase
       .from("leave_vacation_details")
       .insert({
@@ -154,7 +161,7 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
         substitute_1_id: input.vacation_details.substitute_1_id,
         substitute_2_id: input.vacation_details.substitute_2_id,
         substitute_3_id: input.vacation_details.substitute_3_id,
-        branch_head_opinion: input.vacation_details.branch_head_opinion,
+        branch_head_opinion: sanitizedOpinion,
       });
 
     if (vacError) {
@@ -188,8 +195,12 @@ export async function createLeaveRequestByHr(
   }
   validateRequestDates(input.start_date, input.end_date, input.total_days);
 
+  const sanitizedReason = validateTextField(input.reason, "เหตุผล", 1000);
+  const sanitizedContact = validateTextField(input.contact_number, "เบอร์ติดต่อ", 20);
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
@@ -206,8 +217,8 @@ export async function createLeaveRequestByHr(
       start_date: input.start_date,
       end_date: input.end_date,
       total_days: input.total_days,
-      reason: input.reason,
-      contact_number: input.contact_number,
+      reason: sanitizedReason,
+      contact_number: sanitizedContact,
       medical_cert_url: input.medical_cert_url ?? null,
       expected_delivery_date: input.expected_delivery_date ?? null,
       submission_channel: "paper",
@@ -222,6 +233,7 @@ export async function createLeaveRequestByHr(
   }
 
   if (input.vacation_details && request) {
+    const sanitizedOpinion = validateTextField(input.vacation_details.branch_head_opinion, "ความเห็นหัวหน้า", 500);
     const { error: vacError } = await supabase
       .from("leave_vacation_details")
       .insert({
@@ -231,7 +243,7 @@ export async function createLeaveRequestByHr(
         substitute_1_id: input.vacation_details.substitute_1_id,
         substitute_2_id: input.vacation_details.substitute_2_id,
         substitute_3_id: input.vacation_details.substitute_3_id,
-        branch_head_opinion: input.vacation_details.branch_head_opinion,
+        branch_head_opinion: sanitizedOpinion,
       });
 
     if (vacError) {
@@ -250,6 +262,7 @@ export async function approveLeaveRequest(requestId: string) {
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
@@ -269,6 +282,7 @@ export async function approveLeaveRequest(requestId: string) {
 
   if (error || !updated) throw new Error("ไม่สามารถอนุมัติคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
 
+  await logAudit(supabase, user.id, "approve_leave", "leave_request", requestId);
   await createNotificationInternal(supabase, updated.employee_id, "leave_approved", "คำขอลาของคุณได้รับการอนุมัติแล้ว");
 
   revalidatePath("/dashboard/leaves");
@@ -281,6 +295,7 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
   const profile = await getProfile(supabase, user.id);
 
   if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
@@ -301,6 +316,7 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
 
   if (error || !updated) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
 
+  await logAudit(supabase, user.id, "reject_leave", "leave_request", requestId);
   await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", "คำขอลาของคุณไม่ได้รับการอนุมัติ");
 
   revalidatePath("/dashboard/leaves");
@@ -311,6 +327,7 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
 export async function cancelLeaveRequest(requestId: string) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
 
   const { error } = await supabase
     .from("leave_requests")

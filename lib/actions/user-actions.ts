@@ -4,15 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit-log";
 
 /**
  * Validates that the current authenticated user has 'hr' or 'admin' role.
  * Throws an error if not authorized.
  */
-async function checkHrAdminRole(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function checkHrAdminRole(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized: Please log in");
-  
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -22,6 +24,8 @@ async function checkHrAdminRole(supabase: Awaited<ReturnType<typeof createClient
   if (!profile || (profile.role !== "admin" && profile.role !== "hr")) {
     throw new Error("Forbidden: Insufficient permissions");
   }
+
+  return user.id;
 }
 
 /**
@@ -54,7 +58,8 @@ export async function getProfiles() {
  */
 export async function updateUserStatus(userId: string, status: ProfileStatus) {
   const supabase = await createClient();
-  await checkHrAdminRole(supabase);
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
 
   const { error } = await supabase
     .from("profiles")
@@ -66,6 +71,7 @@ export async function updateUserStatus(userId: string, status: ProfileStatus) {
     throw new Error("Failed to update status");
   }
 
+  await logAudit(supabase, actorId, "update_status", "profile", userId, { status });
   revalidatePath("/dashboard/hr/users");
 }
 
@@ -75,7 +81,8 @@ export async function updateUserStatus(userId: string, status: ProfileStatus) {
  */
 export async function updateUserRole(userId: string, role: UserRole) {
   const supabase = await createClient();
-  await checkHrAdminRole(supabase);
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
 
   const { error } = await supabase
     .from("profiles")
@@ -86,6 +93,8 @@ export async function updateUserRole(userId: string, role: UserRole) {
     console.error("[user-actions] Failed to update user role:", error);
     throw new Error("Failed to update role");
   }
+
+  await logAudit(supabase, actorId, "update_role", "profile", userId, { role });
 
   revalidatePath("/dashboard/hr/users");
 }
@@ -102,7 +111,8 @@ export async function createUserByAdmin(data: {
   positionId: string | null;
 }) {
   const supabase = await createClient();
-  await checkHrAdminRole(supabase); // Ensure caller is admin or hr
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
@@ -137,7 +147,7 @@ export async function createUserByAdmin(data: {
     if (authError.message.includes("already registered") || authError.status === 422) {
       throw new Error("อีเมลนี้มีอยู่ในระบบแล้ว (Email already registered)");
     }
-    throw new Error("ไม่สามารถสร้างบัญชีผู้ใช้งานได้: " + authError.message);
+    throw new Error("ไม่สามารถสร้างบัญชีผู้ใช้งานได้");
   }
 
   if (!authData.user) {
@@ -159,10 +169,11 @@ export async function createUserByAdmin(data: {
     console.error("[user-actions] Failed to create profile, rolling back:", profileError);
     // Try to rollback the auth user creation since profile failed
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    throw new Error("บันทึกข้อมูลพนักงานไม่สำเร็จ กรุณาลองใหม่: " + profileError.message);
+    throw new Error("บันทึกข้อมูลพนักงานไม่สำเร็จ กรุณาลองใหม่");
   }
 
+  await logAudit(supabase, actorId, "create_user", "profile", authData.user.id, { email: data.email, role: data.role });
   revalidatePath("/dashboard/hr/users");
-  
+
   return { success: true };
 }
