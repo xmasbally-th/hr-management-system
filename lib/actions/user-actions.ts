@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
+import { env } from "@/lib/env";
 
 /**
  * Validates that the current authenticated user has 'hr' or 'admin' role.
@@ -114,13 +115,9 @@ export async function createUserByAdmin(data: {
   const actorId = await checkHrAdminRole(supabase);
   checkRateLimit(actorId);
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
-  }
-
   const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
     {
       auth: {
         autoRefreshToken: false,

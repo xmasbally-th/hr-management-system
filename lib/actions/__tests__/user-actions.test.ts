@@ -261,7 +261,7 @@ describe("createUserByAdmin", () => {
     setHrClient();
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    await expect(createUserByAdmin(newUserData)).rejects.toThrow("Missing SUPABASE_SERVICE_ROLE_KEY");
+    await expect(createUserByAdmin(newUserData)).rejects.toThrow("Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it("rolls back auth user if profile insert fails", async () => {
