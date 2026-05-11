@@ -115,6 +115,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
+        title: "ช่องทางกระดาษ",
+        href: "/dashboard/hr/paper-channel",
+        icon: "FileInput",
+        roles: ["admin", "hr"],
+      },
+      {
         title: "ติดตามเอกสาร",
         href: "/dashboard/hr/documents",
         icon: "FolderSearch",
