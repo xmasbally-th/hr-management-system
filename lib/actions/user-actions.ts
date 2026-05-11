@@ -29,28 +29,67 @@ async function checkHrAdminRole(supabase: Awaited<ReturnType<typeof createClient
   return user.id;
 }
 
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  role?: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+const DEFAULT_PAGE_SIZE = 10;
+
 /**
- * Retrieves all user profiles, joined with department name.
+ * Retrieves user profiles with pagination, search, and filters.
  * Only accessible by 'admin' and 'hr'.
  */
-export async function getProfiles() {
+export async function getProfiles(params?: PaginationParams): Promise<PaginatedResult<Record<string, unknown>>> {
   const supabase = await createClient();
   await checkHrAdminRole(supabase);
 
-  const { data, error } = await supabase
+  const page = Math.max(1, params?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, params?.pageSize ?? DEFAULT_PAGE_SIZE));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("profiles")
     .select(`
       *,
       department:departments(name)
-    `)
-    .order("created_at", { ascending: false });
+    `, { count: "exact" });
+
+  if (params?.status && params.status !== "all") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.eq("status", params.status as any);
+  }
+
+  if (params?.role && params.role !== "all") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.eq("role", params.role as any);
+  }
+
+  if (params?.search) {
+    query = query.or(`full_name.ilike.%${params.search}%,email.ilike.%${params.search}%`);
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) {
     console.error("[user-actions] Failed to fetch profiles:", error);
     throw new Error("Failed to fetch profiles");
   }
 
-  return data;
+  return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
 }
 
 /**

@@ -22,24 +22,57 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>, us
   return profile;
 }
 
-export async function getMyTravelRequests() {
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+const DEFAULT_PAGE_SIZE = 10;
+
+export async function getMyTravelRequests(params?: PaginationParams): Promise<PaginatedResult<Record<string, unknown>>> {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
 
-  const { data, error } = await supabase
+  const page = Math.max(1, params?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, params?.pageSize ?? DEFAULT_PAGE_SIZE));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("travel_requests")
     .select(`
       *,
       expenses:travel_expenses(*)
-    `)
-    .eq("employee_id", user.id)
-    .order("created_at", { ascending: false });
+    `, { count: "exact" })
+    .eq("employee_id", user.id);
+
+  if (params?.status && params.status !== "all") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.eq("status", params.status as any);
+  }
+
+  if (params?.search) {
+    query = query.or(`title.ilike.%${params.search}%,location.ilike.%${params.search}%`);
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลการเดินทางได้");
-  return data;
+  return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
 }
 
-export async function getAllTravelRequests() {
+export async function getAllTravelRequests(params?: PaginationParams): Promise<PaginatedResult<Record<string, unknown>>> {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   const profile = await getProfile(supabase, user.id);
@@ -48,17 +81,34 @@ export async function getAllTravelRequests() {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
-  const { data, error } = await supabase
+  const page = Math.max(1, params?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, params?.pageSize ?? DEFAULT_PAGE_SIZE));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("travel_requests")
     .select(`
       *,
       employee:profiles!travel_requests_employee_id_fkey(full_name, email, department_id),
       expenses:travel_expenses(*)
-    `)
-    .order("created_at", { ascending: false });
+    `, { count: "exact" });
+
+  if (params?.status && params.status !== "all") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.eq("status", params.status as any);
+  }
+
+  if (params?.search) {
+    query = query.or(`title.ilike.%${params.search}%,location.ilike.%${params.search}%`);
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลการเดินทางทั้งหมดได้");
-  return data;
+  return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
 }
 
 export interface CreateTravelRequestInput {

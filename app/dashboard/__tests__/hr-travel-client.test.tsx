@@ -115,31 +115,8 @@ describe("HrTravelClient", () => {
     expect(within(pendingRow).queryByRole("button", { name: "ปิดงาน" })).toBeNull();
   });
 
-  it("filter tabs work", () => {
-    render(<HrTravelClient requests={REQUESTS} />);
-    // Click the pending tab
-    const pendingTabs = screen.getAllByRole("button").filter((btn) =>
-      btn.textContent?.includes("รออนุมัติ") && btn.textContent?.includes("(")
-    );
-    fireEvent.click(pendingTabs[0]);
-
-    // Should show 1 header + 1 data row
-    const rows = screen.getAllByRole("row");
-    expect(rows.length).toBe(2);
-    expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
-    expect(screen.queryByText("สมหญิง รักดี")).not.toBeInTheDocument();
-  });
-
-  it("shows empty message when no matches", () => {
-    const onlyApproved = REQUESTS.filter((r) => r.status === "approved");
-    render(<HrTravelClient requests={onlyApproved} />);
-
-    // Click the pending tab
-    const pendingTabs = screen.getAllByRole("button").filter((btn) =>
-      btn.textContent?.includes("รออนุมัติ") && btn.textContent?.includes("(")
-    );
-    fireEvent.click(pendingTabs[0]);
-
+  it("shows empty message when no requests", () => {
+    render(<HrTravelClient requests={[]} />);
     expect(screen.getByText("ไม่มีคำขอเดินทางในหมวดนี้")).toBeInTheDocument();
   });
 

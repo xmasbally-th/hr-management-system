@@ -47,19 +47,14 @@ const travelTypeMap: Record<string, string> = {
   official_contact: "ติดต่อราชการ",
 };
 
-export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
+export function HrTravelClient({ requests }: { requests: (TravelRequestRow | Record<string, unknown>)[] }) {
   const [isPending, startTransition] = useTransition();
-  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "completed">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: "approve" | "reject" | "complete";
     id: string;
     employeeName: string;
   } | null>(null);
-
-  const filtered = filter === "all"
-    ? requests
-    : requests.filter((r) => r.status === filter);
 
   function handleConfirm() {
     if (!confirmAction) return;
@@ -99,33 +94,6 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Filter Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        {([
-          ["all", "ทั้งหมด"],
-          ["pending", "รออนุมัติ"],
-          ["approved", "อนุมัติแล้ว"],
-          ["completed", "เสร็จสิ้น"],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-              filter === key
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
-            }`}
-          >
-            {label}
-            {key === "pending" && (
-              <span className="ml-1.5 text-xs">
-                ({requests.filter((r) => r.status === "pending").length})
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
       {/* Table */}
       <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
@@ -142,16 +110,18 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((req) => {
+            {requests.map((raw) => {
+              const req = raw as TravelRequestRow;
               const status = statusMap[req.status] ?? { label: req.status, variant: "outline" as const };
-              const totalEstimated = req.expenses.reduce((s, e) => s + e.estimated_amount, 0);
-              const totalActual = req.expenses.reduce((s, e) => s + (e.actual_amount ?? 0), 0);
+              const expenses = req.expenses ?? [];
+              const totalEstimated = expenses.reduce((s, e) => s + e.estimated_amount, 0);
+              const totalActual = expenses.reduce((s, e) => s + (e.actual_amount ?? 0), 0);
               const isExpanded = expandedId === req.id;
 
               return (
                 <TableRow key={req.id} className="group">
                   <TableCell>
-                    {req.expenses.length > 0 && (
+                    {expenses.length > 0 && (
                       <button onClick={() => setExpandedId(isExpanded ? null : req.id)}>
                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
@@ -212,7 +182,7 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
                 </TableRow>
               );
             })}
-            {filtered.length === 0 && (
+            {requests.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   ไม่มีคำขอเดินทางในหมวดนี้
@@ -225,8 +195,8 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
 
       {/* Expanded expense detail */}
       {expandedId && (() => {
-        const req = requests.find((r) => r.id === expandedId);
-        if (!req || req.expenses.length === 0) return null;
+        const req = requests.find((r) => (r as TravelRequestRow).id === expandedId) as TravelRequestRow | undefined;
+        if (!req || !req.expenses || req.expenses.length === 0) return null;
         return (
           <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
             <h4 className="font-semibold text-sm">รายละเอียดงบประมาณ — {req.title}</h4>

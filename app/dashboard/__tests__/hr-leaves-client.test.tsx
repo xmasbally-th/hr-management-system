@@ -115,36 +115,8 @@ describe("HrLeavesClient", () => {
     expect(within(rejectedRow).queryAllByRole("button")).toHaveLength(0);
   });
 
-  it("filter tabs work — clicking รออนุมัติ shows only pending", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    // Click the pending filter tab
-    const pendingTab = screen.getByRole("button", { name: /รออนุมัติ/ });
-    fireEvent.click(pendingTab);
-
-    // Should show only 1 data row + 1 header row
-    const rows = screen.getAllByRole("row");
-    expect(rows.length).toBe(2);
-    expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
-    expect(screen.queryByText("สมหญิง รักดี")).not.toBeInTheDocument();
-  });
-
-  it("filter shows count for pending tab", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    // The pending tab should show count (1)
-    const pendingTab = screen.getByRole("button", { name: /รออนุมัติ/ });
-    expect(pendingTab.textContent).toContain("(1)");
-  });
-
-  it("shows empty message when no requests match filter", () => {
-    const onlyApproved = REQUESTS.filter((r) => r.status === "approved");
-    render(<HrLeavesClient requests={onlyApproved} />);
-
-    // Click the pending filter tab — use getAllByRole and pick the tab (not the badge)
-    const pendingTabs = screen.getAllByRole("button").filter((btn) =>
-      btn.textContent?.includes("รออนุมัติ") && btn.textContent?.includes("(")
-    );
-    fireEvent.click(pendingTabs[0]);
-
+  it("shows empty message when no requests", () => {
+    render(<HrLeavesClient requests={[]} />);
     expect(screen.getByText("ไม่มีคำขอลาในหมวดนี้")).toBeInTheDocument();
   });
 

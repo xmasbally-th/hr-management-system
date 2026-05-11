@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { getMyLeaveRequests, getMyLeaveBalances } from "@/lib/actions/leave-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
+import { PaginationControls } from "@/components/pagination-controls";
+import { StatusFilter } from "@/components/status-filter";
 
 export const metadata = { title: "ประวัติการลา" };
 
@@ -14,9 +18,25 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
   cancelled: { label: "ยกเลิก", variant: "outline" },
 };
 
-export default async function LeavesPage() {
-  const [requests, balances] = await Promise.all([
-    getMyLeaveRequests(),
+const statusOptions = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "pending", label: "รออนุมัติ" },
+  { value: "approved", label: "อนุมัติ" },
+  { value: "rejected", label: "ไม่อนุมัติ" },
+];
+
+interface LeavesPageProps {
+  searchParams: Promise<{ page?: string; search?: string; status?: string }>;
+}
+
+export default async function LeavesPage({ searchParams }: LeavesPageProps) {
+  const params = await searchParams;
+  const page = Number(params.page) || 1;
+  const search = params.search ?? "";
+  const status = params.status ?? "all";
+
+  const [result, balances] = await Promise.all([
+    getMyLeaveRequests({ page, search, status }),
     getMyLeaveBalances(),
   ]);
 
@@ -47,6 +67,16 @@ export default async function LeavesPage() {
         </div>
       )}
 
+      {/* Search + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Suspense>
+          <SearchInput placeholder="ค้นหาเหตุผล..." className="sm:w-64" />
+        </Suspense>
+        <Suspense>
+          <StatusFilter options={statusOptions} paramName="status" />
+        </Suspense>
+      </div>
+
       <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
@@ -60,35 +90,43 @@ export default async function LeavesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {requests.map((req) => {
-              const status = statusMap[req.status] ?? { label: req.status, variant: "outline" as const };
+            {result.data.map((req) => {
+              const s = statusMap[req.status as string] ?? { label: req.status as string, variant: "outline" as const };
               return (
-                <TableRow key={req.id}>
+                <TableRow key={req.id as string}>
                   <TableCell className="font-medium">
                     {(req.leave_type as { name: string } | null)?.name ?? "-"}
                   </TableCell>
-                  <TableCell>{req.start_date}</TableCell>
-                  <TableCell>{req.end_date}</TableCell>
-                  <TableCell>{req.total_days}</TableCell>
+                  <TableCell>{req.start_date as string}</TableCell>
+                  <TableCell>{req.end_date as string}</TableCell>
+                  <TableCell>{req.total_days as number}</TableCell>
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge variant={s.variant}>{s.label}</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(req.created_at).toLocaleDateString("th-TH")}
+                    {new Date(req.created_at as string).toLocaleDateString("th-TH")}
                   </TableCell>
                 </TableRow>
               );
             })}
-            {requests.length === 0 && (
+            {result.data.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  ยังไม่มีประวัติการลา
+                  {search || status !== "all" ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประวัติการลา"}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      <Suspense>
+        <PaginationControls
+          currentPage={result.page}
+          totalCount={result.totalCount}
+          pageSize={result.pageSize}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getProfiles } from "@/lib/actions/user-actions";
 import {
   Table,
@@ -9,17 +10,36 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { UserActionsMenu } from "./user-actions-menu";
-
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
+import { PaginationControls } from "@/components/pagination-controls";
+import { StatusFilter } from "@/components/status-filter";
 
 export const metadata = {
   title: "จัดการผู้ใช้งาน",
 };
 
-export default async function UsersPage() {
-  const profiles = await getProfiles();
+const roleOptions = [
+  { value: "all", label: "ทุกสิทธิ์" },
+  { value: "admin", label: "Admin" },
+  { value: "hr", label: "HR" },
+  { value: "manager", label: "Manager" },
+  { value: "employee", label: "Employee" },
+];
+
+interface UsersPageProps {
+  searchParams: Promise<{ page?: string; search?: string; role?: string }>;
+}
+
+export default async function UsersPage({ searchParams }: UsersPageProps) {
+  const params = await searchParams;
+  const page = Number(params.page) || 1;
+  const search = params.search ?? "";
+  const role = params.role ?? "all";
+
+  const result = await getProfiles({ page, search, role });
 
   return (
     <div className="space-y-6">
@@ -32,6 +52,16 @@ export default async function UsersPage() {
           <Plus className="mr-2 h-4 w-4" />
           เพิ่มพนักงาน
         </Link>
+      </div>
+
+      {/* Search + Role Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Suspense>
+          <SearchInput placeholder="ค้นหาชื่อ/อีเมล..." className="sm:w-64" />
+        </Suspense>
+        <Suspense>
+          <StatusFilter options={roleOptions} paramName="role" />
+        </Suspense>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
@@ -47,32 +77,40 @@ export default async function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {profiles.map((profile) => (
-              <TableRow key={profile.id} className="hover:bg-muted/30">
-                <TableCell className="font-medium">{profile.full_name}</TableCell>
-                <TableCell className="text-muted-foreground">{profile.email}</TableCell>
+            {result.data.map((profile) => (
+              <TableRow key={profile.id as string} className="hover:bg-muted/30">
+                <TableCell className="font-medium">{profile.full_name as string}</TableCell>
+                <TableCell className="text-muted-foreground">{profile.email as string}</TableCell>
                 <TableCell>{(profile.department as { name: string } | null)?.name || "-"}</TableCell>
                 <TableCell>
-                  <RoleBadge role={profile.role} />
+                  <RoleBadge role={profile.role as string} />
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={profile.status} />
+                  <StatusBadge status={profile.status as string} />
                 </TableCell>
                 <TableCell className="text-right">
-                  <UserActionsMenu profile={profile} />
+                  <UserActionsMenu profile={{ id: profile.id as string, status: profile.status as "approved" | "pending" | "rejected", role: profile.role as "admin" | "hr" | "manager" | "employee", full_name: profile.full_name as string }} />
                 </TableCell>
               </TableRow>
             ))}
-            {profiles.length === 0 && (
+            {result.data.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                  ไม่พบข้อมูลผู้ใช้งาน
+                  {search || role !== "all" ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ไม่พบข้อมูลผู้ใช้งาน"}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      <Suspense>
+        <PaginationControls
+          currentPage={result.page}
+          totalCount={result.totalCount}
+          pageSize={result.pageSize}
+        />
+      </Suspense>
     </div>
   );
 }
@@ -85,9 +123,6 @@ function RoleBadge({ role }: { role: string }) {
     employee: { label: "Employee", variant: "outline" },
   };
   const config = map[role] || { label: role, variant: "outline" };
-  
-  // Since Shadcn default Badge variants are limited, we use standard variants here 
-  // but we can add extra classes if we want custom colors.
   return <Badge variant={config.variant} className="capitalize">{config.label}</Badge>;
 }
 
@@ -98,7 +133,6 @@ function StatusBadge({ status }: { status: string }) {
     rejected: { label: "ระงับการใช้งาน", className: "bg-destructive/10 text-destructive hover:bg-destructive/20 border-destructive/20" },
   };
   const config = map[status] || { label: status, className: "" };
-  
   return (
     <Badge variant="outline" className={config.className}>
       {config.label}

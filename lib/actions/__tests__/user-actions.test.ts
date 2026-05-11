@@ -106,7 +106,8 @@ describe("getProfiles", () => {
     mockedCreateClient.mockResolvedValue(sb as never);
 
     const result = await getProfiles();
-    expect(result).toEqual(profilesData);
+    expect(result.data).toEqual(profilesData);
+    expect(result.page).toBe(1);
   });
 
   it("employee is rejected", async () => {

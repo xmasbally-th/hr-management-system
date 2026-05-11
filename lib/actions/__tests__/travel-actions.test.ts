@@ -489,7 +489,8 @@ describe("getMyTravelRequests", () => {
     mockSupabase({ fromOverrides: { travel_requests: chain } });
 
     const result = await getMyTravelRequests();
-    expect(result).toEqual([{ id: "tr-1" }]);
+    expect(result.data).toEqual([{ id: "tr-1" }]);
+    expect(result.page).toBe(1);
   });
 
   it("throws on error", async () => {
@@ -517,7 +518,8 @@ describe("getAllTravelRequests", () => {
     });
 
     const result = await getAllTravelRequests();
-    expect(result).toEqual([{ id: "tr-all" }]);
+    expect(result.data).toEqual([{ id: "tr-all" }]);
+    expect(result.page).toBe(1);
   });
 
   it("rejects non-HR/admin/manager", async () => {

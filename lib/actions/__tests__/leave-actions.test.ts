@@ -406,7 +406,9 @@ describe("getMyLeaveRequests", () => {
     mockSupabase({ fromOverrides: { leave_requests: chain } });
 
     const result = await getMyLeaveRequests();
-    expect(result).toEqual([{ id: "req-1" }]);
+    expect(result.data).toEqual([{ id: "req-1" }]);
+    expect(result.page).toBe(1);
+    expect(result.pageSize).toBe(10);
   });
 
   it("throws on error", async () => {
@@ -455,7 +457,8 @@ describe("getAllLeaveRequests", () => {
     });
 
     const result = await getAllLeaveRequests();
-    expect(result).toEqual([{ id: "req-all" }]);
+    expect(result.data).toEqual([{ id: "req-all" }]);
+    expect(result.page).toBe(1);
   });
 
   it("rejects non-HR/admin/manager", async () => {
