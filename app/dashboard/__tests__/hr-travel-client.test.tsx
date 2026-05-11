@@ -16,6 +16,10 @@ vi.mock("@/lib/actions/travel-actions", () => ({
   updateActualExpense: (...args: unknown[]) => updateActualExpense(...args),
 }));
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 /* ── Fixtures ─────────────────────────────────────────────────────────── */
 
 const REQUESTS = [
@@ -143,24 +147,38 @@ describe("HrTravelClient", () => {
     render(<HrTravelClient requests={REQUESTS} />);
     const allRows = screen.getAllByRole("row");
     const pendingRow = allRows[1];
-    // Find the approve button (the one with CheckCircle icon / green class)
     const buttons = within(pendingRow).getAllByRole("button");
-    // The expand chevron button is first, then approve, then reject
-    // Find the button with green-600 class (approve)
     const approveBtn = buttons.find((b) => b.className.includes("text-green-600"));
     fireEvent.click(approveBtn!);
+
+    // Wait for confirmation dialog and click confirm
+    await vi.waitFor(() => {
+      expect(screen.getByText("ยืนยันอนุมัติการเดินทาง")).toBeInTheDocument();
+    });
+    const confirmBtn = screen.getByRole("button", { name: "อนุมัติ" });
+    fireEvent.click(confirmBtn);
 
     await vi.waitFor(() => {
       expect(approveTravelRequest).toHaveBeenCalledWith("tr-1");
     });
   });
 
-  it("complete button calls completeTravelRequest (after confirm)", async () => {
+  it("complete button calls completeTravelRequest (after confirm dialog)", async () => {
     render(<HrTravelClient requests={REQUESTS} />);
     const completeButton = screen.getByRole("button", { name: "ปิดงาน" });
     fireEvent.click(completeButton);
 
-    expect(window.confirm).toHaveBeenCalled();
+    // Wait for confirmation dialog
+    await vi.waitFor(() => {
+      expect(screen.getByText("ยืนยันปิดงานเดินทาง")).toBeInTheDocument();
+    });
+    const confirmBtn = screen.getByRole("button", { name: "ปิดงาน" });
+    // There are two "ปิดงาน" buttons — one in the table and one in the dialog
+    // We need the dialog action button
+    const dialogConfirmBtn = screen.getAllByRole("button", { name: "ปิดงาน" }).find(
+      (btn) => btn.getAttribute("data-slot") === "alert-dialog-action"
+    );
+    fireEvent.click(dialogConfirmBtn ?? confirmBtn);
 
     await vi.waitFor(() => {
       expect(completeTravelRequest).toHaveBeenCalledWith("tr-2");

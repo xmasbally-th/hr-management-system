@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { LeaveType } from "@/types/supabase";
 
 interface Props {
@@ -98,10 +99,12 @@ export function LeaveRequestForm({ leaveTypes, employees }: Props) {
     startTransition(async () => {
       try {
         await createLeaveRequest(input);
+        toast.success("ยื่นคำขอลาเรียบร้อยแล้ว");
         router.push("/dashboard/leaves");
       } catch (err: unknown) {
-        if (err instanceof Error) setError(err.message);
-        else setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
+        const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+        setError(message);
+        toast.error(message);
       }
     });
   }

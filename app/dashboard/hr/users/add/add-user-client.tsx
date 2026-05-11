@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { UserRole } from "@/types/supabase";
 
 export function AddUserClient({ departments, positions }: { departments: { id: string; name: string }[], positions: { id: string; name: string; department_id: string }[] }) {
@@ -47,11 +48,12 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
           positionId: formData.positionId === "none" ? null : formData.positionId,
         });
         
-        // Redirect back to users list on success
+        toast.success("เพิ่มพนักงานใหม่เรียบร้อยแล้ว");
         router.push("/dashboard/hr/users");
       } catch (err: unknown) {
-        if (err instanceof Error) setError(err.message || "เกิดข้อผิดพลาดในการสร้างบัญชี");
-        else setError("เกิดข้อผิดพลาดในการสร้างบัญชี");
+        const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการสร้างบัญชี";
+        setError(message);
+        toast.error(message);
       }
     });
   }

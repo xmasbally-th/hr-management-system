@@ -1,9 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
-import { 
-  updateUserStatus, 
-  updateUserRole 
+import { useState, useTransition } from "react";
+import {
+  updateUserStatus,
+  updateUserRole
 } from "@/lib/actions/user-actions";
 import {
   DropdownMenu,
@@ -19,31 +19,42 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, UserCheck, UserX, Shield, Loader2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { toast } from "sonner";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
 
-export function UserActionsMenu({ profile }: { profile: { id: string; status: ProfileStatus; role: UserRole } }) {
+export function UserActionsMenu({ profile }: { profile: { id: string; status: ProfileStatus; role: UserRole; full_name?: string } }) {
   const [isPending, startTransition] = useTransition();
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "status" | "role";
+    value: string;
+    label: string;
+  } | null>(null);
 
-  function handleStatusChange(newStatus: ProfileStatus) {
-    startTransition(async () => {
-      try {
-        await updateUserStatus(profile.id, newStatus);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to update status");
-      }
-    });
-  }
+  function handleConfirm() {
+    if (!confirmAction) return;
+    const { type, value } = confirmAction;
+    setConfirmAction(null);
 
-  function handleRoleChange(newRole: UserRole) {
-    startTransition(async () => {
-      try {
-        await updateUserRole(profile.id, newRole);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to update role");
-      }
-    });
+    if (type === "status") {
+      startTransition(async () => {
+        try {
+          await updateUserStatus(profile.id, value as ProfileStatus);
+          toast.success("เปลี่ยนสถานะเรียบร้อยแล้ว");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+        }
+      });
+    } else {
+      startTransition(async () => {
+        try {
+          await updateUserRole(profile.id, value as UserRole);
+          toast.success("เปลี่ยนระดับสิทธิ์เรียบร้อยแล้ว");
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+        }
+      });
+    }
   }
 
   return (
@@ -65,21 +76,21 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
 
         {/* Status Actions */}
         {profile.status === "pending" && (
-          <DropdownMenuItem onClick={() => handleStatusChange("approved")}>
+          <DropdownMenuItem onClick={() => setConfirmAction({ type: "status", value: "approved", label: "อนุมัติผู้ใช้งาน" })}>
             <UserCheck className="mr-2 h-4 w-4 text-emerald-600" />
             อนุมัติผู้ใช้งาน
           </DropdownMenuItem>
         )}
-        
+
         {profile.status === "approved" && (
-          <DropdownMenuItem onClick={() => handleStatusChange("rejected")}>
+          <DropdownMenuItem onClick={() => setConfirmAction({ type: "status", value: "rejected", label: "ระงับการใช้งาน" })}>
             <UserX className="mr-2 h-4 w-4 text-destructive" />
             ระงับการใช้งาน
           </DropdownMenuItem>
         )}
-        
+
         {profile.status === "rejected" && (
-          <DropdownMenuItem onClick={() => handleStatusChange("approved")}>
+          <DropdownMenuItem onClick={() => setConfirmAction({ type: "status", value: "approved", label: "คืนสิทธิ์การใช้งาน" })}>
             <UserCheck className="mr-2 h-4 w-4 text-emerald-600" />
             คืนสิทธิ์การใช้งาน
           </DropdownMenuItem>
@@ -94,9 +105,9 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
             เปลี่ยนระดับสิทธิ์
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup 
-              value={profile.role} 
-              onValueChange={(val) => handleRoleChange(val as UserRole)}
+            <DropdownMenuRadioGroup
+              value={profile.role}
+              onValueChange={(val) => setConfirmAction({ type: "role", value: val, label: `เปลี่ยนสิทธิ์เป็น ${val}` })}
             >
               <DropdownMenuRadioItem value="admin">Admin</DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="hr">HR</DropdownMenuRadioItem>
@@ -107,6 +118,17 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
         </DropdownMenuSub>
 
       </DropdownMenuContent>
+
+      {/* Confirmation dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={`ยืนยัน: ${confirmAction?.label ?? ""}`}
+        description={`คุณต้องการ${confirmAction?.label ?? ""}สำหรับ ${profile.full_name ?? "ผู้ใช้นี้"} ใช่หรือไม่?`}
+        confirmLabel="ยืนยัน"
+        variant={confirmAction?.value === "rejected" ? "destructive" : "default"}
+        onConfirm={handleConfirm}
+      />
     </DropdownMenu>
   );
 }

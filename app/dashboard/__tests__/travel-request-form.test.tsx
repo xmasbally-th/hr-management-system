@@ -16,6 +16,10 @@ vi.mock("@/lib/actions/travel-actions", () => ({
   createTravelRequest: (...args: unknown[]) => mockCreateTravelRequest(...args),
 }));
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 // Mock Shadcn Select as native <select>.
 vi.mock("@/components/ui/select", () => {
   const callbacks = new Map<number, (v: string) => void>();

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { toast } from "sonner";
 
 interface LeaveRequestRow {
   id: string;
@@ -31,28 +33,40 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
 export function HrLeavesClient({ requests }: { requests: LeaveRequestRow[] }) {
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "approve" | "reject";
+    id: string;
+    employeeName: string;
+  } | null>(null);
 
   const filtered = filter === "all"
     ? requests
     : requests.filter((r) => r.status === filter);
 
-  function handleApprove(id: string) {
-    startTransition(async () => {
-      try {
-        await approveLeaveRequest(id);
-      } catch (err: unknown) {
-        if (err instanceof Error) alert(err.message);
-      }
-    });
+  function openApproveDialog(id: string, name: string) {
+    setConfirmAction({ type: "approve", id, employeeName: name });
   }
 
-  function handleReject(id: string) {
-    const reason = prompt("เหตุผลที่ไม่อนุมัติ (ถ้ามี):");
+  function openRejectDialog(id: string, name: string) {
+    setConfirmAction({ type: "reject", id, employeeName: name });
+  }
+
+  function handleConfirm(reason?: string) {
+    if (!confirmAction) return;
+    const { type, id } = confirmAction;
+    setConfirmAction(null);
+
     startTransition(async () => {
       try {
-        await rejectLeaveRequest(id, reason ?? undefined);
+        if (type === "approve") {
+          await approveLeaveRequest(id);
+          toast.success("อนุมัติการลาเรียบร้อยแล้ว");
+        } else {
+          await rejectLeaveRequest(id, reason || undefined);
+          toast.success("ปฏิเสธการลาเรียบร้อยแล้ว");
+        }
       } catch (err: unknown) {
-        if (err instanceof Error) alert(err.message);
+        toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
       }
     });
   }
@@ -130,7 +144,7 @@ export function HrLeavesClient({ requests }: { requests: LeaveRequestRow[] }) {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => handleApprove(req.id)}
+                          onClick={() => openApproveDialog(req.id, req.employee?.full_name ?? "-")}
                           disabled={isPending}
                           className="text-green-600 hover:text-green-700 hover:bg-green-50"
                         >
@@ -139,7 +153,7 @@ export function HrLeavesClient({ requests }: { requests: LeaveRequestRow[] }) {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => handleReject(req.id)}
+                          onClick={() => openRejectDialog(req.id, req.employee?.full_name ?? "-")}
                           disabled={isPending}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
@@ -161,6 +175,28 @@ export function HrLeavesClient({ requests }: { requests: LeaveRequestRow[] }) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Confirmation dialogs */}
+      <ConfirmDialog
+        open={confirmAction?.type === "approve"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยืนยันอนุมัติการลา"
+        description={`คุณต้องการอนุมัติคำขอลาของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
+        confirmLabel="อนุมัติ"
+        onConfirm={handleConfirm}
+      />
+      <ConfirmDialog
+        open={confirmAction?.type === "reject"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยืนยันปฏิเสธการลา"
+        description={`คุณต้องการปฏิเสธคำขอลาของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
+        confirmLabel="ปฏิเสธ"
+        variant="destructive"
+        withInput
+        inputLabel="เหตุผล (ถ้ามี)"
+        inputPlaceholder="ระบุเหตุผลที่ไม่อนุมัติ..."
+        onConfirm={handleConfirm}
+      />
     </div>
   );
 }

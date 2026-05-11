@@ -12,6 +12,10 @@ vi.mock("@/lib/actions/leave-actions", () => ({
   rejectLeaveRequest: (...args: unknown[]) => rejectLeaveRequest(...args),
 }));
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 /* ── Fixtures ─────────────────────────────────────────────────────────── */
 
 const REQUESTS = [
@@ -149,24 +153,40 @@ describe("HrLeavesClient", () => {
     const allRows = screen.getAllByRole("row");
     const pendingRow = allRows[1];
     const buttons = within(pendingRow).getAllByRole("button");
-    // First button is approve (CheckCircle)
+    // First button opens approve dialog
     fireEvent.click(buttons[0]);
 
-    // The action is wrapped in startTransition — wait for it
+    // Wait for confirmation dialog to appear and click confirm
+    await vi.waitFor(() => {
+      expect(screen.getByText("ยืนยันอนุมัติการลา")).toBeInTheDocument();
+    });
+    const confirmBtn = screen.getByRole("button", { name: "อนุมัติ" });
+    fireEvent.click(confirmBtn);
+
     await vi.waitFor(() => {
       expect(approveLeaveRequest).toHaveBeenCalledWith("req-1");
     });
   });
 
-  it("reject button calls prompt() then rejectLeaveRequest with ID and reason", async () => {
+  it("reject button opens dialog then rejectLeaveRequest with ID and reason", async () => {
     render(<HrLeavesClient requests={REQUESTS} />);
     const allRows = screen.getAllByRole("row");
     const pendingRow = allRows[1];
     const buttons = within(pendingRow).getAllByRole("button");
-    // Second button is reject (XCircle)
+    // Second button opens reject dialog
     fireEvent.click(buttons[1]);
 
-    expect(window.prompt).toHaveBeenCalled();
+    // Wait for rejection dialog
+    await vi.waitFor(() => {
+      expect(screen.getByText("ยืนยันปฏิเสธการลา")).toBeInTheDocument();
+    });
+
+    // Type reason into the input
+    const reasonInput = screen.getByPlaceholderText("ระบุเหตุผลที่ไม่อนุมัติ...");
+    fireEvent.change(reasonInput, { target: { value: "test reason" } });
+
+    const confirmBtn = screen.getByRole("button", { name: "ปฏิเสธ" });
+    fireEvent.click(confirmBtn);
 
     await vi.waitFor(() => {
       expect(rejectLeaveRequest).toHaveBeenCalledWith("req-1", "test reason");

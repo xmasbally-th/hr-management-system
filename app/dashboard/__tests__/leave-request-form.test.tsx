@@ -16,6 +16,10 @@ vi.mock("@/lib/actions/leave-actions", () => ({
   createLeaveRequest: (...args: unknown[]) => mockCreateLeaveRequest(...args),
 }));
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 // Mock Shadcn Select as native <select> using module-level callback ref.
 let __latestOnValueChange: ((v: string) => void) | null = null;
 

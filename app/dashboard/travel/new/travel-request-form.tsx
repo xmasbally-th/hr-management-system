@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ExpenseRow {
   category: string;
@@ -95,10 +96,12 @@ export function TravelRequestForm() {
     startTransition(async () => {
       try {
         await createTravelRequest(input);
+        toast.success("ยื่นคำขอเดินทางเรียบร้อยแล้ว");
         router.push("/dashboard/travel");
       } catch (err: unknown) {
-        if (err instanceof Error) setError(err.message);
-        else setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
+        const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+        setError(message);
+        toast.error(message);
       }
     });
   }

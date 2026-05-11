@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { toast } from "sonner";
 
 interface TravelExpense {
   id: string;
@@ -49,30 +51,36 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
   const [isPending, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "completed">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "approve" | "reject" | "complete";
+    id: string;
+    employeeName: string;
+  } | null>(null);
 
   const filtered = filter === "all"
     ? requests
     : requests.filter((r) => r.status === filter);
 
-  function handleApprove(id: string) {
-    startTransition(async () => {
-      try { await approveTravelRequest(id); }
-      catch (err: unknown) { if (err instanceof Error) alert(err.message); }
-    });
-  }
+  function handleConfirm() {
+    if (!confirmAction) return;
+    const { type, id } = confirmAction;
+    setConfirmAction(null);
 
-  function handleReject(id: string) {
     startTransition(async () => {
-      try { await rejectTravelRequest(id); }
-      catch (err: unknown) { if (err instanceof Error) alert(err.message); }
-    });
-  }
-
-  function handleComplete(id: string) {
-    if (!confirm("ยืนยันปิดงานเดินทางนี้?")) return;
-    startTransition(async () => {
-      try { await completeTravelRequest(id); }
-      catch (err: unknown) { if (err instanceof Error) alert(err.message); }
+      try {
+        if (type === "approve") {
+          await approveTravelRequest(id);
+          toast.success("อนุมัติการเดินทางเรียบร้อยแล้ว");
+        } else if (type === "reject") {
+          await rejectTravelRequest(id);
+          toast.success("ปฏิเสธการเดินทางเรียบร้อยแล้ว");
+        } else {
+          await completeTravelRequest(id);
+          toast.success("ปิดงานเดินทางเรียบร้อยแล้ว");
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      }
     });
   }
 
@@ -80,8 +88,12 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
     const amount = Number(value);
     if (isNaN(amount) || amount < 0) return;
     startTransition(async () => {
-      try { await updateActualExpense(expenseId, amount); }
-      catch (err: unknown) { if (err instanceof Error) alert(err.message); }
+      try {
+        await updateActualExpense(expenseId, amount);
+        toast.success("บันทึกค่าใช้จ่ายจริงแล้ว");
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      }
     });
   }
 
@@ -171,16 +183,16 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
                     <div className="flex gap-1">
                       {req.status === "pending" && (
                         <>
-                          <Button size="icon" variant="ghost" onClick={() => handleApprove(req.id)} disabled={isPending} className="text-green-600 hover:text-green-700 hover:bg-green-50">
+                          <Button size="icon" variant="ghost" onClick={() => setConfirmAction({ type: "approve", id: req.id, employeeName: req.employee?.full_name ?? "-" })} disabled={isPending} className="text-green-600 hover:text-green-700 hover:bg-green-50">
                             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleReject(req.id)} disabled={isPending} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                          <Button size="icon" variant="ghost" onClick={() => setConfirmAction({ type: "reject", id: req.id, employeeName: req.employee?.full_name ?? "-" })} disabled={isPending} className="text-destructive hover:text-destructive hover:bg-destructive/10">
                             <XCircle className="h-4 w-4" />
                           </Button>
                         </>
                       )}
                       {req.status === "approved" && (
-                        <Button size="sm" variant="outline" onClick={() => handleComplete(req.id)} disabled={isPending}>
+                        <Button size="sm" variant="outline" onClick={() => setConfirmAction({ type: "complete", id: req.id, employeeName: req.employee?.full_name ?? "-" })} disabled={isPending}>
                           ปิดงาน
                         </Button>
                       )}
@@ -243,6 +255,33 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
           </div>
         );
       })()}
+
+      {/* Confirmation dialogs */}
+      <ConfirmDialog
+        open={confirmAction?.type === "approve"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยืนยันอนุมัติการเดินทาง"
+        description={`คุณต้องการอนุมัติคำขอเดินทางของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
+        confirmLabel="อนุมัติ"
+        onConfirm={handleConfirm}
+      />
+      <ConfirmDialog
+        open={confirmAction?.type === "reject"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยืนยันปฏิเสธการเดินทาง"
+        description={`คุณต้องการปฏิเสธคำขอเดินทางของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
+        confirmLabel="ปฏิเสธ"
+        variant="destructive"
+        onConfirm={handleConfirm}
+      />
+      <ConfirmDialog
+        open={confirmAction?.type === "complete"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยืนยันปิดงานเดินทาง"
+        description={`คุณต้องการปิดงานเดินทางของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`}
+        confirmLabel="ปิดงาน"
+        onConfirm={handleConfirm}
+      />
     </div>
   );
 }
