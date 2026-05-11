@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, FileDown } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 
@@ -194,6 +194,17 @@ export function HrTravelClient({ requests }: { requests: TravelRequestRow[] }) {
                       {req.status === "approved" && (
                         <Button size="sm" variant="outline" onClick={() => setConfirmAction({ type: "complete", id: req.id, employeeName: req.employee?.full_name ?? "-" })} disabled={isPending}>
                           ปิดงาน
+                        </Button>
+                      )}
+                      {(req.status === "approved" || req.status === "completed") && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => window.open(`/api/documents/travel-order/${req.id}`, "_blank")}
+                          title="ดาวน์โหลดคำสั่งเดินทาง"
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <FileDown className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
