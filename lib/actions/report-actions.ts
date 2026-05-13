@@ -261,3 +261,403 @@ async function checkManagerOrAbove(supabase: Awaited<ReturnType<typeof createCli
     throw new Error("Forbidden");
   }
 }
+
+/* ============================================================================
+ * Role-specific dashboard data (HR Dashboard v2)
+ * ============================================================================ */
+
+export interface ManagerDashboardData {
+  pendingLeavesCount: number;
+  pendingTravelCount: number;
+  teamCount: number;
+  leavesToday: number;
+  travelToday: number;
+  approvalsThisMonth: number;
+  queue: Array<{
+    id: string;
+    type: "leave" | "travel";
+    name: string;
+    initials: string;
+    detail: string;
+    waitingHours: number;
+    urgent: boolean;
+  }>;
+  todayLeaves: Array<{ name: string; initials: string; leaveType: string }>;
+}
+
+export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkManagerOrAbove(supabase, user.id);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const startOfMonth = `${today.slice(0, 7)}-01`;
+
+  const [
+    pendingLeavesRes,
+    pendingTravelRes,
+    teamRes,
+    leavesTodayRes,
+    travelTodayRes,
+    monthApprovedLeavesRes,
+    monthApprovedTravelRes,
+    queueLeavesRes,
+    queueTravelRes,
+    todayLeavesListRes,
+  ] = await Promise.all([
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("travel_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase
+      .from("leave_requests")
+      .select("id", { count: "exact", head: true })
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .eq("status", "approved"),
+    supabase
+      .from("travel_requests")
+      .select("id", { count: "exact", head: true })
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .eq("status", "approved"),
+    supabase
+      .from("leave_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("updated_at", startOfMonth),
+    supabase
+      .from("travel_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("updated_at", startOfMonth),
+    supabase
+      .from("leave_requests")
+      .select("id, total_days, created_at, leave_types(name), profiles!leave_requests_employee_id_fkey(first_name_th, last_name_th)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(5),
+    supabase
+      .from("travel_requests")
+      .select("id, total_days, location, travel_type, created_at, profiles!travel_requests_employee_id_fkey(first_name_th, last_name_th), expenses:travel_expenses(estimated_amount)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(5),
+    supabase
+      .from("leave_requests")
+      .select("id, leave_types(name), profiles!leave_requests_employee_id_fkey(first_name_th, last_name_th)")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .eq("status", "approved")
+      .limit(8),
+  ]);
+
+  const now = Date.now();
+  const initialsOf = (first?: string, last?: string) => {
+    const f = (first || "").trim();
+    const l = (last || "").trim();
+    if (!f && !l) return "?";
+    return ((f[0] ?? "") + (l[0] ?? "")).toUpperCase();
+  };
+
+  const queueLeaves = (queueLeavesRes.data ?? []).map((r) => {
+    const p = r.profiles as { first_name_th: string; last_name_th: string } | null;
+    const lt = r.leave_types as { name: string } | null;
+    const hours = (now - new Date(r.created_at).getTime()) / 36e5;
+    return {
+      id: r.id,
+      type: "leave" as const,
+      name: p ? `${p.first_name_th} ${p.last_name_th}` : "ไม่ทราบชื่อ",
+      initials: initialsOf(p?.first_name_th, p?.last_name_th),
+      detail: `${lt?.name ?? "ลา"} · ${r.total_days} วัน`,
+      waitingHours: hours,
+      urgent: hours > 48,
+    };
+  });
+
+  const queueTravel = (queueTravelRes.data ?? []).map((r) => {
+    const p = r.profiles as { first_name_th: string; last_name_th: string } | null;
+    const exps = (r.expenses ?? []) as Array<{ estimated_amount: number }>;
+    const budget = exps.reduce((s, e) => s + Number(e.estimated_amount ?? 0), 0);
+    const hours = (now - new Date(r.created_at).getTime()) / 36e5;
+    return {
+      id: r.id,
+      type: "travel" as const,
+      name: p ? `${p.first_name_th} ${p.last_name_th}` : "ไม่ทราบชื่อ",
+      initials: initialsOf(p?.first_name_th, p?.last_name_th),
+      detail: `${r.location} · ${r.total_days} วัน · ฿${budget.toLocaleString()}`,
+      waitingHours: hours,
+      urgent: hours > 48,
+    };
+  });
+
+  const queue = [...queueLeaves, ...queueTravel]
+    .sort((a, b) => b.waitingHours - a.waitingHours)
+    .slice(0, 6);
+
+  const todayLeaves = (todayLeavesListRes.data ?? []).map((r) => {
+    const p = r.profiles as { first_name_th: string; last_name_th: string } | null;
+    const lt = r.leave_types as { name: string } | null;
+    return {
+      name: p ? `${p.first_name_th} ${p.last_name_th}` : "—",
+      initials: initialsOf(p?.first_name_th, p?.last_name_th),
+      leaveType: lt?.name ?? "ลา",
+    };
+  });
+
+  return {
+    pendingLeavesCount: pendingLeavesRes.count ?? 0,
+    pendingTravelCount: pendingTravelRes.count ?? 0,
+    teamCount: teamRes.count ?? 0,
+    leavesToday: leavesTodayRes.count ?? 0,
+    travelToday: travelTodayRes.count ?? 0,
+    approvalsThisMonth: (monthApprovedLeavesRes.count ?? 0) + (monthApprovedTravelRes.count ?? 0),
+    queue,
+    todayLeaves,
+  };
+}
+
+export interface HrDashboardData {
+  totalEmployees: number;
+  pendingLeavesCount: number;
+  pendingTravelCount: number;
+  approvedToday: number;
+  paperPending: number;
+  scannedPending: number;
+  pipeline: { pending: number; approved: number; completed: number; rejected: number };
+  recentDocs: Array<{
+    id: string;
+    type: "leave" | "travel";
+    name: string;
+    initials: string;
+    dept: string;
+    status: string;
+    channel: string | null;
+    createdAt: string;
+  }>;
+  departments: Array<{ name: string; total: number }>;
+}
+
+export async function getHrDashboardData(): Promise<HrDashboardData> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkManagerOrAbove(supabase, user.id);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [
+    totalEmpRes,
+    pendingLeavesRes,
+    pendingTravelRes,
+    approvedTodayLeavesRes,
+    approvedTodayTravelRes,
+    paperPendingRes,
+    scannedPendingRes,
+    leavePipelineRes,
+    travelPipelineRes,
+    recentLeavesRes,
+    recentTravelRes,
+    departmentsRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("travel_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("leave_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("updated_at", `${today}T00:00:00`),
+    supabase
+      .from("travel_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .gte("updated_at", `${today}T00:00:00`),
+    supabase
+      .from("travel_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("submission_channel", "paper")
+      .in("status", ["pending", "approved"]),
+    supabase
+      .from("travel_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("submission_channel", "paper")
+      .eq("status", "approved")
+      .is("order_document_url", null),
+    supabase.from("leave_requests").select("status"),
+    supabase.from("travel_requests").select("status"),
+    supabase
+      .from("leave_requests")
+      .select("id, status, submission_channel, created_at, profiles!leave_requests_employee_id_fkey(first_name_th, last_name_th, departments(name))")
+      .order("created_at", { ascending: false })
+      .limit(4),
+    supabase
+      .from("travel_requests")
+      .select("id, status, submission_channel, created_at, profiles!travel_requests_employee_id_fkey(first_name_th, last_name_th, departments(name))")
+      .order("created_at", { ascending: false })
+      .limit(4),
+    supabase.from("departments").select("id, name, profiles(id)"),
+  ]);
+
+  const initialsOf = (first?: string, last?: string) => {
+    const f = (first || "").trim();
+    const l = (last || "").trim();
+    if (!f && !l) return "?";
+    return ((f[0] ?? "") + (l[0] ?? "")).toUpperCase();
+  };
+
+  const pipeline = { pending: 0, approved: 0, completed: 0, rejected: 0 };
+  for (const r of leavePipelineRes.data ?? []) {
+    if (r.status in pipeline) (pipeline as Record<string, number>)[r.status]++;
+  }
+  for (const r of travelPipelineRes.data ?? []) {
+    if (r.status in pipeline) (pipeline as Record<string, number>)[r.status]++;
+  }
+
+  type ProfileWithDept = {
+    first_name_th: string;
+    last_name_th: string;
+    departments: { name: string } | null;
+  } | null;
+
+  const recentLeaves = (recentLeavesRes.data ?? []).map((r) => {
+    const p = r.profiles as ProfileWithDept;
+    return {
+      id: r.id,
+      type: "leave" as const,
+      name: p ? `${p.first_name_th} ${p.last_name_th}` : "—",
+      initials: initialsOf(p?.first_name_th, p?.last_name_th),
+      dept: p?.departments?.name ?? "—",
+      status: r.status,
+      channel: r.submission_channel,
+      createdAt: r.created_at,
+    };
+  });
+
+  const recentTravel = (recentTravelRes.data ?? []).map((r) => {
+    const p = r.profiles as ProfileWithDept;
+    return {
+      id: r.id,
+      type: "travel" as const,
+      name: p ? `${p.first_name_th} ${p.last_name_th}` : "—",
+      initials: initialsOf(p?.first_name_th, p?.last_name_th),
+      dept: p?.departments?.name ?? "—",
+      status: r.status,
+      channel: r.submission_channel,
+      createdAt: r.created_at,
+    };
+  });
+
+  const recentDocs = [...recentLeaves, ...recentTravel]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  const departments = (departmentsRes.data ?? []).map((d) => ({
+    name: d.name as string,
+    total: ((d as { profiles?: unknown[] }).profiles ?? []).length,
+  }));
+
+  return {
+    totalEmployees: totalEmpRes.count ?? 0,
+    pendingLeavesCount: pendingLeavesRes.count ?? 0,
+    pendingTravelCount: pendingTravelRes.count ?? 0,
+    approvedToday: (approvedTodayLeavesRes.count ?? 0) + (approvedTodayTravelRes.count ?? 0),
+    paperPending: paperPendingRes.count ?? 0,
+    scannedPending: scannedPendingRes.count ?? 0,
+    pipeline,
+    recentDocs,
+    departments,
+  };
+}
+
+export interface AdminDashboardData {
+  totalUsers: number;
+  rolesDistribution: Array<{ role: string; count: number }>;
+  recentAuditLogs: Array<{
+    id: string;
+    timestamp: string;
+    user: string;
+    initials: string;
+    action: string;
+    target: string;
+  }>;
+  alertsCount: number;
+  apiCalls24h: number;
+}
+
+async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (error || !profile || profile.role !== "admin") throw new Error("Forbidden");
+}
+
+export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkAdmin(supabase, user.id);
+
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [usersRes, rolesRes, auditRes, apiCallsRes] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    supabase.from("profiles").select("role"),
+    supabase
+      .from("audit_logs")
+      .select("id, action, target_type, target_id, created_at, user_id")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    supabase
+      .from("audit_logs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", dayAgo),
+  ]);
+
+  const roleCounts: Record<string, number> = { employee: 0, manager: 0, hr: 0, admin: 0 };
+  for (const r of rolesRes.data ?? []) {
+    if (r.role in roleCounts) roleCounts[r.role]++;
+  }
+
+  const initialsOf = (first?: string, last?: string) => {
+    const f = (first || "").trim();
+    const l = (last || "").trim();
+    if (!f && !l) return "?";
+    return ((f[0] ?? "") + (l[0] ?? "")).toUpperCase();
+  };
+
+  // Fetch user names for audit log entries (separate query — audit_logs has no FK relation)
+  const userIds = Array.from(new Set((auditRes.data ?? []).map((a) => a.user_id)));
+  const namesByUserId: Record<string, { first: string; last: string }> = {};
+  if (userIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, first_name_th, last_name_th")
+      .in("id", userIds);
+    for (const p of profilesData ?? []) {
+      namesByUserId[p.id] = {
+        first: p.first_name_th ?? "",
+        last: p.last_name_th ?? "",
+      };
+    }
+  }
+
+  const recentAuditLogs = (auditRes.data ?? []).map((a) => {
+    const name = namesByUserId[a.user_id];
+    return {
+      id: a.id,
+      timestamp: a.created_at,
+      user: name ? `${name.first} ${name.last}`.trim() || "system" : "system",
+      initials: name ? initialsOf(name.first, name.last) : "S",
+      action: a.action,
+      target: `${a.target_type}#${a.target_id.slice(0, 8)}`,
+    };
+  });
+
+  return {
+    totalUsers: usersRes.count ?? 0,
+    rolesDistribution: Object.entries(roleCounts).map(([role, count]) => ({ role, count })),
+    recentAuditLogs,
+    alertsCount: 0,
+    apiCalls24h: apiCallsRes.count ?? 0,
+  };
+}

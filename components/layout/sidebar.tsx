@@ -99,6 +99,35 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
           </div>
         </div>
 
+        {/* Role chip */}
+        {!collapsed && (
+          <div className="px-3 pt-3">
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg bg-sidebar-accent/60 ring-1 animate-fade-in",
+              {
+                "ring-sky-400/60": role === "employee",
+                "ring-violet-400/60": role === "manager",
+                "ring-emerald-400/60": role === "hr",
+                "ring-rose-400/60": role === "admin",
+              }
+            )}>
+              <span className={cn("w-1.5 h-1.5 rounded-full", {
+                "bg-sky-400": role === "employee",
+                "bg-violet-400": role === "manager",
+                "bg-emerald-400": role === "hr",
+                "bg-rose-400": role === "admin",
+              })}></span>
+              <span className="text-[11px] uppercase tracking-wider font-mono font-semibold text-sidebar-foreground/60">Role</span>
+              <span className="ml-auto text-[12px] font-semibold text-white">
+                {role === "employee" && "Employee"}
+                {role === "manager" && "Manager"}
+                {role === "hr" && "HR"}
+                {role === "admin" && "Admin"}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto scrollbar-thin py-4 px-3">
           <ul className="space-y-6">

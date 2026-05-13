@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Safelist color utilities used dynamically by role-aware dashboards */
+@source inline("{bg,text,border,ring}-{slate,sky,emerald,amber,rose,violet,indigo}-{50,100,200,300,400,500,600,700,800,900}");
+@source inline("bg-gradient-to-br from-{sky,emerald,amber,rose,violet,indigo}-{400,500,600} to-{sky,emerald,amber,rose,violet,indigo}-{600,700,800}");
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -141,6 +145,13 @@
   .dotted-bg {
     background-image: radial-gradient(rgba(99,102,241,0.12) 1px, transparent 1px);
     background-size: 16px 16px;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent);
   }
   .scrollbar-thin::-webkit-scrollbar { width: 6px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 3px; }

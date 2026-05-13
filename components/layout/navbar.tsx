@@ -39,6 +39,27 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
     employee: "พนักงาน",
   };
 
+  // Role-tinted avatar gradient (matches dashboard role accents)
+  const roleGradient: Record<string, string> = {
+    admin: "from-rose-400 to-rose-600",
+    hr: "from-emerald-400 to-emerald-600",
+    manager: "from-violet-400 to-violet-600",
+    employee: "from-sky-400 to-sky-600",
+  };
+  const avatarGradient = profile?.role
+    ? roleGradient[profile.role]
+    : "from-indigo-400 to-indigo-600";
+
+  const roleBadgeCls: Record<string, string> = {
+    admin: "text-rose-700 bg-rose-50 border-rose-100",
+    hr: "text-emerald-700 bg-emerald-50 border-emerald-100",
+    manager: "text-violet-700 bg-violet-50 border-violet-100",
+    employee: "text-sky-700 bg-sky-50 border-sky-100",
+  };
+  const roleBadgeStyle = profile?.role
+    ? roleBadgeCls[profile.role]
+    : "text-primary bg-primary/10 border-primary/20";
+
   return (
     <header className="sticky top-0 z-30 bg-background border-b border-border">
       <div className="h-16 px-4 sm:px-6 flex items-center gap-3">
@@ -88,8 +109,8 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
           {/* User dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-2.5 sm:pl-1 sm:pr-2 py-1 rounded-lg hover:bg-muted focus:outline-none">
-              {/* Avatar */}
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-[13px] font-semibold shadow-sm">
+              {/* Avatar — role-tinted */}
+              <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-[13px] font-semibold shadow-sm", avatarGradient)}>
                 {initials}
               </div>
               <div className="hidden sm:flex flex-col items-start min-w-0">
@@ -97,7 +118,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
                   {profile?.full_name ?? "Loading…"}
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-1.5 py-px rounded">
+                  <span className={cn("text-[10px] font-medium border px-1.5 py-px rounded", roleBadgeStyle)}>
                     {profile?.role ? roleLabel[profile.role] : "—"}
                   </span>
                 </div>
@@ -108,7 +129,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
             <DropdownMenuContent align="end" className="w-64 rounded-xl p-0 overflow-hidden shadow-lg border border-border animate-fade-in">
               <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-[14px] font-semibold">
+                  <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-[14px] font-semibold", avatarGradient)}>
                     {initials}
                   </div>
                   <div className="min-w-0">
@@ -121,8 +142,13 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
                   </div>
                 </div>
                 {profile?.role && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  <div className={cn("mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium border px-2 py-0.5 rounded", roleBadgeStyle)}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full", {
+                      "bg-rose-500": profile.role === "admin",
+                      "bg-emerald-500": profile.role === "hr",
+                      "bg-violet-500": profile.role === "manager",
+                      "bg-sky-500": profile.role === "employee",
+                    })}></span>
                     {roleLabel[profile.role]}
                   </div>
                 )}
