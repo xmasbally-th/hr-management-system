@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { approveTravelRequest, rejectTravelRequest, completeTravelRequest, updateActualExpense } from "@/lib/actions/travel-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, FileDown } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp, FileDown, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 
@@ -151,6 +152,11 @@ export function HrTravelClient({ requests }: { requests: (TravelRequestRow | Rec
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Link href={`/dashboard/travel/${req.id}`}>
+                        <Button size="icon" variant="ghost" title="ดูรายละเอียด">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       {req.status === "pending" && (
                         <>
                           <Button size="icon" variant="ghost" onClick={() => setConfirmAction({ type: "approve", id: req.id, employeeName: req.employee?.full_name ?? "-" })} disabled={isPending} className="text-green-600 hover:text-green-700 hover:bg-green-50">
