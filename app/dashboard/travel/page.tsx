@@ -96,11 +96,15 @@ export default async function TravelPage({ searchParams }: TravelPageProps) {
               const totalActual = expenses.reduce((sum, e) => sum + (e.actual_amount ?? 0), 0);
 
               return (
-                <TableRow key={req.id as string}>
+                <TableRow key={req.id as string} className="hover:bg-muted/30">
                   <TableCell>
                     <Badge variant="outline">{travelTypeMap[req.travel_type as string] ?? (req.travel_type as string)}</Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{req.title as string}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/dashboard/travel/${req.id as string}`} className="hover:underline">
+                      {req.title as string}
+                    </Link>
+                  </TableCell>
                   <TableCell>{req.location as string}</TableCell>
                   <TableCell className="text-sm">
                     {req.start_date as string} ~ {req.end_date as string}

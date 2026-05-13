@@ -256,6 +256,90 @@ export async function createTravelRequestByHr(
   return { success: true, id: request.id };
 }
 
+/* ── Read: Single travel request (owner OR HR/admin/manager) ────────── */
+
+export async function getTravelRequestById(requestId: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+
+  const { data, error } = await supabase
+    .from("travel_requests")
+    .select(`
+      *,
+      employee:profiles!travel_requests_employee_id_fkey(id, full_name, email, position_title, department_id),
+      approver:profiles!travel_requests_approver_id_fkey(id, full_name, email),
+      expenses:travel_expenses(*)
+    `)
+    .eq("id", requestId)
+    .single();
+
+  if (error || !data) throw new Error("ไม่พบข้อมูลคำขอเดินทาง");
+
+  const isOwner = data.employee_id === user.id;
+  const isPrivileged = profile && ["hr", "admin", "manager"].includes(profile.role);
+  if (!isOwner && !isPrivileged) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  return data;
+}
+
+/* ── Cancel travel request (owner only, pending status) ──────────────── */
+
+export async function cancelTravelRequest(requestId: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+
+  const { error } = await supabase
+    .from("travel_requests")
+    .update({ status: "cancelled" as const })
+    .eq("id", requestId)
+    .eq("employee_id", user.id)
+    .eq("status", "pending");
+
+  if (error) throw new Error("ไม่สามารถยกเลิกคำขอเดินทางได้ (อาจถูกอนุมัติแล้ว)");
+
+  await logAudit(supabase, user.id, "cancel_travel", "travel_request", requestId);
+
+  revalidatePath(`/dashboard/travel/${requestId}`);
+  revalidatePath("/dashboard/travel");
+  revalidatePath("/dashboard/hr/travel");
+}
+
+/* ── Upload scanned signed travel order (HR/Admin only) ──────────────── */
+
+export async function updateTravelScannedDocument(requestId: string, scannedPath: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  const { error } = await supabase
+    .from("travel_requests")
+    .update({ order_document_url: scannedPath || null })
+    .eq("id", requestId);
+
+  if (error) throw new Error("ไม่สามารถบันทึกเอกสารสแกนได้");
+
+  await logAudit(supabase, user.id, "update_travel_scanned_doc", "travel_request", requestId);
+
+  revalidatePath(`/dashboard/travel/${requestId}`);
+  revalidatePath("/dashboard/travel");
+  revalidatePath("/dashboard/hr/travel");
+}
+
 export async function approveTravelRequest(requestId: string) {
   if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
 
