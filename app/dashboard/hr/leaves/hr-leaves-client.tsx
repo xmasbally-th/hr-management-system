@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useTransition, useState } from "react";
 import { approveLeaveRequest, rejectLeaveRequest } from "@/lib/actions/leave-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Eye } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 
@@ -108,28 +109,35 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </TableCell>
                   <TableCell>
-                    {req.status === "pending" && (
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openApproveDialog(req.id, req.employee?.full_name ?? "-")}
-                          disabled={isPending}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        >
-                          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                    <div className="flex gap-1">
+                      <Link href={`/dashboard/leaves/${req.id}`}>
+                        <Button size="icon" variant="ghost" title="ดูรายละเอียด">
+                          <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => openRejectDialog(req.id, req.employee?.full_name ?? "-")}
-                          disabled={isPending}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                      </Link>
+                      {req.status === "pending" && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openApproveDialog(req.id, req.employee?.full_name ?? "-")}
+                            disabled={isPending}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openRejectDialog(req.id, req.employee?.full_name ?? "-")}
+                            disabled={isPending}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );

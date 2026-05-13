@@ -160,6 +160,34 @@ export interface CreateLeaveRequestInput {
   };
 }
 
+/**
+ * Enforce business rules tied to leave type (e.g. maternity = exactly 90 days).
+ * Throws Thai error if violated. Lookup is a single SELECT so callers can pre-validate.
+ */
+async function enforceLeaveTypeRules(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  leaveTypeId: string,
+  totalDays: number,
+  expectedDeliveryDate: string | null | undefined,
+) {
+  const { data: lt } = await supabase
+    .from("leave_types")
+    .select("name")
+    .eq("id", leaveTypeId)
+    .single();
+  const name = (lt?.name ?? "").toLowerCase();
+  const isMaternity = name.includes("คลอด") || name.includes("maternity");
+
+  if (isMaternity) {
+    if (totalDays !== 90) {
+      throw new Error("ลาคลอดต้องเป็น 90 วันเท่านั้น");
+    }
+    if (!expectedDeliveryDate) {
+      throw new Error("กรุณาระบุวันที่กำหนดคลอด");
+    }
+  }
+}
+
 export async function createLeaveRequest(input: CreateLeaveRequestInput) {
   if (!UUID_RE.test(input.leave_type_id)) {
     throw new Error("รหัสประเภทลาไม่ถูกต้อง");
@@ -172,6 +200,8 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   checkRateLimit(user.id);
+
+  await enforceLeaveTypeRules(supabase, input.leave_type_id, input.total_days, input.expected_delivery_date);
 
   const { data: request, error } = await supabase
     .from("leave_requests")
@@ -254,6 +284,7 @@ export async function createLeaveRequestByHr(
   }
 
   await validateEmployeeExists(supabase, employeeId);
+  await enforceLeaveTypeRules(supabase, input.leave_type_id, input.total_days, input.expected_delivery_date);
 
   const { data: request, error } = await supabase
     .from("leave_requests")
@@ -386,6 +417,66 @@ export async function cancelLeaveRequest(requestId: string) {
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
+}
+
+/* ── Read: Single leave request (employee owner OR HR/admin/manager) ── */
+
+export async function getLeaveRequestById(requestId: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .select(`
+      *,
+      leave_type:leave_types(id, name, max_days_per_year),
+      employee:profiles!leave_requests_employee_id_fkey(id, full_name, email, position_title, department_id),
+      approver:profiles!leave_requests_approver_id_fkey(id, full_name, email),
+      vacation_details:leave_vacation_details(
+        accumulated_days, annual_days, branch_head_opinion,
+        substitute_1:profiles!leave_vacation_details_substitute_1_id_fkey(id, full_name),
+        substitute_2:profiles!leave_vacation_details_substitute_2_id_fkey(id, full_name),
+        substitute_3:profiles!leave_vacation_details_substitute_3_id_fkey(id, full_name)
+      )
+    `)
+    .eq("id", requestId)
+    .single();
+
+  if (error || !data) throw new Error("ไม่พบข้อมูลคำขอลา");
+
+  const isOwner = data.employee_id === user.id;
+  const isPrivileged = profile && ["hr", "admin", "manager"].includes(profile.role);
+  if (!isOwner && !isPrivileged) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  return data;
+}
+
+/* ── Update: Medical certificate (owner only) ─────────────────────────── */
+
+export async function updateLeaveMedicalCert(requestId: string, certPath: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+
+  const { error } = await supabase
+    .from("leave_requests")
+    .update({ medical_cert_url: certPath || null })
+    .eq("id", requestId)
+    .eq("employee_id", user.id);
+
+  if (error) throw new Error("ไม่สามารถบันทึกใบรับรองแพทย์ได้");
+
+  await logAudit(supabase, user.id, "update_medical_cert", "leave_request", requestId);
+
+  revalidatePath(`/dashboard/leaves/${requestId}`);
+  revalidatePath("/dashboard/leaves");
 }
 
 export async function getEmployeesForSelection() {

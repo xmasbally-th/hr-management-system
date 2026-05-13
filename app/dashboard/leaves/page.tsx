@@ -93,9 +93,11 @@ export default async function LeavesPage({ searchParams }: LeavesPageProps) {
             {result.data.map((req) => {
               const s = statusMap[req.status as string] ?? { label: req.status as string, variant: "outline" as const };
               return (
-                <TableRow key={req.id as string}>
+                <TableRow key={req.id as string} className="hover:bg-muted/30">
                   <TableCell className="font-medium">
-                    {(req.leave_type as { name: string } | null)?.name ?? "-"}
+                    <Link href={`/dashboard/leaves/${req.id as string}`} className="hover:underline">
+                      {(req.leave_type as { name: string } | null)?.name ?? "-"}
+                    </Link>
                   </TableCell>
                   <TableCell>{req.start_date as string}</TableCell>
                   <TableCell>{req.end_date as string}</TableCell>

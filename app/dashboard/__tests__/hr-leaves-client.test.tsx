@@ -98,21 +98,22 @@ describe("HrLeavesClient", () => {
 
   it("shows approve/reject buttons ONLY for pending requests", () => {
     render(<HrLeavesClient requests={REQUESTS} />);
-    // The pending row (req-1) should have 2 action buttons
+    // The pending row (req-1) should have 3 action buttons: View + Approve + Reject
     const allRows = screen.getAllByRole("row");
     // row index: 0=header, 1=req-1(pending), 2=req-2(approved), 3=req-3(rejected)
     const pendingRow = allRows[1];
     const pendingButtons = within(pendingRow).getAllByRole("button");
-    expect(pendingButtons.length).toBe(2);
+    expect(pendingButtons.length).toBe(3);
   });
 
-  it("does NOT show approve/reject buttons for approved/rejected requests", () => {
+  it("does NOT show approve/reject buttons for approved/rejected requests, but keeps view button", () => {
     render(<HrLeavesClient requests={REQUESTS} />);
     const allRows = screen.getAllByRole("row");
     const approvedRow = allRows[2];
     const rejectedRow = allRows[3];
-    expect(within(approvedRow).queryAllByRole("button")).toHaveLength(0);
-    expect(within(rejectedRow).queryAllByRole("button")).toHaveLength(0);
+    // Only the View (Eye) button remains for non-pending rows
+    expect(within(approvedRow).queryAllByRole("button")).toHaveLength(1);
+    expect(within(rejectedRow).queryAllByRole("button")).toHaveLength(1);
   });
 
   it("shows empty message when no requests", () => {
@@ -125,8 +126,8 @@ describe("HrLeavesClient", () => {
     const allRows = screen.getAllByRole("row");
     const pendingRow = allRows[1];
     const buttons = within(pendingRow).getAllByRole("button");
-    // First button opens approve dialog
-    fireEvent.click(buttons[0]);
+    // Button index: 0=View, 1=Approve, 2=Reject
+    fireEvent.click(buttons[1]);
 
     // Wait for confirmation dialog to appear and click confirm
     await vi.waitFor(() => {
@@ -145,8 +146,8 @@ describe("HrLeavesClient", () => {
     const allRows = screen.getAllByRole("row");
     const pendingRow = allRows[1];
     const buttons = within(pendingRow).getAllByRole("button");
-    // Second button opens reject dialog
-    fireEvent.click(buttons[1]);
+    // Button index: 0=View, 1=Approve, 2=Reject
+    fireEvent.click(buttons[2]);
 
     // Wait for rejection dialog
     await vi.waitFor(() => {
