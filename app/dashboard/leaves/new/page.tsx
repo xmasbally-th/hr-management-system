@@ -1,10 +1,17 @@
-import { getLeaveTypes, getEmployeesForSelection } from "@/lib/actions/leave-actions";
+import {
+  getLeaveTypes,
+  getEmployeesForSelection,
+  getMyLeaveBalances,
+} from "@/lib/actions/leave-actions";
 import { LeaveRequestForm } from "./leave-request-form";
 
 export const metadata = { title: "ยื่นคำขอลา" };
 
 export default async function NewLeavePage() {
-  const leaveTypes = await getLeaveTypes();
+  const [leaveTypes, balancesRaw] = await Promise.all([
+    getLeaveTypes(),
+    getMyLeaveBalances().catch(() => []),
+  ]);
 
   let employees: { id: string; full_name: string; email: string }[] = [];
   try {
@@ -13,16 +20,21 @@ export default async function NewLeavePage() {
     // Non-HR users won't have access — that's expected
   }
 
-  return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">ยื่นคำขอลา</h1>
-        <p className="text-muted-foreground">เลือกประเภทการลาและกรอกข้อมูลให้ครบถ้วน</p>
-      </div>
+  const balances = (balancesRaw ?? []).map((b) => {
+    const r = b as Record<string, unknown>;
+    const lt = r.leave_type as { name: string } | null;
+    return {
+      typeName: lt?.name ?? "",
+      totalDays: Number(r.total_days ?? 0),
+      usedDays: Number(r.used_days ?? 0),
+    };
+  });
 
-      <div className="border rounded-xl p-6 bg-card shadow-sm">
-        <LeaveRequestForm leaveTypes={leaveTypes} employees={employees} />
-      </div>
-    </div>
+  return (
+    <LeaveRequestForm
+      leaveTypes={leaveTypes}
+      employees={employees}
+      balances={balances}
+    />
   );
 }

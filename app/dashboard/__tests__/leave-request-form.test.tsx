@@ -6,9 +6,8 @@ import { LeaveRequestForm } from "../leaves/new/leave-request-form";
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockPush = vi.fn();
-const mockBack = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: vi.fn(() => ({ push: mockPush, back: mockBack })),
+  useRouter: vi.fn(() => ({ push: mockPush, back: vi.fn() })),
 }));
 
 const mockCreateLeaveRequest = vi.fn();
@@ -20,17 +19,17 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-// Mock Shadcn Select as native <select> using module-level callback ref.
-let __latestOnValueChange: ((v: string) => void) | null = null;
+// Mock FileUpload — no real upload in tests
+vi.mock("@/components/file-upload", () => ({
+  FileUpload: () => <div data-testid="file-upload" />,
+}));
 
+// Mock Shadcn Select as native <select>
+let __latestOnValueChange: ((v: string) => void) | null = null;
 vi.mock("@/components/ui/select", () => ({
   Select: ({ children, value, onValueChange }: any) => {
     __latestOnValueChange = onValueChange;
-    return (
-      <div data-testid="select-wrapper" data-value={value}>
-        {children}
-      </div>
-    );
+    return <div data-value={value}>{children}</div>;
   },
   SelectTrigger: ({ children }: any) => <div>{children}</div>,
   SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
@@ -48,13 +47,13 @@ vi.mock("@/components/ui/select", () => ({
   ),
 }));
 
-// ─── Test fixtures ──────────────────────────────────────────────────────────
+// ─── Fixtures ───────────────────────────────────────────────────────────────
 
 const LEAVE_TYPES = [
-  { id: "lt-1", name: "ลาป่วย", max_days_per_year: 30, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-2", name: "ลากิจ", max_days_per_year: 10, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-3", name: "ลาคลอด", max_days_per_year: 90, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-4", name: "ลาพักผ่อน", max_days_per_year: 10, is_accumulative: true, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-vac", name: "ลาพักผ่อน", max_days_per_year: 10, is_accumulative: true, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-sick", name: "ลาป่วย", max_days_per_year: 30, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-per", name: "ลากิจ", max_days_per_year: 10, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-mat", name: "ลาคลอด", max_days_per_year: 90, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
 ];
 
 const EMPLOYEES = [
@@ -62,145 +61,66 @@ const EMPLOYEES = [
   { id: "emp-2", full_name: "สมหญิง ดีใจ", email: "somying@test.com" },
 ];
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+beforeEach(() => {
+  mockPush.mockClear();
+  mockCreateLeaveRequest.mockReset();
+  localStorage.clear();
+});
 
 function renderForm() {
-  return render(
-    <LeaveRequestForm leaveTypes={LEAVE_TYPES} employees={EMPLOYEES} />,
-  );
-}
-
-function selectLeaveType(id: string) {
-  const selects = screen.getAllByTestId("mock-select");
-  fireEvent.change(selects[0], { target: { value: id } });
-}
-
-function getDateInputs() {
-  return document.querySelectorAll<HTMLInputElement>('input[type="date"]');
-}
-
-function fillRequiredFields(leaveTypeId = "lt-2") {
-  selectLeaveType(leaveTypeId);
-  const dateInputs = getDateInputs();
-  fireEvent.change(dateInputs[0], { target: { value: "2026-06-01" } });
-  fireEvent.change(dateInputs[1], { target: { value: "2026-06-03" } });
-  // Placeholder has encoding artifacts — find the reason input by its text input type
-  // It's the first non-date, non-number text input after the date fields
-  const textInputs = document.querySelectorAll<HTMLInputElement>(
-    'input:not([type="date"]):not([type="number"])',
-  );
-  // First text input = reason, second = contact number
-  const reasonInput = textInputs[0];
-  fireEvent.change(reasonInput, { target: { value: "ธุระส่วนตัว" } });
+  return render(<LeaveRequestForm leaveTypes={LEAVE_TYPES} employees={EMPLOYEES} />);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("LeaveRequestForm", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCreateLeaveRequest.mockResolvedValue(undefined);
+describe("LeaveRequestForm (4-in-1 redesign)", () => {
+  it("renders the 4 leave type tiles", () => {
+    renderForm();
+    expect(screen.getAllByText("ลาพักผ่อน").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("ลาป่วย").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("ลากิจ").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("ลาคลอด").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders without crashing", () => {
+  it("defaults to vacation type and shows substitute fields", () => {
     renderForm();
-    expect(screen.getByText("ส่งคำขอลา")).toBeInTheDocument();
+    expect(screen.getByText(/ผู้ปฏิบัติหน้าที่แทนคนที่ 1/)).toBeTruthy();
   });
 
-  it("shows submit button disabled when required fields are empty", () => {
+  it("switches to sick type and shows symptoms field", () => {
     renderForm();
-    const button = screen.getByRole("button", { name: /ส่งคำขอลา/ });
-    expect(button).toBeDisabled();
+    // Click the sick tab pill (one of them in the pill row — last "ลาป่วย" is the pill)
+    const sickTexts = screen.getAllByText("ลาป่วย");
+    fireEvent.click(sickTexts[sickTexts.length - 1].closest("button")!);
+    expect(screen.getByText(/อาการเจ็บป่วย/)).toBeTruthy();
   });
 
-  it("shows validation error when submitting without required fields", () => {
+  it("auto-fills date range from EDD when maternity is selected", () => {
     renderForm();
-    const form = document.querySelector("form")!;
-    fireEvent.submit(form);
-    expect(screen.getByText("กรุณากรอกข้อมูลให้ครบถ้วน")).toBeInTheDocument();
+    const matTexts = screen.getAllByText("ลาคลอด");
+    fireEvent.click(matTexts[matTexts.length - 1].closest("button")!);
+
+    const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    // First date input in the rose pregnancy-info card is the EDD
+    const edd = dateInputs[0];
+    fireEvent.change(edd, { target: { value: "2026-06-01" } });
+
+    // Start date = EDD - 30 = 2026-05-02 ; End date = +89 = 2026-07-30
+    const startInput = dateInputs[1];
+    const endInput = dateInputs[2];
+    expect(startInput.value).toBe("2026-05-02");
+    expect(endInput.value).toBe("2026-07-30");
   });
 
-  it("calculates totalDays correctly from start and end dates", () => {
+  it("blocks vacation submit without substitute 1", async () => {
     renderForm();
-    selectLeaveType("lt-2");
-    const dateInputs = getDateInputs();
+    const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
     fireEvent.change(dateInputs[0], { target: { value: "2026-06-01" } });
     fireEvent.change(dateInputs[1], { target: { value: "2026-06-03" } });
 
-    expect(screen.getByText("3")).toBeInTheDocument();
-  });
+    fireEvent.click(screen.getByRole("button", { name: /ส่งคำขอลา/ }));
 
-  it("shows maternity field when maternity type is selected", () => {
-    renderForm();
-    selectLeaveType("lt-3"); // ลาคลอด
-
-    expect(screen.getByText("วันที่คาดว่าจะคลอด")).toBeInTheDocument();
-  });
-
-  it("shows vacation fields when vacation type is selected", () => {
-    renderForm();
-    selectLeaveType("lt-4"); // ลาพักผ่อน
-
-    expect(screen.getByText("ข้อมูลเพิ่มเติมสำหรับลาพักผ่อน")).toBeInTheDocument();
-    expect(screen.getByText("วันสะสมจากปีก่อน")).toBeInTheDocument();
-    expect(screen.getByText("วันลาพักผ่อนประจำปี")).toBeInTheDocument();
-    expect(screen.getByText("ความเห็นหัวหน้าสาขา")).toBeInTheDocument();
-  });
-
-  it("does NOT show maternity or vacation fields for sick leave", () => {
-    renderForm();
-    selectLeaveType("lt-1"); // ลาป่วย
-
-    expect(screen.queryByText("วันที่คาดว่าจะคลอด")).not.toBeInTheDocument();
-    expect(screen.queryByText("ข้อมูลเพิ่มเติมสำหรับลาพักผ่อน")).not.toBeInTheDocument();
-  });
-
-  it("calls createLeaveRequest on successful submit", async () => {
-    renderForm();
-    fillRequiredFields("lt-2");
-
-    const button = screen.getByRole("button", { name: /ส่งคำขอลา/ });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      expect(mockCreateLeaveRequest).toHaveBeenCalledTimes(1);
-    });
-
-    expect(mockCreateLeaveRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        leave_type_id: "lt-2",
-        start_date: "2026-06-01",
-        end_date: "2026-06-03",
-        total_days: 3,
-        reason: "ธุระส่วนตัว",
-        submission_channel: "digital",
-      }),
-    );
-  });
-
-  it("displays error from server action failure", async () => {
-    mockCreateLeaveRequest.mockRejectedValue(new Error("Server error: ไม่สามารถบันทึกได้"));
-
-    renderForm();
-    fillRequiredFields("lt-2");
-
-    const button = screen.getByRole("button", { name: /ส่งคำขอลา/ });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      expect(screen.getByText("Server error: ไม่สามารถบันทึกได้")).toBeInTheDocument();
-    });
-  });
-
-  it("navigates to leaves list after successful submit", async () => {
-    renderForm();
-    fillRequiredFields("lt-2");
-
-    const button = screen.getByRole("button", { name: /ส่งคำขอลา/ });
-    fireEvent.click(button);
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/dashboard/leaves");
-    });
+    // Validation should prevent submit
+    expect(mockCreateLeaveRequest).not.toHaveBeenCalled();
   });
 });

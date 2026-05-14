@@ -3,19 +3,29 @@ import { getAllLeaveRequests } from "@/lib/actions/leave-actions";
 import { HrLeavesClient } from "./hr-leaves-client";
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
-import { StatusFilter } from "@/components/status-filter";
+import { StatusStatStrip } from "@/components/status-stat-strip";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "จัดการการลา (HR)" };
 
-const statusOptions = [
-  { value: "all", label: "ทั้งหมด" },
-  { value: "pending", label: "รออนุมัติ" },
-  { value: "approved", label: "อนุมัติแล้ว" },
-  { value: "rejected", label: "ไม่อนุมัติ" },
-];
-
 interface HrLeavesPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
+}
+
+async function getStatusCounts() {
+  const supabase = await createClient();
+  const [totalRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }),
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "rejected"),
+  ]);
+  return {
+    total: totalRes.count ?? 0,
+    pending: pendingRes.count ?? 0,
+    approved: approvedRes.count ?? 0,
+    rejected: rejectedRes.count ?? 0,
+  };
 }
 
 export default async function HrLeavesPage({ searchParams }: HrLeavesPageProps) {
@@ -24,7 +34,10 @@ export default async function HrLeavesPage({ searchParams }: HrLeavesPageProps) 
   const search = params.search ?? "";
   const status = params.status ?? "all";
 
-  const result = await getAllLeaveRequests({ page, pageSize: 15, search, status });
+  const [result, counts] = await Promise.all([
+    getAllLeaveRequests({ page, pageSize: 15, search, status }),
+    getStatusCounts(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -33,15 +46,23 @@ export default async function HrLeavesPage({ searchParams }: HrLeavesPageProps) 
         <p className="text-muted-foreground">ตรวจสอบและอนุมัติคำขอลาของพนักงานทั้งหมด</p>
       </div>
 
-      {/* Search + Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Suspense>
-          <SearchInput placeholder="ค้นหาชื่อพนักงาน..." className="sm:w-64" />
-        </Suspense>
-        <Suspense>
-          <StatusFilter options={statusOptions} paramName="status" />
-        </Suspense>
-      </div>
+      {/* Status counter strip — clickable filters */}
+      <Suspense>
+        <StatusStatStrip
+          paramName="status"
+          options={[
+            { value: "all", label: "ทั้งหมด", count: counts.total, tone: "slate" },
+            { value: "pending", label: "รออนุมัติ", count: counts.pending, tone: "amber" },
+            { value: "approved", label: "อนุมัติแล้ว", count: counts.approved, tone: "sky" },
+            { value: "rejected", label: "ไม่อนุมัติ", count: counts.rejected, tone: "rose" },
+          ]}
+        />
+      </Suspense>
+
+      {/* Search */}
+      <Suspense>
+        <SearchInput placeholder="ค้นหาชื่อพนักงาน..." className="sm:w-64" />
+      </Suspense>
 
       <HrLeavesClient requests={result.data} />
 
