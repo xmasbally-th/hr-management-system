@@ -327,7 +327,13 @@ const VALID_ROLES: UserRole[] = ["employee", "manager", "hr", "admin"];
 
 function trim(v: unknown): string | null {
   if (v === null || v === undefined) return null;
-  const s = String(v).trim();
+  let s = String(v).trim();
+  // Strip Excel text-guard wrapper: ="..."  →  ...
+  // This appears when the user opens the template in Excel and re-saves —
+  // our generated template intentionally wraps phone/position_number so
+  // Excel preserves leading zeros.
+  const m = s.match(/^="([\s\S]*)"$/);
+  if (m) s = m[1];
   return s.length > 0 ? s : null;
 }
 

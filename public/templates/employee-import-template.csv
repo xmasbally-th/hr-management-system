@@ -1,4 +1,0 @@
-email,title_th,first_name_th,last_name_th,title_en,first_name_en,last_name_en,position_number,position_title,employee_type,department_name,education_level,birth_date,hire_date,gender,phone,current_address,role
-somchai.j@g.lpru.ac.th,นาย,สมชาย,ใจดี,Mr.,Somchai,Jaidee,P-001,อาจารย์,พนักงานมหาวิทยาลัย,สาขาวิทยาการคอมพิวเตอร์,ปริญญาเอก,1985-05-12,2015-06-01,ชาย,0812345678,123/4 ถ.สนามบิน อ.เมือง จ.ลำปาง,employee
-suchada.k@g.lpru.ac.th,ผศ.ดร.,สุชาดา,กิตติชัย,Asst.Prof.Dr.,Suchada,Kittichai,P-002,ผู้ช่วยศาสตราจารย์,ข้าราชการ,สาขาคณิตศาสตร์,ปริญญาเอก,1978-09-23,2008-05-15,หญิง,0823456789,55/2 ถ.พหลโยธิน อ.เมือง จ.ลำปาง,manager
-admin.it@g.lpru.ac.th,นาย,วิทย์,เทคโน,Mr.,Wit,Techno,P-099,เจ้าหน้าที่ระบบสารสนเทศ,พนักงานมหาวิทยาลัย,งานทรัพยากรบุคคล,ปริญญาตรี,1990-01-10,2018-08-01,ชาย,0898765432,99 หมู่ 5 ต.ชมพู อ.เมือง จ.ลำปาง,hr

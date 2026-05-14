@@ -186,8 +186,8 @@ export function ImportClient() {
               อัปโหลด CSV
             </Button>
             <a
-              href="/templates/employee-import-template.csv"
-              download
+              href="/api/templates/employee-import"
+              download="employee-import-template.csv"
               className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-border bg-card hover:bg-muted"
             >
               <Download className="h-4 w-4" />
@@ -499,6 +499,31 @@ function FormatGuide() {
             ระบบ <b>link อัตโนมัติ</b> ตามอีเมล
           </li>
           <li>นำเข้าได้สูงสุด <b>500 แถวต่อครั้ง</b></li>
+        </ul>
+      </div>
+
+      <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-xs text-sky-900 space-y-2">
+        <div className="font-semibold flex items-center gap-2">
+          💡 หากเปิดไฟล์แม่แบบใน Microsoft Excel
+        </div>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            ภาษาไทยควรแสดงผลถูกต้อง — แม่แบบมี <b>UTF-8 BOM</b> ในตัว
+            (ถ้ายังเห็น <code className="font-mono bg-sky-100 px-1 rounded">เธเธ•เธ•</code> แสดงว่าโหลดไฟล์เก่า ลองเคลียร์ cache แล้วโหลดใหม่)
+          </li>
+          <li>
+            <b>เบอร์โทร</b> และ <b>เลขที่ตำแหน่ง</b> ในแม่แบบใช้รูปแบบ{" "}
+            <code className="font-mono bg-sky-100 px-1 rounded">=&quot;0812345678&quot;</code> เพื่อกัน Excel ตัดเลข 0 หน้า — ระบบจะแกะออกให้อัตโนมัติเมื่อ import
+          </li>
+          <li>
+            <b>แนะนำ:</b> แก้ไขใน Google Sheets หรือ LibreOffice
+            แล้วบันทึกเป็น CSV (UTF-8) จะเสถียรกว่า Excel
+          </li>
+          <li>
+            ถ้า <b>ต้องใช้ Excel</b> เพื่อ save: ใช้{" "}
+            <b>File → Save As → CSV UTF-8 (Comma delimited)</b>{" "}
+            (ไม่ใช่ &quot;CSV (Comma delimited)&quot; แบบเดิม)
+          </li>
         </ul>
       </div>
 
