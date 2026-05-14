@@ -88,19 +88,19 @@ export function EmployeeDashboard({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Welcome hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-card">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
         <div className="absolute inset-0 dotted-bg opacity-60"></div>
         <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-sky-500/5 blur-3xl"></div>
         <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] font-medium text-sky-700 bg-sky-50 border border-sky-100 px-2.5 py-1 rounded-full">
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-sky-700 bg-sky-50 border border-sky-100 px-2.5 py-1 rounded-full">
               <Sparkles className="h-3 w-3" />
               <span>{today}</span>
             </div>
-            <h1 className="mt-3 text-[22px] sm:text-[26px] font-bold text-slate-900 tracking-tight">
+            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               สวัสดี, <span className="text-sky-600">{userName}</span>
             </h1>
-            <p className="mt-1.5 text-[14px] text-slate-600 max-w-lg">
+            <p className="mt-1.5 text-sm text-slate-600 max-w-lg">
               {totalPending > 0 ? (
                 <>
                   คำขอของคุณ{" "}
@@ -113,13 +113,13 @@ export function EmployeeDashboard({
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 href="/dashboard/leaves/new"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-[13px] font-medium hover:bg-slate-800 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition"
               >
                 <Plus className="h-3.5 w-3.5" /> ยื่นใบลา
               </Link>
               <Link
                 href="/dashboard/travel/new"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-slate-200 text-slate-700 text-[13px] font-medium hover:bg-slate-50 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-border text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
               >
                 <Plane className="h-3.5 w-3.5" /> ขออนุญาตเดินทาง
               </Link>
@@ -128,16 +128,16 @@ export function EmployeeDashboard({
 
           {leaveTotal > 0 && (
             <div className="shrink-0 w-44 h-32 rounded-xl bg-gradient-to-br from-sky-600 to-sky-800 text-white p-4 flex flex-col justify-between shadow-lg shadow-sky-900/20">
-              <div className="text-[11px] font-medium text-sky-200">วันลาคงเหลือ</div>
+              <div className="text-xs font-medium text-sky-200">วันลาคงเหลือ</div>
               <div>
-                <div className="text-[32px] font-bold leading-none font-mono">
+                <div className="text-4xl font-bold leading-none font-mono">
                   {leaveTotal - leaveUsed}
-                  <span className="text-[14px] font-medium text-sky-200 ml-1">/{leaveTotal}</span>
+                  <span className="text-sm font-medium text-sky-200 ml-1">/{leaveTotal}</span>
                 </div>
                 <div className="mt-2 h-1.5 bg-white/15 rounded-full overflow-hidden">
                   <div className="h-full bg-white/80 rounded-full" style={{ width: `${pct}%` }}></div>
                 </div>
-                <div className="text-[10px] text-sky-200 mt-1">{vacation?.leaveType ?? "วันลา"}</div>
+                <div className="text-[0.625rem] text-sky-200 mt-1">{vacation?.leaveType ?? "วันลา"}</div>
               </div>
             </div>
           )}
@@ -185,7 +185,7 @@ export function EmployeeDashboard({
           action={
             <Link
               href="/dashboard/leaves"
-              className="text-[12px] text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -194,11 +194,11 @@ export function EmployeeDashboard({
           {recentActivity.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีกิจกรรม</p>
           ) : (
-            <ul className="divide-y divide-slate-100 -mx-1">
+            <ul className="divide-y divide-border/70 -mx-1">
               {recentActivity.slice(0, 5).map((r) => (
                 <li
                   key={`${r.type}-${r.id}`}
-                  className="flex items-center gap-3 py-3 px-1 hover:bg-slate-50/60 rounded-md"
+                  className="flex items-center gap-3 py-3 px-1 hover:bg-muted/40 rounded-md"
                 >
                   <div
                     className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${
@@ -214,10 +214,10 @@ export function EmployeeDashboard({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-slate-900 truncate">
+                    <div className="text-sm font-medium text-slate-900 truncate">
                       {r.description}
                     </div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-xs text-slate-500">
                       {new Date(r.date).toLocaleDateString("th-TH", {
                         day: "numeric",
                         month: "short",
@@ -226,7 +226,7 @@ export function EmployeeDashboard({
                     </div>
                   </div>
                   <span
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded-full ring-1 shrink-0 ${
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ring-1 shrink-0 ${
                       statusBadgeTone[r.status] ?? "bg-slate-50 text-slate-600 ring-slate-200"
                     }`}
                   >
@@ -250,14 +250,14 @@ export function EmployeeDashboard({
               <Link
                 key={a.label}
                 href={a.href}
-                className="group flex flex-col items-start gap-2 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition"
+                className="group flex flex-col items-start gap-2 p-3 rounded-lg border border-border hover:border-slate-300 hover:bg-slate-50 transition"
               >
                 <div
                   className={`w-8 h-8 rounded-lg bg-${a.tone}-100 text-${a.tone}-700 grid place-items-center`}
                 >
                   <a.Ico className="h-[15px] w-[15px]" />
                 </div>
-                <div className="text-[12.5px] font-medium text-slate-800 group-hover:text-slate-900">
+                <div className="text-xs font-medium text-slate-800 group-hover:text-slate-900">
                   {a.label}
                 </div>
               </Link>

@@ -35,38 +35,38 @@ export function HrDashboard({ data }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-card">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
         <div className="absolute inset-0 dotted-bg opacity-60"></div>
         <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-emerald-500/5 blur-3xl"></div>
         <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1">
-            <div className="inline-flex items-center gap-2 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
               <Shield className="h-3 w-3" />
               <span>ภาพรวมองค์กร · HR Console</span>
             </div>
-            <h1 className="mt-3 text-[22px] sm:text-[26px] font-bold text-slate-900 tracking-tight">
+            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               ศูนย์จัดการบุคลากร
             </h1>
-            <p className="mt-1.5 text-[14px] text-slate-600 max-w-lg">
+            <p className="mt-1.5 text-sm text-slate-600 max-w-lg">
               วันนี้มี <span className="font-semibold text-slate-900">{totalPending} เอกสาร</span> รอดำเนินการ ·{" "}
               <span className="font-semibold text-slate-900">{data.paperPending} ฉบับ</span> รอบันทึก Paper Channel
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 href="/dashboard/approvals/leaves"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-[13px] font-semibold hover:bg-slate-800 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition"
               >
                 <FileText className="h-3.5 w-3.5" /> เปิดศูนย์เอกสาร
               </Link>
               <Link
                 href="/dashboard/hr/paper-channel"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[13px] font-medium hover:bg-emerald-100 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium hover:bg-emerald-100 transition"
               >
                 <ScanLine className="h-3.5 w-3.5" /> Paper Channel
               </Link>
               <Link
                 href="/dashboard/hr/users/add"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-slate-200 text-slate-700 text-[13px] font-medium hover:bg-slate-50 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-border text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
               >
                 <Plus className="h-3.5 w-3.5" /> เพิ่มพนักงาน
               </Link>
@@ -75,14 +75,14 @@ export function HrDashboard({ data }: Props) {
 
           <div className="shrink-0 grid grid-cols-2 gap-2 w-56">
             <div className="rounded-xl bg-emerald-600 text-white p-3">
-              <div className="text-[10px] text-emerald-200 font-medium uppercase tracking-wider">วันนี้</div>
-              <div className="text-[26px] font-bold leading-none font-mono mt-1">{totalPending}</div>
-              <div className="text-[10px] text-emerald-200 mt-1">รอดำเนินการ</div>
+              <div className="text-[0.625rem] text-emerald-200 font-medium uppercase tracking-wider">วันนี้</div>
+              <div className="text-3xl font-bold leading-none font-mono mt-1">{totalPending}</div>
+              <div className="text-[0.625rem] text-emerald-200 mt-1">รอดำเนินการ</div>
             </div>
             <div className="rounded-xl bg-slate-900 text-white p-3">
-              <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">ทั้งหมด</div>
-              <div className="text-[26px] font-bold leading-none font-mono mt-1">{data.totalEmployees}</div>
-              <div className="text-[10px] text-slate-400 mt-1">พนักงาน</div>
+              <div className="text-[0.625rem] text-slate-400 font-medium uppercase tracking-wider">ทั้งหมด</div>
+              <div className="text-3xl font-bold leading-none font-mono mt-1">{data.totalEmployees}</div>
+              <div className="text-[0.625rem] text-slate-400 mt-1">พนักงาน</div>
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@ export function HrDashboard({ data }: Props) {
           action={
             <Link
               href="/dashboard/hr/leaves"
-              className="text-[12px] text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
             >
               เปิดทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -143,13 +143,13 @@ export function HrDashboard({ data }: Props) {
                 className={`rounded-lg bg-${s.tone}-50 border border-${s.tone}-100 p-3`}
               >
                 <div
-                  className={`flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono font-semibold text-${s.tone}-700`}
+                  className={`flex items-center gap-1.5 text-[0.625rem] uppercase tracking-wider font-mono font-semibold text-${s.tone}-700`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full bg-${s.tone}-500`}></span>
                   <span className="truncate">{s.label}</span>
                 </div>
                 <div
-                  className={`text-[24px] font-bold tracking-tight text-${s.tone}-900 mt-1 font-mono`}
+                  className={`text-2xl font-bold tracking-tight text-${s.tone}-900 mt-1 font-mono`}
                 >
                   {s.count}
                 </div>
@@ -161,33 +161,33 @@ export function HrDashboard({ data }: Props) {
           {data.recentDocs.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ยังไม่มีเอกสาร</p>
           ) : (
-            <ul className="divide-y divide-slate-100 -mx-1">
+            <ul className="divide-y divide-border/70 -mx-1">
               {data.recentDocs.map((d) => {
                 const tone = statusBadgeTone[d.status] ?? statusBadgeTone.pending;
                 const href = d.type === "leave" ? `/dashboard/leaves/${d.id}` : `/dashboard/travel/${d.id}`;
                 return (
-                  <li key={`${d.type}-${d.id}`} className="hover:bg-slate-50/60 rounded-md">
+                  <li key={`${d.type}-${d.id}`} className="hover:bg-muted/40 rounded-md">
                     <Link href={href} className="flex items-center gap-3 py-3 px-1">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 grid place-items-center text-white text-[11px] font-semibold shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 grid place-items-center text-white text-xs font-semibold shrink-0">
                         {d.initials}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[11px] text-slate-500">
+                          <span className="font-mono text-xs text-slate-500">
                             {d.type === "leave" ? "LV" : "TR"}-{d.id.slice(0, 8)}
                           </span>
                           {d.channel === "paper" && (
-                            <span className="text-[9px] font-mono uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                            <span className="text-[0.625rem] font-mono uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                               Paper
                             </span>
                           )}
                         </div>
-                        <div className="text-[13px] font-medium text-slate-900 truncate">
+                        <div className="text-sm font-medium text-slate-900 truncate">
                           {d.name} · <span className="text-slate-500 font-normal">{d.dept}</span>
                         </div>
                       </div>
                       <span
-                        className={`text-[11px] font-medium px-2 py-0.5 rounded-full ring-1 shrink-0 ${tone.cls}`}
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ring-1 shrink-0 ${tone.cls}`}
                       >
                         {tone.label}
                       </span>
@@ -205,7 +205,7 @@ export function HrDashboard({ data }: Props) {
           sub="งานเอกสารกระดาษ"
           action={
             data.paperPending > 0 ? (
-              <span className="text-[10px] font-mono uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+              <span className="text-[0.625rem] font-mono uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                 {data.paperPending} รอ
               </span>
             ) : null
@@ -238,7 +238,7 @@ export function HrDashboard({ data }: Props) {
               <Link
                 key={t.step}
                 href="/dashboard/hr/paper-channel"
-                className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 text-left transition"
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-slate-300 hover:bg-muted/40 text-left transition"
               >
                 <div
                   className={`w-9 h-9 rounded-lg bg-${t.tone}-100 text-${t.tone}-700 grid place-items-center shrink-0`}
@@ -246,11 +246,11 @@ export function HrDashboard({ data }: Props) {
                   <t.Ico className="h-[15px] w-[15px]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[12.5px] font-semibold text-slate-900">{t.step}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{t.desc}</div>
+                  <div className="text-xs font-semibold text-slate-900">{t.step}</div>
+                  <div className="text-xs text-slate-500 truncate">{t.desc}</div>
                 </div>
                 <span
-                  className={`shrink-0 min-w-[28px] h-7 px-2 rounded-full grid place-items-center text-[12px] font-mono font-bold ${
+                  className={`shrink-0 min-w-[28px] h-7 px-2 rounded-full grid place-items-center text-xs font-mono font-bold ${
                     t.count > 0
                       ? `bg-${t.tone}-600 text-white`
                       : "bg-slate-100 text-slate-400"
@@ -269,10 +269,10 @@ export function HrDashboard({ data }: Props) {
         <Panel title="ภาพรวมตามแผนก" sub="Department Breakdown">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {data.departments.map((d) => (
-              <div key={d.name} className="p-3 rounded-lg border border-slate-200">
+              <div key={d.name} className="p-3 rounded-lg border border-border">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-[13px] font-semibold text-slate-900 truncate">{d.name}</div>
-                  <div className="text-[11px] text-slate-500 font-mono shrink-0">{d.total} คน</div>
+                  <div className="text-sm font-semibold text-slate-900 truncate">{d.name}</div>
+                  <div className="text-xs text-slate-500 font-mono shrink-0">{d.total} คน</div>
                 </div>
                 <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div

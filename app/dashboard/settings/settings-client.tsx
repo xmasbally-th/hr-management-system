@@ -25,7 +25,10 @@ import {
   Database,
   Settings,
   FileSpreadsheet,
+  Palette,
 } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { DensitySwitcher } from "@/components/density-switcher";
 
 interface LeaveType {
   id: string;
@@ -53,7 +56,7 @@ interface SettingsProps {
   };
 }
 
-type Tab = "general" | "leave" | "export";
+type Tab = "general" | "appearance" | "leave" | "export";
 
 export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, systemStats }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("general");
@@ -64,6 +67,7 @@ export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, sys
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "general", label: "ภาพรวมระบบ", icon: <Settings className="h-4 w-4" /> },
+    { key: "appearance", label: "หน้าตาและธีม", icon: <Palette className="h-4 w-4" /> },
     { key: "leave", label: "ประเภทการลา", icon: <CalendarDays className="h-4 w-4" /> },
     { key: "export", label: "ส่งออกข้อมูล", icon: <FileSpreadsheet className="h-4 w-4" /> },
   ];
@@ -160,6 +164,43 @@ export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, sys
                 <InfoRow label="Styling" value="Tailwind CSS + Shadcn UI" />
                 <InfoRow label="Deployment" value="Vercel" />
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "appearance" && (
+          <div className="space-y-6">
+            {/* Theme picker */}
+            <div className="bg-card border rounded-xl p-5">
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Palette className="h-4 w-4" /> เลือกธีมสี
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ธีมจะถูกบันทึกในเครื่องของคุณและใช้กับทุกหน้า
+                </p>
+              </div>
+              <ThemeSwitcher variant="full" />
+            </div>
+
+            {/* Density picker */}
+            <div className="bg-card border rounded-xl p-5">
+              <div className="mb-4">
+                <h3 className="font-semibold text-sm">ขนาดตัวอักษร</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ปรับขนาดตัวอักษรทั้งระบบ — เลือกตามความสบายตา
+                  (ทั้งหมดจะ scale ตามขนาดหน้าจอเช่นกัน)
+                </p>
+              </div>
+              <DensitySwitcher variant="segmented" />
+            </div>
+
+            {/* Tip card */}
+            <div className="bg-muted/40 border border-dashed border-border rounded-xl p-4 text-xs text-muted-foreground">
+              <p>
+                💡 ค่าที่ตั้งไว้จะคงอยู่บนเครื่องนี้เท่านั้น
+                — เปิดบนเครื่องอื่นหรือ browser อื่นจะกลับเป็นค่าเริ่มต้น
+              </p>
             </div>
           </div>
         )}

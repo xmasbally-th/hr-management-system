@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, LogOut, User, Settings, Search, ChevronDown } from "lucide-react";
+import { Menu, LogOut, User, Settings, Search, ChevronDown, Palette, Type } from "lucide-react";
 import { NotificationBell } from "./notification-bell";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { DensitySwitcher } from "@/components/density-switcher";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -88,9 +90,9 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               placeholder="ค้นหาพนักงาน คำขอ หรือเอกสาร..."
-              className="flex-1 bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground"
+              className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
             />
-            <kbd className="hidden md:inline-flex items-center px-1.5 h-5 rounded border border-border bg-background text-[10px] text-muted-foreground font-mono">
+            <kbd className="hidden md:inline-flex items-center px-1.5 h-5 rounded border border-border bg-background text-xs text-muted-foreground font-mono">
               ⌘K
             </kbd>
           </div>
@@ -110,15 +112,15 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-2.5 sm:pl-1 sm:pr-2 py-1 rounded-lg hover:bg-muted focus:outline-none">
               {/* Avatar — role-tinted */}
-              <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-[13px] font-semibold shadow-sm", avatarGradient)}>
+              <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold shadow-sm", avatarGradient)}>
                 {initials}
               </div>
               <div className="hidden sm:flex flex-col items-start min-w-0">
-                <div className="text-[13px] font-semibold text-foreground leading-tight truncate max-w-[140px]">
+                <div className="text-sm font-semibold text-foreground leading-tight truncate max-w-[140px]">
                   {profile?.full_name ?? "Loading…"}
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className={cn("text-[10px] font-medium border px-1.5 py-px rounded", roleBadgeStyle)}>
+                  <span className={cn("text-xs font-medium border px-1.5 py-px rounded", roleBadgeStyle)}>
                     {profile?.role ? roleLabel[profile.role] : "—"}
                   </span>
                 </div>
@@ -129,20 +131,20 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
             <DropdownMenuContent align="end" className="w-64 rounded-xl p-0 overflow-hidden shadow-lg border border-border animate-fade-in">
               <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-[14px] font-semibold", avatarGradient)}>
+                  <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold", avatarGradient)}>
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-foreground truncate">
+                    <div className="text-sm font-semibold text-foreground truncate">
                       {profile?.full_name ?? "Loading…"}
                     </div>
-                    <div className="text-[11px] text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground truncate">
                       {profile?.email ?? "—"}
                     </div>
                   </div>
                 </div>
                 {profile?.role && (
-                  <div className={cn("mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium border px-2 py-0.5 rounded", roleBadgeStyle)}>
+                  <div className={cn("mt-2 inline-flex items-center gap-1.5 text-xs font-medium border px-2 py-0.5 rounded", roleBadgeStyle)}>
                     <span className={cn("w-1.5 h-1.5 rounded-full", {
                       "bg-rose-500": profile.role === "admin",
                       "bg-emerald-500": profile.role === "hr",
@@ -156,7 +158,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
               
               <div className="py-1.5">
                 <DropdownMenuItem
-                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm cursor-pointer"
                   onClick={() => { window.location.href = "/dashboard/profile"; }}
                 >
                   <User className="size-4 text-muted-foreground" />
@@ -164,7 +166,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem
-                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm cursor-pointer"
                   onClick={() => { window.location.href = "/dashboard/settings"; }}
                 >
                   <Settings className="size-4 text-muted-foreground" />
@@ -174,10 +176,28 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
 
               <DropdownMenuSeparator className="m-0" />
 
+              {/* Theme + density quick toggle */}
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <Palette className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">ธีม</span>
+                </div>
+                <ThemeSwitcher variant="compact" />
+                <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Type className="size-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">ขนาดอักษร</span>
+                  </div>
+                  <DensitySwitcher variant="compact" />
+                </div>
+              </div>
+
+              <DropdownMenuSeparator className="m-0" />
+
               <div className="py-1.5">
                 <DropdownMenuItem
                   onClick={onSignOut}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                 >
                   <LogOut className="size-4" />
                   <span>ออกจากระบบ</span>

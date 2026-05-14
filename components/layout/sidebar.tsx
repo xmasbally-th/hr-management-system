@@ -67,7 +67,7 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
       {mobileOpen && (
         <div
           onClick={onMobileClose}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-40 lg:hidden"
         />
       )}
       
@@ -85,15 +85,15 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
         <div className={cn(
           "flex items-center h-16 border-b border-sidebar-border shrink-0",
           collapsed ? "justify-center px-3" : "px-5"
-        )} style={{ borderColor: "rgb(5, 73, 184)" }}>
+        )}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 grid place-items-center shadow-lg shadow-indigo-900/40 shrink-0">
               <span className="text-white font-bold text-sm tracking-tight">HR</span>
             </div>
             {!collapsed && (
               <div className="animate-fade-in min-w-0">
-                <div className="text-white font-semibold text-[13px] leading-tight truncate">HR Hybrid Workflow</div>
-                <div className="text-sidebar-foreground/70 text-[11px] leading-tight">ระบบจัดการบุคลากร</div>
+                <div className="text-sidebar-accent-foreground font-semibold text-sm leading-tight truncate">HR Hybrid Workflow</div>
+                <div className="text-sidebar-foreground/80 text-xs leading-tight">ระบบจัดการบุคลากร</div>
               </div>
             )}
           </div>
@@ -117,8 +117,8 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
                 "bg-emerald-400": role === "hr",
                 "bg-rose-400": role === "admin",
               })}></span>
-              <span className="text-[11px] uppercase tracking-wider font-mono font-semibold text-sidebar-foreground/60">Role</span>
-              <span className="ml-auto text-[12px] font-semibold text-white">
+              <span className="text-xs uppercase tracking-wider font-mono font-semibold text-sidebar-foreground/70">Role</span>
+              <span className="ml-auto text-xs font-semibold text-sidebar-accent-foreground">
                 {role === "employee" && "Employee"}
                 {role === "manager" && "Manager"}
                 {role === "hr" && "HR"}
@@ -134,7 +134,7 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
             {groups.map((group) => (
               <li key={group.label} className="flex flex-col gap-1">
                 {!collapsed && (
-                  <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/50 font-semibold">
+                  <div className="px-3 pb-2 text-[0.625rem] uppercase tracking-wider text-sidebar-foreground/60 font-semibold">
                     {group.label}
                   </div>
                 )}
@@ -152,28 +152,28 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
                       onClick={() => onMobileClose && onMobileClose()}
                       title={collapsed ? `${item.title}` : ""}
                       className={cn(
-                        "group relative w-full flex items-center gap-3 rounded-lg text-[13px] font-medium transition-all",
+                        "group relative w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-all",
                         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
                         isActive
-                          ? "bg-sidebar-primary/15 text-white shadow-[inset_2px_0_0_0] shadow-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:text-white hover:bg-sidebar-accent/70"
+                          ? "bg-sidebar-primary/15 text-sidebar-accent-foreground shadow-[inset_2px_0_0_0] shadow-sidebar-primary"
+                          : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/70"
                       )}
                     >
-                      <span className={cn("shrink-0", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground/90")}>
+                      <span className={cn("shrink-0", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")}>
                         {Icon && <Icon size={19} />}
                       </span>
                       {!collapsed && (
                         <span className="flex-1 flex items-center justify-between min-w-0 animate-fade-in">
                           <span className="truncate">{item.title}</span>
                           {item.badge && (
-                            <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-white text-[10px] font-semibold">
+                            <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-white text-[0.625rem] font-semibold">
                               {item.badge}
                             </span>
                           )}
                         </span>
                       )}
                       {collapsed && item.badge && (
-                        <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-white text-[9px] font-semibold grid place-items-center">
+                        <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-white text-[0.625rem] font-semibold grid place-items-center">
                           {item.badge}
                         </span>
                       )}
@@ -189,19 +189,19 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
         <div className="border-t border-sidebar-border p-3 shrink-0">
           {!collapsed ? (
             <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/40">
-              <div className="w-8 h-8 rounded-md bg-sidebar-accent grid place-items-center text-sidebar-foreground/90">
+              <div className="w-8 h-8 rounded-md bg-sidebar-accent grid place-items-center text-sidebar-accent-foreground">
                 <HelpCircle size={16} />
               </div>
               <div className="flex-1 min-w-0 animate-fade-in">
-                <div className="text-[12px] text-white font-medium leading-tight">ต้องการความช่วยเหลือ?</div>
-                <div className="text-[11px] text-sidebar-foreground/60 leading-tight">ติดต่อฝ่าย IT</div>
+                <div className="text-xs text-sidebar-accent-foreground font-medium leading-tight">ต้องการความช่วยเหลือ?</div>
+                <div className="text-xs text-sidebar-foreground/70 leading-tight">ติดต่อฝ่าย IT</div>
               </div>
             </div>
           ) : null}
           <button
             onClick={onToggleCollapse}
             className={cn(
-              "hidden lg:flex mt-2 w-full items-center px-2 py-2 rounded-lg text-sidebar-foreground/70 hover:text-white hover:bg-sidebar-accent text-[12px]",
+              "hidden lg:flex mt-2 w-full items-center px-2 py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent text-xs",
               collapsed ? "justify-center" : "justify-end gap-2"
             )}
             aria-label="Toggle sidebar"

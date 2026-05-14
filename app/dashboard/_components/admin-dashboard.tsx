@@ -39,21 +39,21 @@ export function AdminDashboard({ data }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header — terminal-like */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-slate-950 text-white">
         <div className="absolute inset-0 grid-bg opacity-50"></div>
         <div className="absolute -top-32 -right-20 w-[420px] h-[420px] rounded-full bg-rose-600/10 blur-3xl"></div>
         <div className="relative p-6 sm:p-8">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-rose-300 bg-rose-500/10 border border-rose-400/20 px-2.5 py-1 rounded-full">
+              <div className="inline-flex items-center gap-2 text-[0.625rem] font-mono uppercase tracking-widest text-rose-300 bg-rose-500/10 border border-rose-400/20 px-2.5 py-1 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
                 <span>System Administrator</span>
               </div>
-              <h1 className="mt-3 text-[26px] font-bold tracking-tight font-mono">
+              <h1 className="mt-3 text-3xl font-bold tracking-tight font-mono">
                 <span className="text-slate-400">$</span> system.status
                 <span className="text-rose-400">()</span>
               </h1>
-              <p className="mt-1.5 text-[13px] text-slate-400 max-w-xl font-mono">
+              <p className="mt-1.5 text-sm text-slate-400 max-w-xl font-mono">
                 All systems <span className="text-emerald-400">operational</span> ·{" "}
                 <span className="text-sky-300">{data.totalUsers}</span> users · audit events tracked
               </p>
@@ -69,10 +69,10 @@ export function AdminDashboard({ data }: Props) {
                   key={k.label}
                   className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 min-w-[88px]"
                 >
-                  <div className="text-[9px] uppercase tracking-widest font-mono text-slate-400">
+                  <div className="text-[0.625rem] uppercase tracking-widest font-mono text-slate-400">
                     {k.label}
                   </div>
-                  <div className={`text-[16px] font-bold font-mono mt-0.5 text-${k.tone}-300`}>
+                  <div className={`text-base font-bold font-mono mt-0.5 text-${k.tone}-300`}>
                     {k.value}
                   </div>
                 </div>
@@ -111,7 +111,7 @@ export function AdminDashboard({ data }: Props) {
           action={
             <Link
               href="/dashboard/hr/users"
-              className="text-[12px] text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -121,9 +121,9 @@ export function AdminDashboard({ data }: Props) {
             <p className="py-8 text-center text-sm text-muted-foreground">ยังไม่มี audit log</p>
           ) : (
             <div className="overflow-x-auto -mx-5">
-              <table className="w-full text-[12.5px]">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[10px] font-mono uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <tr className="text-left text-[0.625rem] font-mono uppercase tracking-wider text-slate-500 border-b border-border">
                     <th className="px-5 py-2 font-semibold">Timestamp</th>
                     <th className="px-2 py-2 font-semibold">User</th>
                     <th className="px-2 py-2 font-semibold">Action</th>
@@ -136,7 +136,7 @@ export function AdminDashboard({ data }: Props) {
                     return (
                       <tr
                         key={e.id}
-                        className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60"
+                        className="border-b border-border/70 last:border-b-0 hover:bg-muted/40"
                       >
                         <td className="px-5 py-2.5 font-mono text-slate-600">
                           {new Date(e.timestamp).toLocaleTimeString("th-TH", {
@@ -147,7 +147,7 @@ export function AdminDashboard({ data }: Props) {
                         </td>
                         <td className="px-2 py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 grid place-items-center text-white text-[9px] font-semibold">
+                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 grid place-items-center text-white text-[0.625rem] font-semibold">
                               {e.initials}
                             </span>
                             <span className="text-slate-800 font-medium truncate max-w-[120px]">
@@ -157,7 +157,7 @@ export function AdminDashboard({ data }: Props) {
                         </td>
                         <td className="px-2 py-2.5">
                           <span
-                            className={`font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-${tone}-50 text-${tone}-700 ring-1 ring-${tone}-200`}
+                            className={`font-mono text-[0.625rem] uppercase tracking-wider px-1.5 py-0.5 rounded bg-${tone}-50 text-${tone}-700 ring-1 ring-${tone}-200`}
                           >
                             {e.action}
                           </span>
@@ -182,7 +182,7 @@ export function AdminDashboard({ data }: Props) {
               const tone = roleTone[rr.role] ?? "slate";
               return (
                 <div key={rr.role}>
-                  <div className="flex items-center justify-between text-[12px] mb-1">
+                  <div className="flex items-center justify-between text-xs mb-1">
                     <span className="font-medium text-slate-700">
                       {roleLabel[rr.role] ?? rr.role}
                     </span>
@@ -199,9 +199,9 @@ export function AdminDashboard({ data }: Props) {
                 </div>
               );
             })}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[12px] text-slate-500">รวม</span>
-              <span className="text-[14px] font-mono font-bold text-slate-900">
+            <div className="pt-3 border-t border-border/70 flex items-center justify-between">
+              <span className="text-xs text-slate-500">รวม</span>
+              <span className="text-sm font-mono font-bold text-slate-900">
                 {data.totalUsers} ผู้ใช้
               </span>
             </div>
