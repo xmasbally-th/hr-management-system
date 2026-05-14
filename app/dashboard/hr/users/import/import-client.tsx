@@ -45,6 +45,7 @@ const EXPECTED_HEADERS = [
   "hire_date",
   "gender",
   "phone",
+  "current_address",
   "role",
 ] as const;
 
@@ -205,17 +206,7 @@ export function ImportClient() {
           />
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-1.5">
-          <div className="font-medium text-foreground">📋 หมายเหตุ</div>
-          <ul className="list-disc pl-5 space-y-1">
-            <li>ระบบจะสร้าง <b>placeholder profile</b> โดยยังไม่มี auth user — พนักงานจะอ้างสิทธิ์ของตัวเองเมื่อเข้าสู่ระบบครั้งแรกด้วย Google (ผ่าน email match)</li>
-            <li>อีเมลต้องอยู่ในโดเมนที่อนุญาต (ดูตาราง preview)</li>
-            <li>department_name ต้องตรงกับชื่อแผนกที่มีอยู่ในระบบ (เช็คได้ที่หน้า ตั้งค่า → แผนก)</li>
-            <li>role: employee / manager / hr / admin (ค่าเริ่มต้น: employee)</li>
-            <li>วันที่ใช้รูปแบบ YYYY-MM-DD เช่น 1985-05-12</li>
-            <li>นำเข้าได้สูงสุด 500 แถวต่อครั้ง</li>
-          </ul>
-        </div>
+        <FormatGuide />
       </div>
     );
   }
@@ -438,6 +429,134 @@ function ResultCard({
       <div className="mt-2 text-3xl font-bold font-mono">{value}</div>
       <div className="text-xs opacity-70 mt-0.5">
         {pct}% ของ {total} แถว
+      </div>
+    </div>
+  );
+}
+
+// ─── Column reference table for the import format ──────────────────────────
+
+interface FieldDef {
+  name: string;
+  thai: string;
+  required: boolean;
+  notes: string;
+  example: string;
+}
+
+const FIELDS: FieldDef[] = [
+  { name: "email", thai: "อีเมล", required: true, notes: "ต้องอยู่ในโดเมนที่อนุญาต · ห้ามซ้ำ", example: "somchai.j@g.lpru.ac.th" },
+  { name: "title_th", thai: "คำนำหน้า (ไทย)", required: false, notes: "นาย / นาง / นางสาว / ผศ. / รศ. / ศ. / ดร. / ผศ.ดร. / รศ.ดร. / ศ.ดร.", example: "ผศ.ดร." },
+  { name: "first_name_th", thai: "ชื่อ (ไทย)", required: false, notes: "", example: "สมชาย" },
+  { name: "last_name_th", thai: "นามสกุล (ไทย)", required: false, notes: "", example: "ใจดี" },
+  { name: "title_en", thai: "คำนำหน้า (อังกฤษ)", required: false, notes: "", example: "Asst.Prof.Dr." },
+  { name: "first_name_en", thai: "ชื่อ (อังกฤษ)", required: false, notes: "", example: "Somchai" },
+  { name: "last_name_en", thai: "นามสกุล (อังกฤษ)", required: false, notes: "", example: "Jaidee" },
+  { name: "position_number", thai: "เลขที่ตำแหน่ง", required: false, notes: "เลขที่ตามคำสั่งกรอบอัตรากำลัง", example: "P-001" },
+  { name: "position_title", thai: "ตำแหน่ง", required: false, notes: "เช่น อาจารย์ / ผู้ช่วยศาสตราจารย์ / เจ้าหน้าที่บริหารงานทั่วไป", example: "อาจารย์" },
+  { name: "employee_type", thai: "ประเภทบุคลากร", required: false, notes: "ข้าราชการ / พนักงานมหาวิทยาลัย / พนักงานราชการ / พนักงานชั่วคราว / ลูกจ้างประจำ", example: "พนักงานมหาวิทยาลัย" },
+  { name: "department_name", thai: "สังกัดหน่วยงาน", required: false, notes: "ต้องตรงกับชื่อแผนกใน ตั้งค่า → แผนก (ตัวพิมพ์ไม่ต้องเท่า) — ไม่พบ = ข้ามแถว", example: "สาขาวิทยาการคอมพิวเตอร์" },
+  { name: "education_level", thai: "วุฒิการศึกษา", required: false, notes: "ปริญญาตรี / ปริญญาโท / ปริญญาเอก / ปวส. / ปวช. / อื่น ๆ", example: "ปริญญาเอก" },
+  { name: "birth_date", thai: "วันเดือนปีเกิด", required: false, notes: "รูปแบบ YYYY-MM-DD", example: "1985-05-12" },
+  { name: "hire_date", thai: "วันที่เริ่มทำงาน", required: false, notes: "รูปแบบ YYYY-MM-DD", example: "2015-06-01" },
+  { name: "gender", thai: "เพศ", required: false, notes: "ชาย / หญิง / ไม่ระบุ", example: "ชาย" },
+  { name: "phone", thai: "เบอร์โทรศัพท์", required: false, notes: "", example: "0812345678" },
+  { name: "current_address", thai: "ที่อยู่ปัจจุบัน", required: false, notes: "", example: "123/4 ถ.สนามบิน อ.เมือง จ.ลำปาง" },
+  { name: "role", thai: "สิทธิ์ระบบ", required: false, notes: "employee / manager / hr / admin (default: employee)", example: "employee" },
+];
+
+function FormatGuide() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="text-sm font-semibold flex items-center gap-2 mb-1">
+          📋 รูปแบบไฟล์ CSV
+        </div>
+        <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+          <li>
+            ไฟล์ต้องเป็น <b>CSV</b> เข้ารหัส <b>UTF-8</b> มีแถวแรกเป็น header
+            ตามชื่อ column ภาษาอังกฤษทางด้านล่าง
+          </li>
+          <li>
+            <b>email</b> เป็นช่องเดียวที่ <b>บังคับ</b> — column อื่นเว้นว่างได้
+            (แต่ HR ควรกรอกให้ครบ เพราะระบบเอาไปใช้ในเอกสารต่าง ๆ)
+          </li>
+          <li>
+            <b>วันที่</b> ใช้รูปแบบ <code className="font-mono bg-muted px-1 rounded">YYYY-MM-DD</code>{" "}
+            (เช่น 1985-05-12 — ปี ค.ศ.)
+          </li>
+          <li>
+            <b>department_name</b> ต้องตรงกับชื่อหน่วยงานในระบบ
+            (ตั้งค่า → ข้อมูลหลัก → แผนก) — ถ้าไม่พบจะข้ามแถวนั้น
+          </li>
+          <li>
+            อีเมลต้องอยู่ในโดเมนที่อนุญาต (ตั้งจาก env{" "}
+            <code className="font-mono bg-muted px-1 rounded">NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS</code>)
+          </li>
+          <li>ห้ามมีอีเมลซ้ำในไฟล์ และห้ามซ้ำกับที่มีอยู่ในระบบ</li>
+          <li>
+            ผู้ใช้ที่นำเข้าจะเข้าสู่ระบบครั้งแรกผ่าน Google ตามอีเมล —
+            ระบบ <b>link อัตโนมัติ</b> ตามอีเมล
+          </li>
+          <li>นำเข้าได้สูงสุด <b>500 แถวต่อครั้ง</b></li>
+        </ul>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border text-sm font-semibold">
+          รายละเอียดคอลัมน์ ({FIELDS.length} ช่อง)
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Column</TableHead>
+                <TableHead className="text-xs">ความหมาย</TableHead>
+                <TableHead className="text-xs w-16">บังคับ</TableHead>
+                <TableHead className="text-xs">หมายเหตุ / ค่าที่ยอมรับ</TableHead>
+                <TableHead className="text-xs">ตัวอย่าง</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {FIELDS.map((f) => (
+                <TableRow key={f.name}>
+                  <TableCell className="font-mono text-xs whitespace-nowrap">
+                    {f.name}
+                  </TableCell>
+                  <TableCell className="text-xs">{f.thai}</TableCell>
+                  <TableCell>
+                    {f.required ? (
+                      <span className="text-xs font-semibold text-rose-600">บังคับ</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {f.notes || "—"}
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground">
+                    {f.example}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 space-y-2">
+        <div className="font-semibold flex items-center gap-2">⚠️ ข้อมูลที่ไม่อยู่ใน CSV</div>
+        <p>
+          ข้อมูลขั้นสูงต่อไปนี้ต้องให้พนักงานกรอกเองในหน้าโปรไฟล์
+          หรือให้ HR กรอกใน <b>/dashboard/hr/users/&#123;id&#125;</b> ภายหลัง
+          (เนื่องจากเป็นข้อมูลแบบหลายรายการต่อคน):
+        </p>
+        <ul className="list-disc pl-5 space-y-0.5">
+          <li>รูปประจำตัว (500×500 px — อัปโหลดในหน้าโปรไฟล์)</li>
+          <li>ประวัติการศึกษา (เพิ่มทีละรายการ)</li>
+          <li>ประวัติการได้รับเครื่องราชอิสริยาภรณ์</li>
+          <li>ประวัติการบริหาร</li>
+        </ul>
       </div>
     </div>
   );

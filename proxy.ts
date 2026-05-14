@@ -6,8 +6,6 @@ const PUBLIC_ROUTES = ["/login", "/auth/callback"];
 const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/settings"];
 const MANAGER_PLUS_ROUTES = ["/dashboard/reports"];
 const MANAGER_ROUTES = ["/dashboard/approvals"];
-// Routes that require auth but bypass the profile-completion gate
-const AUTH_ONLY_ROUTES = ["/welcome"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -43,12 +41,8 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const requiresAuth =
-    pathname.startsWith("/dashboard") ||
-    AUTH_ONLY_ROUTES.some((r) => pathname.startsWith(r));
-
   // Not authenticated → redirect to login
-  if (!user && requiresAuth) {
+  if (!user && pathname.startsWith("/dashboard")) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
@@ -59,11 +53,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // RBAC + profile-completion gate
-  if (user && requiresAuth) {
+  // RBAC route protection for dashboard routes
+  if (user && pathname.startsWith("/dashboard")) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, status, profile_completed_at")
+      .select("role, status")
       .eq("id", user.id)
       .single();
 
@@ -80,31 +74,17 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // First-login confirmation gate — block all dashboard routes
-    // until the user fills /welcome.
-    const isWelcomeRoute = pathname.startsWith("/welcome");
-    if (!profile.profile_completed_at && !isWelcomeRoute) {
-      return NextResponse.redirect(new URL("/welcome", request.url));
-    }
-    // Conversely, if already completed, don't show /welcome again
-    if (profile.profile_completed_at && isWelcomeRoute) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-
-    // RBAC checks only apply to /dashboard routes
-    if (pathname.startsWith("/dashboard")) {
-      // HR/Admin-only routes
-      if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
-        if (profile.role !== "hr" && profile.role !== "admin") {
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        }
+    // HR/Admin-only routes
+    if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
+      if (profile.role !== "hr" && profile.role !== "admin") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
+    }
 
-      // Manager+ routes (reports, approvals)
-      if ([...MANAGER_ROUTES, ...MANAGER_PLUS_ROUTES].some((route) => pathname.startsWith(route))) {
-        if (profile.role !== "manager" && profile.role !== "hr" && profile.role !== "admin") {
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        }
+    // Manager+ routes (reports, approvals)
+    if ([...MANAGER_ROUTES, ...MANAGER_PLUS_ROUTES].some((route) => pathname.startsWith(route))) {
+      if (profile.role !== "manager" && profile.role !== "hr" && profile.role !== "admin") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
   }

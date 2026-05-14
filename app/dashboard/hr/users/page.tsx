@@ -148,14 +148,6 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
               >
                 <TableCell className="font-medium">
                   {profile.full_name as string}
-                  {!profile.profile_completed_at && (
-                    <Badge
-                      variant="outline"
-                      className="ml-2 text-[0.625rem] font-mono uppercase bg-slate-100 text-slate-600 border-slate-200"
-                    >
-                      placeholder
-                    </Badge>
-                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {profile.email as string}

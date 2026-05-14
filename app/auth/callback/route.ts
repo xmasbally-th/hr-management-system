@@ -116,6 +116,10 @@ export async function GET(request: Request) {
         full_name: fullName,
         role: "employee",
         status: env.AUTO_APPROVE_NEW_USERS ? "approved" : "pending",
+        // No welcome gate — mark complete on creation so the user lands
+        // on /dashboard immediately. HR is the source of truth for the
+        // full profile (see /dashboard/hr/users/import).
+        profile_completed_at: new Date().toISOString(),
       });
 
       if (insertError) {

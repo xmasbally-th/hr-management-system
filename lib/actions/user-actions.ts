@@ -313,6 +313,7 @@ export interface ImportRow {
   hire_date?: string | null;
   gender?: string | null;
   phone?: string | null;
+  current_address?: string | null;
   role?: string | null;
 }
 
@@ -486,9 +487,12 @@ export async function bulkImportEmployees(
       hire_date: trim(row.hire_date),
       gender: trim(row.gender),
       phone: trim(row.phone),
+      current_address: trim(row.current_address),
       role,
       status: "approved" as ProfileStatus,
-      profile_completed_at: null, // user must confirm on first login
+      // HR is filling the profile on behalf of the employee — mark as
+      // complete so the user doesn't get stuck on a welcome page.
+      profile_completed_at: new Date().toISOString(),
     };
 
     const { error: insertError } = await supabaseAdmin
