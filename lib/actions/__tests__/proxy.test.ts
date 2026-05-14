@@ -54,8 +54,10 @@ function setAuth(user: { id: string } | null) {
   mockGetUser.mockResolvedValue({ data: { user } });
 }
 
-function setProfile(role: string, status = "approved") {
-  const chain = createMockChain({ data: { role, status } });
+function setProfile(role: string, status = "approved", profileCompletedAt: string | null = "2025-01-01T00:00:00Z") {
+  const chain = createMockChain({
+    data: { role, status, profile_completed_at: profileCompletedAt },
+  });
   mockFrom.mockReturnValue(chain);
 }
 
