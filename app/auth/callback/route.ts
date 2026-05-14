@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isEmailAllowed } from "@/lib/auth/allowed-domains";
 
 /**
  * OAuth callback route.
@@ -8,9 +9,10 @@ import { createClient } from "@/lib/supabase/server";
  * here with an authorization `code`. This handler:
  *
  * 1. Exchanges the code for a session (sets auth cookies)
- * 2. Checks whether a `profiles` row exists for the user
- * 3. If not → creates one with default role='employee', status='pending'
- * 4. Redirects to /dashboard
+ * 2. Enforces the email-domain allowlist — signs the user out if not allowed
+ * 3. Checks whether a `profiles` row exists for the user
+ * 4. If not → creates one with default role='employee', status='pending'
+ * 5. Redirects to /dashboard
  *
  * If anything fails it redirects to /login with an error param.
  */
@@ -36,14 +38,24 @@ export async function GET(request: Request) {
 
   const user = sessionData.user;
 
-  // 2. Check if profile exists
+  // 2. Enforce email-domain allowlist
+  if (!isEmailAllowed(user.email)) {
+    console.warn(
+      "[auth/callback] Rejected sign-in from disallowed domain:",
+      user.email,
+    );
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=domain`);
+  }
+
+  // 3. Check if profile exists
   const { data: existingProfile } = await supabase
     .from("profiles")
     .select("id")
     .eq("id", user.id)
     .single();
 
-  // 3. Auto-create profile for first-time login
+  // 4. Auto-create profile for first-time login
   if (!existingProfile) {
     const fullName =
       user.user_metadata?.full_name ||
@@ -55,8 +67,8 @@ export async function GET(request: Request) {
       id: user.id,
       email: user.email!,
       full_name: fullName,
-      role: "employee",    // default role for new users
-      status: "pending",   // pending until admin activates
+      role: "employee", // default role for new users
+      status: "pending", // pending until admin activates
     });
 
     if (insertError) {
@@ -66,6 +78,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // 4. Redirect to dashboard (or wherever `next` points)
+  // 5. Redirect to dashboard (or wherever `next` points)
   return NextResponse.redirect(`${origin}${next}`);
 }

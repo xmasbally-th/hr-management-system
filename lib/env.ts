@@ -28,4 +28,12 @@ export const env = {
   get SUPABASE_SERVICE_ROLE_KEY(): string {
     return requireEnv("SUPABASE_SERVICE_ROLE_KEY");
   },
+  /**
+   * Comma-separated list of email domains allowed to sign in (e.g. "g.lpru.ac.th").
+   * Empty/unset disables the check (any Google account can sign in).
+   * NEXT_PUBLIC_ so the login page can use it for the Google `hd` hint.
+   */
+  get NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS(): string {
+    return process.env.NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS ?? "";
+  },
 } as const;

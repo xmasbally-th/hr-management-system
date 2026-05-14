@@ -123,6 +123,8 @@ export interface Database {
           current_address: string | null;
           phone: string | null;
           avatar_url: string | null;
+          education_level: string | null;
+          profile_completed_at: string | null;
           role: "admin" | "hr" | "manager" | "employee";
           status: "pending" | "approved" | "rejected";
           created_at: string;
@@ -151,6 +153,8 @@ export interface Database {
           current_address?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          education_level?: string | null;
+          profile_completed_at?: string | null;
           role?: "admin" | "hr" | "manager" | "employee";
           status?: "pending" | "approved" | "rejected";
           created_at?: string;
@@ -179,6 +183,8 @@ export interface Database {
           current_address?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          education_level?: string | null;
+          profile_completed_at?: string | null;
           role?: "admin" | "hr" | "manager" | "employee";
           status?: "pending" | "approved" | "rejected";
           created_at?: string;
@@ -195,6 +201,147 @@ export interface Database {
             foreignKeyName: "profiles_position_id_fkey";
             columns: ["position_id"];
             referencedRelation: "positions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      profile_educations: {
+        Row: {
+          id: string;
+          profile_id: string;
+          entry_year: number | null;
+          graduation_year: number | null;
+          institution: string;
+          country: string | null;
+          degree: string;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          entry_year?: number | null;
+          graduation_year?: number | null;
+          institution: string;
+          country?: string | null;
+          degree: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          entry_year?: number | null;
+          graduation_year?: number | null;
+          institution?: string;
+          country?: string | null;
+          degree?: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_educations_profile_id_fkey";
+            columns: ["profile_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      profile_decorations: {
+        Row: {
+          id: string;
+          profile_id: string;
+          decoration_name: string;
+          abbreviation: string | null;
+          document_reference: string | null;
+          approved_date: string | null;
+          position_at_grant: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          decoration_name: string;
+          abbreviation?: string | null;
+          document_reference?: string | null;
+          approved_date?: string | null;
+          position_at_grant?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          decoration_name?: string;
+          abbreviation?: string | null;
+          document_reference?: string | null;
+          approved_date?: string | null;
+          position_at_grant?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_decorations_profile_id_fkey";
+            columns: ["profile_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      profile_admin_positions: {
+        Row: {
+          id: string;
+          profile_id: string;
+          appointment_order_number: string | null;
+          position_title: string;
+          responsible_unit: string | null;
+          start_date: string;
+          end_date: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          appointment_order_number?: string | null;
+          position_title: string;
+          responsible_unit?: string | null;
+          start_date: string;
+          end_date?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string;
+          appointment_order_number?: string | null;
+          position_title?: string;
+          responsible_unit?: string | null;
+          start_date?: string;
+          end_date?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_admin_positions_profile_id_fkey";
+            columns: ["profile_id"];
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
