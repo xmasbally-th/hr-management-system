@@ -36,4 +36,13 @@ export const env = {
   get NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS(): string {
     return process.env.NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS ?? "";
   },
+  /**
+   * When true, brand-new users created via the OAuth callback (no HR
+   * pre-import) get status="approved" automatically instead of "pending".
+   * Defaults to false — HR must approve before they can use the system.
+   */
+  get AUTO_APPROVE_NEW_USERS(): boolean {
+    const v = (process.env.AUTO_APPROVE_NEW_USERS ?? "").toLowerCase();
+    return v === "true" || v === "1" || v === "yes";
+  },
 } as const;

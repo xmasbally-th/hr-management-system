@@ -115,7 +115,7 @@ export async function GET(request: Request) {
         email: user.email!,
         full_name: fullName,
         role: "employee",
-        status: "pending",
+        status: env.AUTO_APPROVE_NEW_USERS ? "approved" : "pending",
       });
 
       if (insertError) {

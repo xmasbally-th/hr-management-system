@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { env } from "@/lib/env";
 import { isEmailAllowed } from "@/lib/auth/allowed-domains";
+import { createNotificationInternal } from "./notification-actions";
 
 /**
  * Validates that the current authenticated user has 'hr' or 'admin' role.
@@ -113,7 +114,83 @@ export async function updateUserStatus(userId: string, status: ProfileStatus) {
   }
 
   await logAudit(supabase, actorId, "update_status", "profile", userId, { status });
+  await notifyStatusChange(supabase, userId, status);
   revalidatePath("/dashboard/hr/users");
+}
+
+async function notifyStatusChange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  status: ProfileStatus,
+): Promise<void> {
+  const message =
+    status === "approved"
+      ? "บัญชีของคุณได้รับการอนุมัติแล้ว"
+      : status === "rejected"
+        ? "บัญชีของคุณถูกระงับการใช้งาน — กรุณาติดต่อ HR"
+        : "สถานะบัญชีของคุณกลับเป็น 'รออนุมัติ'";
+  try {
+    await createNotificationInternal(supabase, userId, `account_${status}`, message);
+  } catch (err) {
+    console.warn("[user-actions] notifyStatusChange failed:", err);
+  }
+}
+
+// =============================================================================
+// Bulk status updates (Phase M5)
+// =============================================================================
+
+export interface BulkResult {
+  success: string[];
+  failed: Array<{ id: string; error: string }>;
+}
+
+async function bulkUpdateStatus(
+  ids: string[],
+  status: ProfileStatus,
+): Promise<BulkResult> {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error("ไม่มีผู้ใช้ที่จะดำเนินการ");
+  }
+  if (ids.length > 100) {
+    throw new Error("จำนวนเกิน 100 รายการต่อครั้ง");
+  }
+
+  const supabase = await createClient();
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
+
+  const result: BulkResult = { success: [], failed: [] };
+
+  for (const id of ids) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status })
+      .eq("id", id);
+    if (error) {
+      result.failed.push({ id, error: error.message });
+      continue;
+    }
+    await notifyStatusChange(supabase, id, status);
+    result.success.push(id);
+  }
+
+  await logAudit(supabase, actorId, `bulk_${status}`, "profile", "batch", {
+    total: ids.length,
+    success: result.success.length,
+    failed: result.failed.length,
+  });
+
+  revalidatePath("/dashboard/hr/users");
+  return result;
+}
+
+export async function bulkApproveUsers(ids: string[]): Promise<BulkResult> {
+  return bulkUpdateStatus(ids, "approved");
+}
+
+export async function bulkRejectUsers(ids: string[]): Promise<BulkResult> {
+  return bulkUpdateStatus(ids, "rejected");
 }
 
 /**
