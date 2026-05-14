@@ -7,6 +7,7 @@ import type { ProfileStatus, UserRole } from "@/types/supabase";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { env } from "@/lib/env";
+import { isEmailAllowed } from "@/lib/auth/allowed-domains";
 
 /**
  * Validates that the current authenticated user has 'hr' or 'admin' role.
@@ -212,4 +213,233 @@ export async function createUserByAdmin(data: {
   revalidatePath("/dashboard/hr/users");
 
   return { success: true };
+}
+
+// =============================================================================
+// Bulk Import (placeholder profile mode — Phase M2)
+// =============================================================================
+
+export interface ImportRow {
+  email: string;
+  title_th?: string | null;
+  first_name_th?: string | null;
+  last_name_th?: string | null;
+  title_en?: string | null;
+  first_name_en?: string | null;
+  last_name_en?: string | null;
+  position_number?: string | null;
+  position_title?: string | null;
+  employee_type?: string | null;
+  department_name?: string | null;
+  education_level?: string | null;
+  birth_date?: string | null;
+  hire_date?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  role?: string | null;
+}
+
+export interface ImportResult {
+  success: Array<{ row: number; email: string }>;
+  failed: Array<{ row: number; email: string; error: string }>;
+  skipped: Array<{ row: number; email: string; reason: string }>;
+}
+
+const VALID_ROLES: UserRole[] = ["employee", "manager", "hr", "admin"];
+
+function trim(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s.length > 0 ? s : null;
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function buildFullName(r: ImportRow, fallbackEmail: string): string {
+  const parts = [r.title_th, r.first_name_th, r.last_name_th].filter(Boolean);
+  if (parts.length > 0) return parts.join(" ");
+  const en = [r.title_en, r.first_name_en, r.last_name_en].filter(Boolean);
+  if (en.length > 0) return en.join(" ");
+  return fallbackEmail.split("@")[0];
+}
+
+/**
+ * Bulk-import employees from a parsed CSV/XLSX as **placeholder profiles**.
+ *
+ * Each row is INSERTed into `profiles` with a fresh UUID. No auth.users row
+ * is created — the user picks up the placeholder when they sign in via
+ * Google for the first time (callback re-keys by email match).
+ *
+ * Returns per-row success/failed/skipped summaries so the UI can show a
+ * report and let HR download a CSV of failures.
+ */
+export async function bulkImportEmployees(
+  rows: ImportRow[],
+): Promise<ImportResult> {
+  const supabase = await createClient();
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("ไม่มีข้อมูลที่จะนำเข้า");
+  }
+  if (rows.length > 500) {
+    throw new Error("จำนวนแถวเกิน 500 รายการ — กรุณาแบ่งไฟล์");
+  }
+
+  const supabaseAdmin = createSupabaseClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
+
+  // Pre-fetch reference data
+  const [{ data: existingProfiles }, { data: departments }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("email"),
+    supabaseAdmin.from("departments").select("id, name"),
+  ]);
+
+  const existingEmails = new Set(
+    (existingProfiles ?? []).map((p) => p.email.toLowerCase()),
+  );
+  const deptByName = new Map<string, string>();
+  for (const d of departments ?? []) {
+    deptByName.set(d.name.toLowerCase(), d.id);
+  }
+
+  const result: ImportResult = { success: [], failed: [], skipped: [] };
+  const seenInBatch = new Set<string>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 1;
+
+    // Trim/normalize
+    const email = trim(row.email)?.toLowerCase() ?? "";
+
+    if (!email) {
+      result.failed.push({ row: rowNum, email: "", error: "ไม่มีอีเมล" });
+      continue;
+    }
+    if (!isValidEmail(email)) {
+      result.failed.push({ row: rowNum, email, error: "รูปแบบอีเมลไม่ถูกต้อง" });
+      continue;
+    }
+    if (!isEmailAllowed(email)) {
+      result.failed.push({
+        row: rowNum,
+        email,
+        error: "โดเมนอีเมลไม่อยู่ในรายการที่อนุญาต",
+      });
+      continue;
+    }
+    if (existingEmails.has(email)) {
+      result.skipped.push({ row: rowNum, email, reason: "มีในระบบแล้ว" });
+      continue;
+    }
+    if (seenInBatch.has(email)) {
+      result.skipped.push({
+        row: rowNum,
+        email,
+        reason: "อีเมลซ้ำในไฟล์เดียวกัน",
+      });
+      continue;
+    }
+    seenInBatch.add(email);
+
+    // Resolve department
+    const deptName = trim(row.department_name);
+    let departmentId: string | null = null;
+    if (deptName) {
+      const resolved = deptByName.get(deptName.toLowerCase());
+      if (!resolved) {
+        result.failed.push({
+          row: rowNum,
+          email,
+          error: `ไม่พบแผนก "${deptName}"`,
+        });
+        continue;
+      }
+      departmentId = resolved;
+    }
+
+    // Resolve role
+    const roleRaw = trim(row.role)?.toLowerCase();
+    let role: UserRole = "employee";
+    if (roleRaw) {
+      if (VALID_ROLES.includes(roleRaw as UserRole)) {
+        role = roleRaw as UserRole;
+      } else {
+        result.failed.push({
+          row: rowNum,
+          email,
+          error: `role ไม่ถูกต้อง (${roleRaw})`,
+        });
+        continue;
+      }
+    }
+
+    // Build INSERT payload
+    const fullName = buildFullName(row, email);
+    const insertData = {
+      // Placeholder id — re-keyed on first login. crypto.randomUUID() is
+      // available in Node 19+ (Vercel runtime supports it).
+      id: crypto.randomUUID(),
+      email,
+      full_name: fullName,
+      title_th: trim(row.title_th),
+      title_en: trim(row.title_en),
+      first_name_th: trim(row.first_name_th),
+      first_name_en: trim(row.first_name_en),
+      last_name_th: trim(row.last_name_th),
+      last_name_en: trim(row.last_name_en),
+      position_number: trim(row.position_number),
+      position_title: trim(row.position_title),
+      employee_type: trim(row.employee_type),
+      department_id: departmentId,
+      education_level: trim(row.education_level),
+      birth_date: trim(row.birth_date),
+      hire_date: trim(row.hire_date),
+      gender: trim(row.gender),
+      phone: trim(row.phone),
+      role,
+      status: "approved" as ProfileStatus,
+      profile_completed_at: null, // user must confirm on first login
+    };
+
+    const { error: insertError } = await supabaseAdmin
+      .from("profiles")
+      .insert(insertData);
+
+    if (insertError) {
+      result.failed.push({
+        row: rowNum,
+        email,
+        error: insertError.message,
+      });
+      continue;
+    }
+
+    existingEmails.add(email);
+    result.success.push({ row: rowNum, email });
+  }
+
+  // Audit
+  await logAudit(supabase, actorId, "bulk_import_users", "profile", "batch", {
+    total: rows.length,
+    success: result.success.length,
+    failed: result.failed.length,
+    skipped: result.skipped.length,
+  });
+
+  revalidatePath("/dashboard/hr/users");
+
+  return result;
 }
