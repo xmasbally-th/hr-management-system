@@ -15,10 +15,12 @@ import {
   FileSpreadsheet,
   Palette,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { DensitySwitcher } from "@/components/density-switcher";
 import { SecuritySection } from "./_sections/security-section";
+import { AuditLogSection } from "./_sections/audit-log-section";
 
 interface SettingsProps {
   systemStats: {
@@ -33,23 +35,30 @@ interface SettingsProps {
     allowed_email_domains: string | null;
     auto_approve_new_users: string | null;
   };
+  initialTab?: string;
 }
 
-type Tab = "general" | "appearance" | "security" | "export";
+type Tab = "general" | "appearance" | "security" | "audit" | "export";
+
+const VALID_TABS: Tab[] = ["general", "appearance", "security", "audit", "export"];
 
 export function SettingsClient({
   systemStats,
   allowedDomains,
   autoApprove,
   lastUpdated,
+  initialTab,
 }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+  const [activeTab, setActiveTab] = useState<Tab>(
+    VALID_TABS.includes(initialTab as Tab) ? (initialTab as Tab) : "general",
+  );
   const [isPending, startTransition] = useTransition();
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "general", label: "สถิติระบบ", icon: <Settings className="h-4 w-4" /> },
     { key: "appearance", label: "หน้าตาและธีม", icon: <Palette className="h-4 w-4" /> },
     { key: "security", label: "ความปลอดภัย", icon: <ShieldCheck className="h-4 w-4" /> },
+    { key: "audit", label: "Audit Log", icon: <ClipboardList className="h-4 w-4" /> },
     { key: "export", label: "ส่งออกข้อมูล", icon: <FileSpreadsheet className="h-4 w-4" /> },
   ];
 
@@ -167,6 +176,8 @@ export function SettingsClient({
             lastUpdated={lastUpdated}
           />
         )}
+
+        {activeTab === "audit" && <AuditLogSection />}
 
         {activeTab === "export" && (
           <div className="space-y-4">

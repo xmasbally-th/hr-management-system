@@ -8,14 +8,17 @@ import {
   GraduationCap,
   Award,
   Briefcase,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IdentitySection } from "./_sections/identity-section";
 import { EducationSection } from "./_sections/education-section";
 import { DecorationsSection } from "./_sections/decorations-section";
 import { AdminPositionsSection } from "./_sections/admin-positions-section";
+import { NotificationsSection } from "./_sections/notifications-section";
+import type { NotificationType } from "@/lib/notification-types";
 
-type TabKey = "identity" | "education" | "decorations" | "admin";
+type TabKey = "identity" | "education" | "decorations" | "admin" | "notifications";
 
 // Loose profile shape — the underlying row has many optional/nullable fields
 // and a joined `department`. We accept anything matching this loose contract.
@@ -76,6 +79,7 @@ interface Props {
   employeeTypes: string[];
   educationLevels: string[];
   decorationCatalog: Array<{ name: string; abbreviation: string | null }>;
+  notificationPrefs: Record<NotificationType, boolean>;
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -121,6 +125,7 @@ export function ProfileClient({
   employeeTypes,
   educationLevels,
   decorationCatalog,
+  notificationPrefs,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
 
@@ -152,6 +157,7 @@ export function ProfileClient({
     { key: "education", label: "ประวัติการศึกษา", icon: GraduationCap, count: educations.length },
     { key: "decorations", label: "เครื่องราชอิสริยาภรณ์", icon: Award, count: decorations.length },
     { key: "admin", label: "ประวัติการบริหาร", icon: Briefcase, count: adminPositions.length },
+    { key: "notifications", label: "การแจ้งเตือน", icon: Bell },
   ];
 
   return (
@@ -259,6 +265,9 @@ export function ProfileClient({
           <DecorationsSection rows={decorations} catalog={decorationCatalog} />
         )}
         {activeTab === "admin" && <AdminPositionsSection rows={adminPositions} />}
+        {activeTab === "notifications" && (
+          <NotificationsSection initialPrefs={notificationPrefs} />
+        )}
       </div>
     </div>
   );

@@ -1,12 +1,28 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { env } from "@/lib/env";
+import type { Database } from "@/types/supabase";
+import {
+  ALLOWED_NOTIFICATION_TYPES,
+  VALID_NOTIFICATION_TYPE_SET,
+  type NotificationType,
+} from "@/lib/notification-types";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
   return user;
+}
+
+function getAdminClient() {
+  return createSupabaseClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
 }
 
 export async function getMyNotifications() {
@@ -80,14 +96,92 @@ export async function deleteNotification(notificationId: string) {
   revalidatePath("/dashboard");
 }
 
-const ALLOWED_NOTIFICATION_TYPES = [
-  "new_leave_request",
-  "new_travel_request",
-  "leave_approved",
-  "leave_rejected",
-  "travel_approved",
-  "travel_rejected",
-] as const;
+// =============================================================================
+// Per-user notification preferences (Phase S6)
+// =============================================================================
+
+/**
+ * Returns the calling user's notification preferences as a complete map,
+ * defaulting any missing key to `true` (opt-out model).
+ */
+export async function getMyNotificationPrefs(): Promise<Record<NotificationType, boolean>> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  const { data } = await supabase
+    .from("notification_preferences")
+    .select("preferences")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const stored = (data?.preferences ?? {}) as Record<string, boolean>;
+  const out = {} as Record<NotificationType, boolean>;
+  for (const t of ALLOWED_NOTIFICATION_TYPES) {
+    out[t] = stored[t] === false ? false : true; // default true
+  }
+  return out;
+}
+
+/**
+ * Replaces the calling user's preferences. Missing keys are treated as
+ * "enabled" (the opt-out default).
+ */
+export async function updateMyNotificationPrefs(
+  prefs: Partial<Record<NotificationType, boolean>>,
+): Promise<void> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  // Sanitize — only store known types, and only when explicitly false
+  // (true is the default, so we don't bloat the JSON with all keys).
+  const toStore: Record<string, boolean> = {};
+  for (const t of ALLOWED_NOTIFICATION_TYPES) {
+    if (prefs[t] === false) toStore[t] = false;
+  }
+
+  const { error } = await supabase
+    .from("notification_preferences")
+    .upsert(
+      {
+        user_id: user.id,
+        preferences: toStore,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+  if (error) {
+    console.error("[notification-actions] updateMyNotificationPrefs failed:", error);
+    throw new Error("บันทึกการตั้งค่าการแจ้งเตือนไม่สำเร็จ");
+  }
+
+  revalidatePath("/dashboard/profile");
+}
+
+/**
+ * Service-role lookup — used by createNotificationInternal() to honor the
+ * target user's opt-out preferences. Returns `true` (send) on any failure
+ * so notifications are never silently dropped when the prefs system itself
+ * has a problem.
+ */
+async function shouldSendNotification(
+  targetUserId: string,
+  type: string,
+): Promise<boolean> {
+  try {
+    const admin = getAdminClient();
+    const { data, error } = await admin
+      .from("notification_preferences")
+      .select("preferences")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+    if (error) return true; // err-on-the-side-of-sending
+    const prefs = (data?.preferences ?? {}) as Record<string, boolean>;
+    return prefs[type] !== false; // explicit false = opted out
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Internal only — NOT exported as a server action.
@@ -98,10 +192,16 @@ export async function createNotificationInternal(
   supabase: Awaited<ReturnType<typeof createClient>>,
   targetUserId: string,
   type: string,
-  message: string
+  message: string,
 ) {
-  if (!targetUserId || !ALLOWED_NOTIFICATION_TYPES.includes(type as typeof ALLOWED_NOTIFICATION_TYPES[number])) {
+  if (!targetUserId || !VALID_NOTIFICATION_TYPE_SET.has(type)) {
     console.error("[notification-actions] Invalid notification params:", { targetUserId, type });
+    return;
+  }
+
+  // Per-user opt-out check (service-role read — caller's RLS would block
+  // reading another user's prefs row).
+  if (!(await shouldSendNotification(targetUserId, type))) {
     return;
   }
 

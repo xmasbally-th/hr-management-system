@@ -110,7 +110,7 @@ export function AdminDashboard({ data }: Props) {
           className="lg:col-span-2"
           action={
             <Link
-              href="/dashboard/hr/users"
+              href="/dashboard/settings?tab=audit"
               className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />

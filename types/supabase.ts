@@ -206,6 +206,32 @@ export interface Database {
         ];
       };
 
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          preferences: Record<string, boolean>;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          preferences?: Record<string, boolean>;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          preferences?: Record<string, boolean>;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       system_settings: {
         Row: {
           key: string;

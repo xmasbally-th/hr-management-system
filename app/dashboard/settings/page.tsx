@@ -8,7 +8,12 @@ import { SettingsClient } from "./settings-client";
 
 export const metadata = { title: "ตั้งค่าระบบ" };
 
-export default async function SettingsPage() {
+interface PageProps {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function SettingsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   const [systemStats, domains, autoApprove, allSettings] = await Promise.all([
     getSystemStats(),
     getAllowedDomains(),
@@ -23,7 +28,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">ตั้งค่าระบบ</h1>
         <p className="text-muted-foreground">
-          สถิติระบบ ธีม ความปลอดภัย และส่งออกข้อมูล —
+          สถิติระบบ · ธีม · ความปลอดภัย · Audit Log · ส่งออกข้อมูล —
           จัดการประเภทการลา/หน่วยงาน ดูที่เมนู &quot;ข้อมูลหลัก&quot;
         </p>
       </div>
@@ -40,6 +45,7 @@ export default async function SettingsPage() {
             (allSettings.auto_approve_new_users?.updated_at as string | undefined) ??
             null,
         }}
+        initialTab={params.tab}
       />
     </div>
   );
