@@ -323,6 +323,7 @@ export interface EducationInput {
   institution: string;
   country?: string | null;
   degree: string;
+  major_field?: string | null;
 }
 
 function validateEducation(e: EducationInput) {
@@ -355,6 +356,7 @@ export async function addEducation(input: EducationInput) {
       institution: input.institution.trim(),
       country: trim(input.country),
       degree: input.degree.trim(),
+      major_field: trim(input.major_field),
     })
     .select()
     .single();
@@ -377,6 +379,7 @@ export async function updateEducation(id: string, input: EducationInput) {
       institution: input.institution.trim(),
       country: trim(input.country),
       degree: input.degree.trim(),
+      major_field: trim(input.major_field),
     })
     .eq("id", id)
     .eq("profile_id", user.id);

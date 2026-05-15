@@ -58,6 +58,7 @@ interface Props {
     institution: string;
     country: string | null;
     degree: string;
+    major_field: string | null;
   }>;
   decorations: Array<{
     id: string;
@@ -260,7 +261,9 @@ export function ProfileClient({
             educationLevels={educationLevels}
           />
         )}
-        {activeTab === "education" && <EducationSection rows={educations} />}
+        {activeTab === "education" && (
+          <EducationSection rows={educations} educationLevels={educationLevels} />
+        )}
         {activeTab === "decorations" && (
           <DecorationsSection rows={decorations} catalog={decorationCatalog} />
         )}

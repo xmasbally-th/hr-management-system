@@ -51,6 +51,8 @@ interface ReportsProps {
   initialCalendarEvents: CalendarEvent[];
   initialYear: number;
   initialMonth: number;
+  /** Human-readable label of the active range (e.g. "ปีงบประมาณ 2569") */
+  rangeLabel?: string;
 }
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
@@ -79,6 +81,7 @@ export function ReportsClient({
   initialCalendarEvents,
   initialYear,
   initialMonth,
+  rangeLabel,
 }: ReportsProps) {
   const [chartMode, setChartMode] = useState<"bar" | "pie">("bar");
   const [isExporting, startExport] = useTransition();
@@ -200,7 +203,14 @@ export function ReportsClient({
 
         {/* Monthly leaves line chart */}
         <div className="bg-card border rounded-xl p-5">
-          <h3 className="font-semibold text-sm mb-4">การลารายเดือน (ปีนี้)</h3>
+          <h3 className="font-semibold text-sm mb-4">
+            การลารายเดือน
+            {rangeLabel && (
+              <span className="ml-2 font-normal text-muted-foreground text-xs">
+                · {rangeLabel}
+              </span>
+            )}
+          </h3>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={monthlyLeaves}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />

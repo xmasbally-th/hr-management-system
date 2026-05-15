@@ -11,6 +11,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Plus,
@@ -30,11 +37,23 @@ interface EducationRow {
   institution: string;
   country: string | null;
   degree: string;
+  major_field: string | null;
 }
 
 interface Props {
   rows: EducationRow[];
+  /** From education_levels catalog. Falls back to a small built-in list if empty. */
+  educationLevels: string[];
 }
+
+const FALLBACK_LEVELS = [
+  "ปริญญาตรี",
+  "ปริญญาโท",
+  "ปริญญาเอก",
+  "ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)",
+  "ประกาศนียบัตรวิชาชีพ (ปวช.)",
+  "อื่น ๆ",
+];
 
 const BLANK: EducationInput = {
   entry_year: null,
@@ -42,9 +61,11 @@ const BLANK: EducationInput = {
   institution: "",
   country: "",
   degree: "",
+  major_field: "",
 };
 
-export function EducationSection({ rows }: Props) {
+export function EducationSection({ rows, educationLevels }: Props) {
+  const levelOptions = educationLevels.length > 0 ? educationLevels : FALLBACK_LEVELS;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -64,6 +85,7 @@ export function EducationSection({ rows }: Props) {
       institution: r.institution,
       country: r.country,
       degree: r.degree,
+      major_field: r.major_field ?? "",
     });
     setEditingId(r.id);
     setAdding(false);
@@ -180,12 +202,31 @@ export function EducationSection({ rows }: Props) {
                 disabled={isPending}
               />
             </div>
-            <div className="col-span-12 space-y-1">
+            <div className="col-span-12 sm:col-span-5 space-y-1">
               <Label className="text-xs">วุฒิการศึกษา *</Label>
-              <Input
+              <Select
                 value={form.degree}
-                onChange={(e) => setForm({ ...form, degree: e.target.value })}
-                placeholder="ปริญญาเอก สาขาวิทยาการคอมพิวเตอร์"
+                onValueChange={(v) => setForm({ ...form, degree: v ?? "" })}
+                disabled={isPending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือก..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {levelOptions.map((lvl) => (
+                    <SelectItem key={lvl} value={lvl}>
+                      {lvl}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-12 sm:col-span-7 space-y-1">
+              <Label className="text-xs">สาขาวิชา</Label>
+              <Input
+                value={form.major_field ?? ""}
+                onChange={(e) => setForm({ ...form, major_field: e.target.value })}
+                placeholder="เช่น การจัดการ, การบัญชี"
                 disabled={isPending}
               />
             </div>
@@ -226,7 +267,15 @@ export function EducationSection({ rows }: Props) {
                   <GraduationCap className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">{r.degree}</div>
+                  <div className="font-medium text-sm">
+                    {r.degree}
+                    {r.major_field && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        · สาขา{r.major_field}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {r.institution}
                     {r.country && <> · {r.country}</>}

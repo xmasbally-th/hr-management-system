@@ -75,14 +75,24 @@ export async function getLeaveBalanceSummary() {
   }));
 }
 
-export async function getReportLeaveByType() {
+/** Optional inclusive date filter for the report actions. */
+export interface ReportRange {
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+}
+
+export async function getReportLeaveByType(range?: ReportRange) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   await checkManagerOrAbove(supabase, user.id);
 
-  const { data } = await supabase
+  let q = supabase
     .from("leave_requests")
     .select("leave_type_id, status, leave_types(name)");
+  if (range) {
+    q = q.gte("start_date", range.start).lte("start_date", range.end);
+  }
+  const { data } = await q;
 
   const grouped: Record<string, { name: string; pending: number; approved: number; rejected: number }> = {};
   for (const r of data ?? []) {
@@ -96,10 +106,31 @@ export async function getReportLeaveByType() {
   return Object.values(grouped);
 }
 
-export async function getReportTravelBudget() {
+export async function getReportTravelBudget(range?: ReportRange) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   await checkManagerOrAbove(supabase, user.id);
+
+  if (range) {
+    // travel_expenses doesn't have a date column — filter via the parent
+    // travel_request's start_date by joining.
+    const { data } = await supabase
+      .from("travel_expenses")
+      .select(
+        "expense_category, estimated_amount, actual_amount, travel_request:travel_requests!inner(start_date)",
+      )
+      .gte("travel_request.start_date", range.start)
+      .lte("travel_request.start_date", range.end);
+
+    const grouped: Record<string, { category: string; estimated: number; actual: number }> = {};
+    for (const e of data ?? []) {
+      const cat = e.expense_category;
+      if (!grouped[cat]) grouped[cat] = { category: cat, estimated: 0, actual: 0 };
+      grouped[cat].estimated += Number(e.estimated_amount) || 0;
+      grouped[cat].actual += Number(e.actual_amount) || 0;
+    }
+    return Object.values(grouped);
+  }
 
   const { data } = await supabase
     .from("travel_expenses")
@@ -116,30 +147,64 @@ export async function getReportTravelBudget() {
   return Object.values(grouped);
 }
 
-export async function getReportMonthlyLeaves() {
+const THAI_MONTH_ABBR = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+];
+
+/**
+ * Returns one bucket per month between range.start and range.end (inclusive).
+ * Bucket label is "เดือน 2568" (Thai short month + พ.ศ. year). Without a
+ * range, defaults to the current calendar year (12 buckets, Jan-Dec).
+ */
+export async function getReportMonthlyLeaves(range?: ReportRange) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   await checkManagerOrAbove(supabase, user.id);
 
-  const year = new Date().getFullYear();
+  const start = range ? new Date(range.start) : new Date(`${new Date().getFullYear()}-01-01`);
+  const end = range ? new Date(range.end) : new Date(`${new Date().getFullYear()}-12-31`);
+
+  // Build month buckets between start and end
+  const buckets: Array<{ key: string; label: string; count: number }> = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endCursor = new Date(end.getFullYear(), end.getMonth(), 1);
+  while (cursor <= endCursor) {
+    const y = cursor.getFullYear();
+    const m = cursor.getMonth();
+    buckets.push({
+      key: `${y}-${String(m + 1).padStart(2, "0")}`,
+      label: `${THAI_MONTH_ABBR[m]} ${(y + 543).toString().slice(-2)}`,
+      count: 0,
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
   const { data } = await supabase
     .from("leave_requests")
     .select("start_date, status")
-    .gte("start_date", `${year}-01-01`)
-    .lte("start_date", `${year}-12-31`)
+    .gte("start_date", buckets[0]?.key ? `${buckets[0].key}-01` : `${start.getFullYear()}-01-01`)
+    .lte(
+      "start_date",
+      buckets.length > 0
+        ? // Approximate end-of-last-month — over-fetches a few days but the
+          // bucket lookup below ignores rows outside the range.
+          `${buckets[buckets.length - 1].key}-31`
+        : `${end.getFullYear()}-12-31`,
+    )
     .eq("status", "approved");
 
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    month: new Date(year, i).toLocaleDateString("th-TH", { month: "short" }),
-    count: 0,
-  }));
+  const indexByKey = new Map<string, number>();
+  buckets.forEach((b, i) => indexByKey.set(b.key, i));
 
   for (const r of data ?? []) {
-    const m = new Date(r.start_date).getMonth();
-    months[m].count++;
+    const d = new Date(r.start_date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const idx = indexByKey.get(key);
+    if (idx !== undefined) buckets[idx].count++;
   }
 
-  return months;
+  return buckets.map((b) => ({ month: b.label, count: b.count }));
 }
 
 export async function getRecentActivity() {
