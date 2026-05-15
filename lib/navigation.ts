@@ -91,7 +91,7 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
-        title: "แผนก",
+        title: "สังกัดหน่วยงาน",
         href: "/dashboard/hr/departments",
         icon: "Building2",
         roles: ["admin", "hr"],
