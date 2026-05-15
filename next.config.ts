@@ -19,7 +19,9 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              // Google profile photos (lh3-7.googleusercontent.com),
+              // Supabase storage (public avatar bucket), local previews
+              "img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co",
               "font-src 'self' https://fonts.gstatic.com",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
               "frame-ancestors 'none'",
