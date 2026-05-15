@@ -67,10 +67,23 @@ describe("getLeaveTypeSettings", () => {
     await expect(getLeaveTypeSettings()).rejects.toThrow("Forbidden");
   });
 
-  it("rejects HR (admin-only)", async () => {
+  it("allows HR (leave types are now master data)", async () => {
     const profileChain = createMockChain({ data: profileRow("hr") });
+    const leaveTypeData = [{ id: "lt1", name: "Sick", max_days_per_year: 30 }];
+    const leaveTypesChain = createMockChain({ data: leaveTypeData });
     setupMock({
       authUser: TEST_HR_USER,
+      fromOverrides: { profiles: profileChain, leave_types: leaveTypesChain },
+    });
+
+    const result = await getLeaveTypeSettings();
+    expect(result).toEqual(leaveTypeData);
+  });
+
+  it("rejects manager", async () => {
+    const profileChain = createMockChain({ data: profileRow("manager") });
+    setupMock({
+      authUser: TEST_USER,
       fromOverrides: { profiles: profileChain },
     });
 
@@ -90,7 +103,7 @@ describe("updateLeaveType", () => {
     });
 
     await updateLeaveType(VALID_UUID, { name: "Updated Sick", max_days_per_year: 15 });
-    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/settings");
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard/hr/master-data");
   });
 
   it("rejects invalid UUID", async () => {
@@ -153,14 +166,16 @@ describe("getDepartmentList", () => {
     expect(result).toEqual(deptData);
   });
 
-  it("rejects non-admin", async () => {
-    const profileChain = createMockChain({ data: profileRow("manager") });
+  it("any authenticated user can read (used by profile/welcome forms)", async () => {
+    const profileChain = createMockChain({ data: profileRow("employee") });
+    const deptChain = createMockChain({ data: [] });
     setupMock({
       authUser: TEST_USER,
-      fromOverrides: { profiles: profileChain },
+      fromOverrides: { profiles: profileChain, departments: deptChain },
     });
 
-    await expect(getDepartmentList()).rejects.toThrow("Forbidden");
+    const result = await getDepartmentList();
+    expect(result).toEqual([]);
   });
 });
 

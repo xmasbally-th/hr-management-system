@@ -1,27 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateLeaveType } from "@/lib/actions/settings-actions";
 import { exportEmployees, exportLeaveRequests, exportTravelRequests } from "@/lib/actions/export-actions";
 import { downloadCsv } from "@/lib/export-utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Users,
   CalendarDays,
   Plane,
   Building2,
   Download,
-  Save,
   Database,
   Settings,
   FileSpreadsheet,
@@ -30,24 +18,7 @@ import {
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { DensitySwitcher } from "@/components/density-switcher";
 
-interface LeaveType {
-  id: string;
-  name: string;
-  max_days_per_year: number;
-  is_accumulative: boolean;
-  conditions: string | null;
-  created_at: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
 interface SettingsProps {
-  leaveTypes: LeaveType[];
-  departments: Department[];
   systemStats: {
     totalUsers: number;
     totalLeaveRequests: number;
@@ -56,31 +27,17 @@ interface SettingsProps {
   };
 }
 
-type Tab = "general" | "appearance" | "leave" | "export";
+type Tab = "general" | "appearance" | "export";
 
-export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, systemStats }: SettingsProps) {
+export function SettingsClient({ systemStats }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("general");
-  const [leaveTypes, setLeaveTypes] = useState(initialLeaveTypes);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editMaxDays, setEditMaxDays] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "general", label: "ภาพรวมระบบ", icon: <Settings className="h-4 w-4" /> },
+    { key: "general", label: "สถิติระบบ", icon: <Settings className="h-4 w-4" /> },
     { key: "appearance", label: "หน้าตาและธีม", icon: <Palette className="h-4 w-4" /> },
-    { key: "leave", label: "ประเภทการลา", icon: <CalendarDays className="h-4 w-4" /> },
     { key: "export", label: "ส่งออกข้อมูล", icon: <FileSpreadsheet className="h-4 w-4" /> },
   ];
-
-  function handleSaveMaxDays(id: string) {
-    const days = parseInt(editMaxDays);
-    if (isNaN(days) || days < 0) return;
-    startTransition(async () => {
-      await updateLeaveType(id, { max_days_per_year: days });
-      setLeaveTypes((prev) => prev.map((lt) => (lt.id === id ? { ...lt, max_days_per_year: days } : lt)));
-      setEditingId(null);
-    });
-  }
 
   function handleExport(type: "employees" | "leaves" | "travel") {
     startTransition(async () => {
@@ -135,35 +92,19 @@ export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, sys
               <StatCard icon={<Users className="h-5 w-5 text-indigo-500" />} label="ผู้ใช้งาน" value={systemStats.totalUsers} />
               <StatCard icon={<CalendarDays className="h-5 w-5 text-amber-500" />} label="คำขอลา" value={systemStats.totalLeaveRequests} />
               <StatCard icon={<Plane className="h-5 w-5 text-emerald-500" />} label="คำขอเดินทาง" value={systemStats.totalTravelRequests} />
-              <StatCard icon={<Building2 className="h-5 w-5 text-blue-500" />} label="แผนก" value={systemStats.totalDepartments} />
+              <StatCard icon={<Building2 className="h-5 w-5 text-blue-500" />} label="หน่วยงาน" value={systemStats.totalDepartments} />
             </div>
 
-            {/* Department list */}
+            {/* Placeholder for live connection status (S4 will replace this) */}
             <div className="bg-card border rounded-xl p-5">
-              <h3 className="font-semibold text-sm mb-4">แผนกทั้งหมด</h3>
-              <div className="flex flex-wrap gap-2">
-                {departments.map((d) => (
-                  <Badge key={d.id} variant="secondary" className="text-sm py-1 px-3">{d.name}</Badge>
-                ))}
-                {departments.length === 0 && (
-                  <p className="text-sm text-muted-foreground">ยังไม่มีแผนก</p>
-                )}
-              </div>
-            </div>
-
-            {/* System info */}
-            <div className="bg-card border rounded-xl p-5">
-              <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                 <Database className="h-4 w-4" /> ข้อมูลระบบ
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <InfoRow label="Framework" value="Next.js (App Router)" />
-                <InfoRow label="Database" value="Supabase (PostgreSQL)" />
-                <InfoRow label="Authentication" value="Supabase Auth (Google OAuth)" />
-                <InfoRow label="Storage" value="Supabase Storage" />
-                <InfoRow label="Styling" value="Tailwind CSS + Shadcn UI" />
-                <InfoRow label="Deployment" value="Vercel" />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                หน้านี้จะแสดงสถานะการเชื่อมต่อระบบจริง ขนาดพื้นที่จัดเก็บ และเวอร์ชันการ deploy
+                ในเร็ว ๆ นี้ — สำหรับจัดการ &quot;ประเภทการลา&quot; / &quot;สังกัดหน่วยงาน&quot;
+                ดูที่เมนู <b>ข้อมูลหลัก</b>
+              </p>
             </div>
           </div>
         )}
@@ -202,63 +143,6 @@ export function SettingsClient({ leaveTypes: initialLeaveTypes, departments, sys
                 — เปิดบนเครื่องอื่นหรือ browser อื่นจะกลับเป็นค่าเริ่มต้น
               </p>
             </div>
-          </div>
-        )}
-
-        {activeTab === "leave" && (
-          <div className="bg-card border rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h3 className="font-semibold text-sm">จัดการประเภทการลา</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">กำหนดจำนวนวันลาสูงสุดแต่ละประเภท</p>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ประเภทลา</TableHead>
-                  <TableHead className="text-center w-[140px]">จำนวนวันสูงสุด</TableHead>
-                  <TableHead className="w-[80px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leaveTypes.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">ยังไม่มีประเภทลา</TableCell>
-                  </TableRow>
-                )}
-                {leaveTypes.map((lt) => (
-                  <TableRow key={lt.id}>
-                    <TableCell className="font-medium">{lt.name}</TableCell>
-                    <TableCell className="text-center">
-                      {editingId === lt.id ? (
-                        <Input
-                          type="number"
-                          min={0}
-                          value={editMaxDays}
-                          onChange={(e) => setEditMaxDays(e.target.value)}
-                          className="h-8 w-20 text-center mx-auto"
-                          autoFocus
-                          onKeyDown={(e) => { if (e.key === "Enter") handleSaveMaxDays(lt.id); if (e.key === "Escape") setEditingId(null); }}
-                        />
-                      ) : (
-                        <span
-                          className="cursor-pointer hover:text-primary"
-                          onClick={() => { setEditingId(lt.id); setEditMaxDays(lt.max_days_per_year?.toString() ?? "0"); }}
-                        >
-                          {lt.max_days_per_year ?? "—"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === lt.id ? (
-                        <Button variant="ghost" size="sm" onClick={() => handleSaveMaxDays(lt.id)} disabled={isPending}>
-                          <Save className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </div>
         )}
 
@@ -303,15 +187,6 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
         <div className="text-xl font-bold">{value}</div>
         <div className="text-xs text-muted-foreground">{label}</div>
       </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center py-1.5 border-b border-dashed last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
     </div>
   );
 }

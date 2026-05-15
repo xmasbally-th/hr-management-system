@@ -116,8 +116,8 @@ describe("getPositions", () => {
 // ===================================================================
 describe("createDepartment", () => {
   it("HR creates a department", async () => {
-    const chain = createMockChain();
-    const sb = setHrClientWithTable("departments", chain);
+    const chain = createMockChain({ data: { id: "dept-new", name: "Finance" } });
+    setHrClientWithTable("departments", chain);
 
     await createDepartment("Finance");
 
@@ -130,11 +130,16 @@ describe("createDepartment", () => {
     await expect(createDepartment("Finance")).rejects.toThrow("Forbidden");
   });
 
-  it("throws on DB error", async () => {
+  it("rejects empty name", async () => {
+    setHrClientWithTable("departments", createMockChain());
+    await expect(createDepartment("   ")).rejects.toThrow(/1-200|1–200/);
+  });
+
+  it("throws on DB error (e.g. duplicate name)", async () => {
     const chain = createMockChain({ error: { message: "duplicate" } });
     setHrClientWithTable("departments", chain);
 
-    await expect(createDepartment("Finance")).rejects.toThrow("Failed to create department");
+    await expect(createDepartment("Finance")).rejects.toThrow("เพิ่มหน่วยงานไม่สำเร็จ");
   });
 });
 
@@ -143,7 +148,7 @@ describe("createDepartment", () => {
 // ===================================================================
 describe("createPosition", () => {
   it("HR creates a position", async () => {
-    const chain = createMockChain();
+    const chain = createMockChain({ data: { id: "pos-new", name: "Developer" } });
     setHrClientWithTable("positions", chain);
 
     await createPosition("Developer", "dept-1");
@@ -155,6 +160,11 @@ describe("createPosition", () => {
   it("non-HR is rejected", async () => {
     setNonHrClient();
     await expect(createPosition("Dev", "d1")).rejects.toThrow("Forbidden");
+  });
+
+  it("rejects missing department_id", async () => {
+    setHrClientWithTable("positions", createMockChain());
+    await expect(createPosition("Dev", "")).rejects.toThrow("กรุณาเลือก");
   });
 });
 
@@ -178,11 +188,11 @@ describe("deleteDepartment", () => {
     await expect(deleteDepartment("dept-1")).rejects.toThrow("Forbidden");
   });
 
-  it("throws on DB error (in use)", async () => {
+  it("throws on DB error (rare — should be caught by FK pre-check first)", async () => {
     const chain = createMockChain({ error: { message: "foreign key" } });
     setHrClientWithTable("departments", chain);
 
-    await expect(deleteDepartment("dept-1")).rejects.toThrow("Failed to delete department");
+    await expect(deleteDepartment("dept-1")).rejects.toThrow("ลบหน่วยงานไม่สำเร็จ");
   });
 });
 

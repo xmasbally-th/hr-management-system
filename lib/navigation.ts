@@ -91,12 +91,6 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
-        title: "สังกัดหน่วยงาน",
-        href: "/dashboard/hr/departments",
-        icon: "Building2",
-        roles: ["admin", "hr"],
-      },
-      {
         title: "จัดการการลา",
         href: "/dashboard/hr/leaves",
         icon: "CalendarRange",
@@ -138,7 +132,7 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager"],
       },
       {
-        title: "ตั้งค่าองค์กร (Master Data)",
+        title: "ข้อมูลหลัก",
         href: "/dashboard/hr/master-data",
         icon: "Building",
         roles: ["admin", "hr"],
