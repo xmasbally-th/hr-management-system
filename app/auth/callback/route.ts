@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isEmailAllowed } from "@/lib/auth/allowed-domains";
+import {
+  isEmailAllowed,
+  getAutoApproveNewUsers,
+} from "@/lib/system-settings";
 import { env } from "@/lib/env";
 import type { Database } from "@/types/supabase";
 
@@ -42,8 +45,9 @@ export async function GET(request: Request) {
 
   const user = sessionData.user;
 
-  // 2. Enforce email-domain allowlist
-  if (!isEmailAllowed(user.email)) {
+  // 2. Enforce email-domain allowlist (reads from system_settings table —
+  //    falls back to NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS env when missing)
+  if (!(await isEmailAllowed(user.email))) {
     console.warn(
       "[auth/callback] Rejected sign-in from disallowed domain:",
       user.email,
@@ -110,12 +114,13 @@ export async function GET(request: Request) {
         user.email?.split("@")[0] ||
         "New User";
 
+      const autoApprove = await getAutoApproveNewUsers();
       const { error: insertError } = await supabaseAdmin.from("profiles").insert({
         id: user.id,
         email: user.email!,
         full_name: fullName,
         role: "employee",
-        status: env.AUTO_APPROVE_NEW_USERS ? "approved" : "pending",
+        status: autoApprove ? "approved" : "pending",
         // No welcome gate — mark complete on creation so the user lands
         // on /dashboard immediately. HR is the source of truth for the
         // full profile (see /dashboard/hr/users/import).

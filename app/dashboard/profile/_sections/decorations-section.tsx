@@ -32,8 +32,15 @@ interface DecorationRow {
   position_at_grant: string | null;
 }
 
+interface CatalogEntry {
+  name: string;
+  abbreviation: string | null;
+}
+
 interface Props {
   rows: DecorationRow[];
+  /** From master-data catalog — used as datalist autocomplete. */
+  catalog?: CatalogEntry[];
 }
 
 const BLANK: DecorationInput = {
@@ -44,7 +51,7 @@ const BLANK: DecorationInput = {
   position_at_grant: "",
 };
 
-export function DecorationsSection({ rows }: Props) {
+export function DecorationsSection({ rows, catalog = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -136,10 +143,33 @@ export function DecorationsSection({ rows }: Props) {
               <Label className="text-xs">เครื่องราชอิสริยาภรณ์ *</Label>
               <Input
                 value={form.decoration_name}
-                onChange={(e) => setForm({ ...form, decoration_name: e.target.value })}
-                placeholder="เช่น ทวีติยาภรณ์ช้างเผือก"
+                onChange={(e) => {
+                  const name = e.target.value;
+                  // Auto-fill abbreviation when name matches a catalog entry
+                  const match = catalog.find(
+                    (c) => c.name.toLowerCase() === name.toLowerCase(),
+                  );
+                  setForm({
+                    ...form,
+                    decoration_name: name,
+                    ...(match && match.abbreviation
+                      ? { abbreviation: match.abbreviation }
+                      : {}),
+                  });
+                }}
+                list="decoration-catalog-list"
+                placeholder="พิมพ์/เลือกจากรายการ..."
                 disabled={isPending}
               />
+              {catalog.length > 0 && (
+                <datalist id="decoration-catalog-list">
+                  {catalog.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.abbreviation ? `(${c.abbreviation})` : ""}
+                    </option>
+                  ))}
+                </datalist>
+              )}
             </div>
             <div className="col-span-12 sm:col-span-4 space-y-1">
               <Label className="text-xs">ชื่อย่อ</Label>

@@ -14,9 +14,11 @@ import {
   Settings,
   FileSpreadsheet,
   Palette,
+  ShieldCheck,
 } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { DensitySwitcher } from "@/components/density-switcher";
+import { SecuritySection } from "./_sections/security-section";
 
 interface SettingsProps {
   systemStats: {
@@ -25,17 +27,29 @@ interface SettingsProps {
     totalTravelRequests: number;
     totalDepartments: number;
   };
+  allowedDomains: string[];
+  autoApprove: boolean;
+  lastUpdated: {
+    allowed_email_domains: string | null;
+    auto_approve_new_users: string | null;
+  };
 }
 
-type Tab = "general" | "appearance" | "export";
+type Tab = "general" | "appearance" | "security" | "export";
 
-export function SettingsClient({ systemStats }: SettingsProps) {
+export function SettingsClient({
+  systemStats,
+  allowedDomains,
+  autoApprove,
+  lastUpdated,
+}: SettingsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [isPending, startTransition] = useTransition();
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "general", label: "สถิติระบบ", icon: <Settings className="h-4 w-4" /> },
     { key: "appearance", label: "หน้าตาและธีม", icon: <Palette className="h-4 w-4" /> },
+    { key: "security", label: "ความปลอดภัย", icon: <ShieldCheck className="h-4 w-4" /> },
     { key: "export", label: "ส่งออกข้อมูล", icon: <FileSpreadsheet className="h-4 w-4" /> },
   ];
 
@@ -144,6 +158,14 @@ export function SettingsClient({ systemStats }: SettingsProps) {
               </p>
             </div>
           </div>
+        )}
+
+        {activeTab === "security" && (
+          <SecuritySection
+            initialDomains={allowedDomains}
+            initialAutoApprove={autoApprove}
+            lastUpdated={lastUpdated}
+          />
         )}
 
         {activeTab === "export" && (

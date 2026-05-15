@@ -41,10 +41,14 @@ interface ProfileData {
 interface Props {
   profile: ProfileData;
   departments: Array<{ id: string; name: string }>;
+  /** From master-data catalog. Falls back to a small built-in list if empty. */
+  employeeTypes: string[];
+  /** From master-data catalog. Falls back to a small built-in list if empty. */
+  educationLevels: string[];
 }
 
 const TITLE_TH = ["นาย", "นาง", "นางสาว", "ผศ.", "รศ.", "ศ.", "ดร.", "ผศ.ดร.", "รศ.ดร.", "ศ.ดร."];
-const EMPLOYEE_TYPES = [
+const FALLBACK_EMPLOYEE_TYPES = [
   "ข้าราชการ",
   "พนักงานมหาวิทยาลัย",
   "พนักงานราชการ",
@@ -52,7 +56,7 @@ const EMPLOYEE_TYPES = [
   "ลูกจ้างประจำ",
   "อื่น ๆ",
 ];
-const EDUCATION_LEVELS = [
+const FALLBACK_EDUCATION_LEVELS = [
   "ปริญญาตรี",
   "ปริญญาโท",
   "ปริญญาเอก",
@@ -61,7 +65,16 @@ const EDUCATION_LEVELS = [
   "อื่น ๆ",
 ];
 
-export function IdentitySection({ profile, departments }: Props) {
+export function IdentitySection({
+  profile,
+  departments,
+  employeeTypes,
+  educationLevels,
+}: Props) {
+  const employeeTypeOptions =
+    employeeTypes.length > 0 ? employeeTypes : FALLBACK_EMPLOYEE_TYPES;
+  const educationLevelOptions =
+    educationLevels.length > 0 ? educationLevels : FALLBACK_EDUCATION_LEVELS;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -237,7 +250,7 @@ export function IdentitySection({ profile, departments }: Props) {
             >
               <SelectTrigger><SelectValue placeholder="เลือก..." /></SelectTrigger>
               <SelectContent>
-                {EMPLOYEE_TYPES.map((t) => (
+                {employeeTypeOptions.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
               </SelectContent>
@@ -267,7 +280,7 @@ export function IdentitySection({ profile, departments }: Props) {
             >
               <SelectTrigger><SelectValue placeholder="เลือก..." /></SelectTrigger>
               <SelectContent>
-                {EDUCATION_LEVELS.map((t) => (
+                {educationLevelOptions.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
               </SelectContent>

@@ -7,7 +7,7 @@ import type { ProfileStatus, UserRole } from "@/types/supabase";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { env } from "@/lib/env";
-import { isEmailAllowed } from "@/lib/auth/allowed-domains";
+import { isEmailAllowed } from "@/lib/system-settings";
 import { createNotificationInternal } from "./notification-actions";
 
 /**
@@ -416,7 +416,7 @@ export async function bulkImportEmployees(
       result.failed.push({ row: rowNum, email, error: "รูปแบบอีเมลไม่ถูกต้อง" });
       continue;
     }
-    if (!isEmailAllowed(email)) {
+    if (!(await isEmailAllowed(email))) {
       result.failed.push({
         row: rowNum,
         email,

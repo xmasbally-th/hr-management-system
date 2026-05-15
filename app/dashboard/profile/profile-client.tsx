@@ -73,6 +73,9 @@ interface Props {
     end_date: string | null;
   }>;
   departments: Array<{ id: string; name: string }>;
+  employeeTypes: string[];
+  educationLevels: string[];
+  decorationCatalog: Array<{ name: string; abbreviation: string | null }>;
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -115,6 +118,9 @@ export function ProfileClient({
   decorations,
   adminPositions,
   departments,
+  employeeTypes,
+  educationLevels,
+  decorationCatalog,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
 
@@ -241,10 +247,17 @@ export function ProfileClient({
       {/* Content */}
       <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
         {activeTab === "identity" && (
-          <IdentitySection profile={profile} departments={departments} />
+          <IdentitySection
+            profile={profile}
+            departments={departments}
+            employeeTypes={employeeTypes}
+            educationLevels={educationLevels}
+          />
         )}
         {activeTab === "education" && <EducationSection rows={educations} />}
-        {activeTab === "decorations" && <DecorationsSection rows={decorations} />}
+        {activeTab === "decorations" && (
+          <DecorationsSection rows={decorations} catalog={decorationCatalog} />
+        )}
         {activeTab === "admin" && <AdminPositionsSection rows={adminPositions} />}
       </div>
     </div>

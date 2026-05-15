@@ -1,4 +1,10 @@
-import { getDepartments, getPositions } from "@/lib/actions/master-data-actions";
+import {
+  getDepartments,
+  getPositions,
+  getEmployeeTypes,
+  getEducationLevels,
+  getDecorationCatalog,
+} from "@/lib/actions/master-data-actions";
 import { getLeaveTypeSettings } from "@/lib/actions/settings-actions";
 import { MasterDataClient } from "./master-data-client";
 
@@ -7,10 +13,20 @@ export const metadata = {
 };
 
 export default async function MasterDataPage() {
-  const [departments, positions, leaveTypes] = await Promise.all([
+  const [
+    departments,
+    positions,
+    leaveTypes,
+    employeeTypes,
+    educationLevels,
+    decorationCatalog,
+  ] = await Promise.all([
     getDepartments(),
     getPositions(),
     getLeaveTypeSettings(),
+    getEmployeeTypes(),
+    getEducationLevels(),
+    getDecorationCatalog(),
   ]);
 
   return (
@@ -18,8 +34,8 @@ export default async function MasterDataPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">ข้อมูลหลัก</h1>
         <p className="text-muted-foreground">
-          จัดการหน่วยงาน ตำแหน่ง และประเภทการลา —
-          ข้อมูลในหน้านี้จะถูกใช้ใน dropdown ของฟอร์มทั่วทั้งระบบ
+          จัดการข้อมูลที่ถูกอ้างอิงในฟอร์มต่าง ๆ ทั้งระบบ —
+          หน่วยงาน · ตำแหน่ง · ประเภทการลา · ประเภทบุคลากร · วุฒิการศึกษา · เครื่องราชอิสริยาภรณ์
         </p>
       </div>
 
@@ -27,6 +43,9 @@ export default async function MasterDataPage() {
         departments={departments}
         positions={positions}
         leaveTypes={leaveTypes}
+        employeeTypes={employeeTypes}
+        educationLevels={educationLevels}
+        decorationCatalog={decorationCatalog}
       />
     </div>
   );

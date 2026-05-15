@@ -1,13 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Briefcase, CalendarDays } from "lucide-react";
+import {
+  Building2,
+  Briefcase,
+  CalendarDays,
+  IdCard,
+  GraduationCap,
+  Award,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DepartmentsSection } from "./_sections/departments-section";
 import { PositionsSection } from "./_sections/positions-section";
 import { LeaveTypesSection } from "./_sections/leave-types-section";
+import { EmployeeTypesSection } from "./_sections/employee-types-section";
+import { EducationLevelsSection } from "./_sections/education-levels-section";
+import { DecorationCatalogSection } from "./_sections/decoration-catalog-section";
 
-type TabKey = "departments" | "positions" | "leave-types";
+type TabKey =
+  | "departments"
+  | "positions"
+  | "leave-types"
+  | "employee-types"
+  | "education-levels"
+  | "decoration-catalog";
 
 interface DeptRow {
   id: string;
@@ -24,14 +40,35 @@ interface LeaveTypeRow {
   name: string;
   max_days_per_year: number;
 }
+interface NameOrderRow {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+interface DecorationCatalogRow {
+  id: string;
+  name: string;
+  abbreviation: string | null;
+  sort_order: number;
+}
 
 interface Props {
   departments: DeptRow[];
   positions: PosRow[];
   leaveTypes: LeaveTypeRow[];
+  employeeTypes: NameOrderRow[];
+  educationLevels: NameOrderRow[];
+  decorationCatalog: DecorationCatalogRow[];
 }
 
-export function MasterDataClient({ departments, positions, leaveTypes }: Props) {
+export function MasterDataClient({
+  departments,
+  positions,
+  leaveTypes,
+  employeeTypes,
+  educationLevels,
+  decorationCatalog,
+}: Props) {
   const [active, setActive] = useState<TabKey>("departments");
 
   const tabs: Array<{
@@ -43,6 +80,9 @@ export function MasterDataClient({ departments, positions, leaveTypes }: Props) 
     { key: "departments", label: "หน่วยงาน", count: departments.length, icon: Building2 },
     { key: "positions", label: "ตำแหน่ง", count: positions.length, icon: Briefcase },
     { key: "leave-types", label: "ประเภทการลา", count: leaveTypes.length, icon: CalendarDays },
+    { key: "employee-types", label: "ประเภทบุคลากร", count: employeeTypes.length, icon: IdCard },
+    { key: "education-levels", label: "วุฒิการศึกษา", count: educationLevels.length, icon: GraduationCap },
+    { key: "decoration-catalog", label: "เครื่องราชฯ", count: decorationCatalog.length, icon: Award },
   ];
 
   return (
@@ -86,6 +126,9 @@ export function MasterDataClient({ departments, positions, leaveTypes }: Props) 
           <PositionsSection rows={positions} departments={departments} />
         )}
         {active === "leave-types" && <LeaveTypesSection rows={leaveTypes} />}
+        {active === "employee-types" && <EmployeeTypesSection rows={employeeTypes} />}
+        {active === "education-levels" && <EducationLevelsSection rows={educationLevels} />}
+        {active === "decoration-catalog" && <DecorationCatalogSection rows={decorationCatalog} />}
       </div>
     </div>
   );
