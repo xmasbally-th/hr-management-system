@@ -8,12 +8,16 @@ import { logAudit } from "@/lib/audit-log";
 /**
  * Server actions for the /welcome onboarding gate (Phase P-Onboard).
  *
- * Three states a user might be in when they hit /welcome:
- *   - awaiting_confirmation → showed profile, choose [accurate] or [incorrect]
- *   - awaiting_correction   → already submitted a correction request, can
- *                             cancel to make a new one
- *   - approved (re-visit)   → not normally routed here; redirect handled at page
+ * Statuses considered "in onboarding" (any of these allows /welcome actions):
+ *   - pre_registered, awaiting_confirmation, awaiting_correction, pending
  */
+
+const ONBOARDING_STATUSES = new Set([
+  "pre_registered",
+  "awaiting_confirmation",
+  "awaiting_correction",
+  "pending",
+]);
 
 async function getAuthUser(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -42,8 +46,8 @@ export async function confirmProfileAsAccurate(): Promise<void> {
     .single();
 
   if (!profile) throw new Error("ไม่พบโปรไฟล์");
-  if (profile.status !== "awaiting_confirmation") {
-    throw new Error("สถานะบัญชีไม่อยู่ในขั้นตอนยืนยัน");
+  if (!ONBOARDING_STATUSES.has(profile.status)) {
+    throw new Error(`สถานะบัญชี (${profile.status}) ไม่อยู่ในขั้นตอนยืนยัน`);
   }
 
   const now = new Date().toISOString();
@@ -58,7 +62,7 @@ export async function confirmProfileAsAccurate(): Promise<void> {
 
   if (error) {
     console.error("[welcome-actions] confirmProfileAsAccurate failed:", error);
-    throw new Error("บันทึกการยืนยันไม่สำเร็จ");
+    throw new Error("บันทึกการยืนยันไม่สำเร็จ: " + error.message);
   }
 
   await logAudit(supabase, user.id, "confirm_profile_accurate", "profile", user.id, {});
@@ -104,8 +108,8 @@ export async function submitFirstReviewCorrection(
     .single();
 
   if (!profile) throw new Error("ไม่พบโปรไฟล์");
-  if (profile.status !== "awaiting_confirmation") {
-    throw new Error("สถานะบัญชีไม่อยู่ในขั้นตอนยืนยัน");
+  if (!ONBOARDING_STATUSES.has(profile.status)) {
+    throw new Error(`สถานะบัญชี (${profile.status}) ไม่อยู่ในขั้นตอนยืนยัน`);
   }
 
   // Insert correction request
@@ -128,7 +132,9 @@ export async function submitFirstReviewCorrection(
       "[welcome-actions] submitFirstReviewCorrection failed:",
       insertError,
     );
-    throw new Error("ส่งคำขอแก้ไขไม่สำเร็จ");
+    throw new Error(
+      "ส่งคำขอแก้ไขไม่สำเร็จ: " + (insertError?.message ?? "unknown"),
+    );
   }
 
   // Move user to awaiting_correction state
