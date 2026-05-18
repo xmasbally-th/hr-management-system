@@ -126,7 +126,13 @@ export interface Database {
           education_level: string | null;
           profile_completed_at: string | null;
           role: "admin" | "hr" | "manager" | "employee";
-          status: "pending" | "approved" | "rejected";
+          status:
+            | "pending"
+            | "approved"
+            | "rejected"
+            | "pre_registered"
+            | "awaiting_confirmation"
+            | "awaiting_correction";
           created_at: string;
           updated_at: string;
         };
@@ -156,7 +162,13 @@ export interface Database {
           education_level?: string | null;
           profile_completed_at?: string | null;
           role?: "admin" | "hr" | "manager" | "employee";
-          status?: "pending" | "approved" | "rejected";
+          status?:
+            | "pending"
+            | "approved"
+            | "rejected"
+            | "pre_registered"
+            | "awaiting_confirmation"
+            | "awaiting_correction";
           created_at?: string;
           updated_at?: string;
         };
@@ -186,7 +198,13 @@ export interface Database {
           education_level?: string | null;
           profile_completed_at?: string | null;
           role?: "admin" | "hr" | "manager" | "employee";
-          status?: "pending" | "approved" | "rejected";
+          status?:
+            | "pending"
+            | "approved"
+            | "rejected"
+            | "pre_registered"
+            | "awaiting_confirmation"
+            | "awaiting_correction";
           created_at?: string;
           updated_at?: string;
         };
@@ -480,6 +498,71 @@ export interface Database {
           {
             foreignKeyName: "profile_admin_positions_profile_id_fkey";
             columns: ["profile_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      profile_correction_requests: {
+        Row: {
+          id: string;
+          target_user_id: string;
+          submitted_by: string;
+          reason_text: string;
+          fields_flagged: string[]; // jsonb array of field keys
+          proposed_payload: Record<string, unknown> | null;
+          scope: "first_review" | "post_approval";
+          status: "pending" | "resolved" | "rejected" | "cancelled";
+          resolver_note: string | null;
+          resolved_by: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          target_user_id: string;
+          submitted_by: string;
+          reason_text: string;
+          fields_flagged?: string[];
+          proposed_payload?: Record<string, unknown> | null;
+          scope: "first_review" | "post_approval";
+          status?: "pending" | "resolved" | "rejected" | "cancelled";
+          resolver_note?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          target_user_id?: string;
+          submitted_by?: string;
+          reason_text?: string;
+          fields_flagged?: string[];
+          proposed_payload?: Record<string, unknown> | null;
+          scope?: "first_review" | "post_approval";
+          status?: "pending" | "resolved" | "rejected" | "cancelled";
+          resolver_note?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "profile_correction_requests_target_user_id_fkey";
+            columns: ["target_user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_correction_requests_submitted_by_fkey";
+            columns: ["submitted_by"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "profile_correction_requests_resolved_by_fkey";
+            columns: ["resolved_by"];
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
@@ -932,7 +1015,13 @@ export interface Database {
     };
     Enums: {
       user_role: "admin" | "hr" | "manager" | "employee";
-      profile_status: "pending" | "approved" | "rejected";
+      profile_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "pre_registered"
+        | "awaiting_confirmation"
+        | "awaiting_correction";
       request_status: "pending" | "approved" | "rejected" | "cancelled";
     };
     CompositeTypes: {

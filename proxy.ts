@@ -7,6 +7,14 @@ const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/settings"];
 const MANAGER_PLUS_ROUTES = ["/dashboard/reports"];
 const MANAGER_ROUTES = ["/dashboard/approvals"];
 
+// Statuses that block dashboard access — user must go through /welcome
+const ONBOARDING_STATUSES = new Set([
+  "pre_registered",
+  "awaiting_confirmation",
+  "awaiting_correction",
+  "pending", // legacy — treat same as awaiting_confirmation for safety
+]);
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -41,20 +49,25 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isWelcome = pathname.startsWith("/welcome");
+  const needsAuth = isDashboard || isWelcome;
+
   // Not authenticated → redirect to login
-  if (!user && pathname.startsWith("/dashboard")) {
+  if (!user && needsAuth) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated user on /login → redirect to dashboard
+  // Authenticated user on /login → kick to dashboard (status-routing below
+  // will then send them to /welcome if onboarding still pending)
   if (user && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // RBAC route protection for dashboard routes
-  if (user && pathname.startsWith("/dashboard")) {
+  // Status-aware routing + RBAC for protected pages
+  if (user && needsAuth) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role, status")
@@ -67,24 +80,47 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Rejected accounts
+    // Rejected accounts — always bounce to login
     if (profile.status === "rejected") {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("error", "account_rejected");
       return NextResponse.redirect(loginUrl);
     }
 
-    // HR/Admin-only routes
-    if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
-      if (profile.role !== "hr" && profile.role !== "admin") {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
+    // Onboarding gate — users mid-onboarding belong at /welcome only
+    const onboarding = ONBOARDING_STATUSES.has(profile.status);
+
+    if (onboarding && isDashboard) {
+      return NextResponse.redirect(new URL("/welcome", request.url));
     }
 
-    // Manager+ routes (reports, approvals)
-    if ([...MANAGER_ROUTES, ...MANAGER_PLUS_ROUTES].some((route) => pathname.startsWith(route))) {
-      if (profile.role !== "manager" && profile.role !== "hr" && profile.role !== "admin") {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+    // Approved user accidentally on /welcome → send to dashboard
+    if (!onboarding && isWelcome) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    // RBAC only applies to /dashboard/* routes (after onboarding clears)
+    if (isDashboard) {
+      // HR/Admin-only routes
+      if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
+        if (profile.role !== "hr" && profile.role !== "admin") {
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
+      }
+
+      // Manager+ routes (reports, approvals)
+      if (
+        [...MANAGER_ROUTES, ...MANAGER_PLUS_ROUTES].some((route) =>
+          pathname.startsWith(route),
+        )
+      ) {
+        if (
+          profile.role !== "manager" &&
+          profile.role !== "hr" &&
+          profile.role !== "admin"
+        ) {
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
       }
     }
   }

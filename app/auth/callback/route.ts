@@ -1,27 +1,26 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
-import {
-  isEmailAllowed,
-  getAutoApproveNewUsers,
-} from "@/lib/system-settings";
+import { isEmailAllowed } from "@/lib/system-settings";
 import { env } from "@/lib/env";
 import type { Database } from "@/types/supabase";
 
 /**
- * OAuth callback route.
+ * OAuth callback route — Whitelist-First Onboarding (Phase P-Onboard).
  *
  * After Google OAuth redirects here with an authorization `code`:
  *
  * 1. Exchange code for session (sets auth cookies)
  * 2. Enforce email-domain allowlist
- * 3. Profile linking — three cases:
- *    a) profile already exists for this auth.user.id → use it
- *    b) placeholder profile exists with matching email (HR-imported, no
- *       login yet) → re-key the placeholder ID to auth.user.id, including
- *       all FK references in child tables
- *    c) no profile → create a fresh one (status=pending, completed=null)
- * 4. Redirect to /dashboard (proxy will then send to /welcome if needed)
+ * 3. Profile linking — whitelist-strict:
+ *    a) profile already linked by auth.user.id → check status
+ *       (rejected → signOut · ok → continue)
+ *    b) placeholder profile exists with matching email (HR-imported, never
+ *       logged in) → re-key the placeholder ID to auth.user.id, cascade
+ *       FKs, set status='awaiting_confirmation' so /welcome gates them
+ *    c) no profile (HR didn't pre-register this email) → signOut + redirect
+ *       to /login?error=not_whitelisted. NEW USERS CANNOT SELF-REGISTER.
+ * 4. Redirect to /dashboard (proxy routes to /welcome based on status)
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -57,7 +56,7 @@ export async function GET(request: Request) {
   }
 
   // 3. Profile linking — service-role client bypasses RLS for the
-  //    re-key + insert paths.
+  //    re-key + status update paths.
   const supabaseAdmin: SupabaseClient<Database> = createSupabaseClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY,
@@ -69,77 +68,82 @@ export async function GET(request: Request) {
     },
   );
 
-  // 3a. Already linked by ID — fast path
+  // 3a. Already linked by ID — returning user
   const { data: existingById } = await supabaseAdmin
     .from("profiles")
-    .select("id")
+    .select("id, status")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!existingById) {
-    // 3b. Try email match — HR-imported placeholder waiting to be claimed
-    const { data: placeholder } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .ilike("email", user.email!)
-      .is("profile_completed_at", null)
-      .maybeSingle();
-
-    if (placeholder && placeholder.id !== user.id) {
-      // Re-key the placeholder → cascade FKs in all child tables
-      try {
-        await rekeyPlaceholderProfile(
-          supabaseAdmin,
-          placeholder.id,
-          user.id,
-          user.email!,
-        );
-      } catch (err) {
-        console.error("[auth/callback] Re-key failed:", err);
-        // Fall through to create a fresh profile — at least don't block login
-      }
+  if (existingById) {
+    if (existingById.status === "rejected") {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(
+        `${origin}/login?error=account_rejected`,
+      );
     }
-
-    // 3c. Re-check (re-key may have succeeded or failed); if still no profile, insert fresh
-    const { data: recheck } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!recheck) {
-      const fullName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email?.split("@")[0] ||
-        "New User";
-
-      const autoApprove = await getAutoApproveNewUsers();
-      const { error: insertError } = await supabaseAdmin.from("profiles").insert({
-        id: user.id,
-        email: user.email!,
-        full_name: fullName,
-        role: "employee",
-        status: autoApprove ? "approved" : "pending",
-        // No welcome gate — mark complete on creation so the user lands
-        // on /dashboard immediately. HR is the source of truth for the
-        // full profile (see /dashboard/hr/users/import).
-        profile_completed_at: new Date().toISOString(),
-      });
-
-      if (insertError) {
-        console.error(
-          "[auth/callback] Fresh profile creation failed:",
-          insertError,
-        );
-        // Don't block — proxy/dashboard-shell may still create a fallback
-      }
-    }
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
-  // 4. Redirect to dashboard (or wherever `next` points). The /dashboard
-  //    layout will check profile_completed_at and redirect to /welcome in
-  //    Phase M3.
+  // 3b. Try email match — HR-imported placeholder waiting to be claimed
+  const { data: placeholder } = await supabaseAdmin
+    .from("profiles")
+    .select("id, status")
+    .ilike("email", user.email!)
+    .is("profile_completed_at", null)
+    .maybeSingle();
+
+  if (!placeholder) {
+    // 3c. Whitelist gate — no placeholder means HR didn't pre-register
+    //     this email. Reject; do not auto-create.
+    console.warn(
+      "[auth/callback] Not whitelisted — no placeholder profile for:",
+      user.email,
+    );
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=not_whitelisted`);
+  }
+
+  if (placeholder.status === "rejected") {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=account_rejected`);
+  }
+
+  // Re-key the placeholder → cascade FKs in all child tables
+  try {
+    await rekeyPlaceholderProfile(
+      supabaseAdmin,
+      placeholder.id,
+      user.id,
+      user.email!,
+    );
+  } catch (err) {
+    console.error("[auth/callback] Re-key failed:", err);
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=rekey_failed`);
+  }
+
+  // After re-key, gate user at /welcome until they confirm their profile.
+  // Placeholders were created with profile_completed_at=NULL — we leave it
+  // that way; status moves to 'awaiting_confirmation' so the proxy routes
+  // them to /welcome.
+  const { error: statusError } = await supabaseAdmin
+    .from("profiles")
+    .update({
+      status: "awaiting_confirmation",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (statusError) {
+    console.error(
+      "[auth/callback] Failed to set awaiting_confirmation status:",
+      statusError,
+    );
+    // Don't block — proxy still works off whatever status remains
+  }
+
+  // 4. Redirect to dashboard — proxy will route to /welcome based on status
   return NextResponse.redirect(`${origin}${next}`);
 }
 
