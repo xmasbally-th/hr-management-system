@@ -137,19 +137,21 @@ export async function submitFirstReviewCorrection(
     );
   }
 
-  // Move user to awaiting_correction state
+  // User has reviewed the data and noted required corrections — treat as
+  // "approved for use". Pending correction request stays in queue for HR.
   const now = new Date().toISOString();
   const { error: statusError } = await supabase
     .from("profiles")
     .update({
-      status: "awaiting_correction",
+      status: "approved",
+      profile_completed_at: now,
       updated_at: now,
     })
     .eq("id", user.id);
 
   if (statusError) {
     console.error(
-      "[welcome-actions] failed to set awaiting_correction:",
+      "[welcome-actions] failed to set approved after correction:",
       statusError,
     );
     // Continue — the request is in DB; HR can still resolve it
@@ -165,6 +167,7 @@ export async function submitFirstReviewCorrection(
   );
 
   revalidatePath("/welcome");
+  revalidatePath("/dashboard");
   return { id: inserted.id };
 }
 
@@ -205,14 +208,9 @@ export async function cancelMyCorrectionRequest(id: string): Promise<void> {
     throw new Error("ยกเลิกคำขอไม่สำเร็จ");
   }
 
-  // If this was a first_review correction, move user back to
-  // awaiting_confirmation so they can re-review and (optionally) re-submit.
-  if (cr.scope === "first_review") {
-    await supabase
-      .from("profiles")
-      .update({ status: "awaiting_confirmation", updated_at: now })
-      .eq("id", user.id);
-  }
+  // Note: we no longer revert profile.status — once a correction is
+  // submitted the user is approved+can use the system. Cancelling the
+  // request just removes HR's pending action item.
 
   await logAudit(
     supabase,
@@ -224,6 +222,37 @@ export async function cancelMyCorrectionRequest(id: string): Promise<void> {
   );
 
   revalidatePath("/welcome");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * List of pending correction requests submitted by the current user — for
+ * showing the "HR is reviewing your changes" banner on /dashboard.
+ */
+export async function getMyPendingCorrections(): Promise<
+  Array<{
+    id: string;
+    reason_text: string;
+    fields_flagged: string[];
+    scope: "first_review" | "post_approval";
+    created_at: string;
+  }>
+> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  const { data, error } = await supabase
+    .from("profile_correction_requests")
+    .select("id, reason_text, fields_flagged, scope, created_at")
+    .eq("target_user_id", user.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[welcome-actions] getMyPendingCorrections:", error);
+    return [];
+  }
+  return data ?? [];
 }
 
 /**

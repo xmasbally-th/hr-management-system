@@ -191,7 +191,11 @@ export function WelcomeClient({
           fields_flagged: Array.from(flaggedFields),
           reason_text: reason,
         });
-        toast.success("ส่งคำขอแก้ไขให้ HR แล้ว — กรุณารอการดำเนินการ");
+        toast.success(
+          "ส่งคำขอแก้ไขแล้ว — เริ่มใช้งานระบบได้เลย ฝ่ายบุคคลจะดำเนินการให้",
+          { duration: 5000 },
+        );
+        router.push("/dashboard");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "ส่งคำขอไม่สำเร็จ");

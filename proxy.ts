@@ -7,11 +7,14 @@ const HR_ADMIN_ROUTES = ["/dashboard/hr", "/dashboard/settings"];
 const MANAGER_PLUS_ROUTES = ["/dashboard/reports"];
 const MANAGER_ROUTES = ["/dashboard/approvals"];
 
-// Statuses that block dashboard access — user must go through /welcome
+// Statuses that block dashboard access — user must go through /welcome.
+// Note: awaiting_correction is NOT in this set — users who submit a
+// correction request are immediately approved and can use the system
+// while HR processes their changes. A banner in the dashboard layout
+// surfaces the pending request.
 const ONBOARDING_STATUSES = new Set([
   "pre_registered",
   "awaiting_confirmation",
-  "awaiting_correction",
   "pending", // legacy — treat same as awaiting_confirmation for safety
 ]);
 
