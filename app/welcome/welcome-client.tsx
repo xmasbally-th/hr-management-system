@@ -240,10 +240,7 @@ export function WelcomeClient({
                 </div>
                 <p className="text-sm text-amber-800 mt-1">
                   คุณได้ส่งคำขอแก้ไขข้อมูลแล้วเมื่อ{" "}
-                  {new Date(pendingCorrection.created_at).toLocaleString("th-TH", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}{" "}
+                  {formatThaiDateTime(pendingCorrection.created_at)}{" "}
                   — กรุณารอการดำเนินการจากฝ่ายบุคคล
                   หลังจาก HR แก้ไขเรียบร้อยแล้ว คุณจะกลับมายืนยันได้อีกครั้ง
                 </p>
@@ -568,17 +565,50 @@ function joinEnglish(p: Profile): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+/**
+ * Deterministic Thai date formatter — produces identical output on both
+ * server and client to avoid React hydration mismatches. Returns the form
+ * "DD เดือน พ.ศ." (e.g. "15 มกราคม 2569").
+ */
+const THAI_MONTHS = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
 function formatDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleDateString("th-TH", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.getUTCDate();
+  const month = THAI_MONTHS[d.getUTCMonth()];
+  const yearBE = d.getUTCFullYear() + 543;
+  return `${day} ${month} ${yearBE}`;
+}
+
+/**
+ * Deterministic Thai datetime formatter (UTC-based to match server/client).
+ * Returns "DD เดือน พ.ศ. HH:mm" (e.g. "15 มกราคม 2569 14:30").
+ */
+function formatThaiDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.getUTCDate();
+  const month = THAI_MONTHS[d.getUTCMonth()];
+  const yearBE = d.getUTCFullYear() + 543;
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${day} ${month} ${yearBE} ${hh}:${mm} น.`;
 }
 
 interface ProfileSectionProps {
