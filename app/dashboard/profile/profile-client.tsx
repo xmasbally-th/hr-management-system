@@ -58,6 +58,7 @@ interface Props {
     institution: string;
     country: string | null;
     degree: string;
+    program_name: string | null;
     major_field: string | null;
   }>;
   decorations: Array<{

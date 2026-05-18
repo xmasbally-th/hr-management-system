@@ -37,6 +37,7 @@ interface EducationRow {
   institution: string;
   country: string | null;
   degree: string;
+  program_name: string | null;
   major_field: string | null;
 }
 
@@ -61,6 +62,7 @@ const BLANK: EducationInput = {
   institution: "",
   country: "",
   degree: "",
+  program_name: "",
   major_field: "",
 };
 
@@ -85,6 +87,7 @@ export function EducationSection({ rows, educationLevels }: Props) {
       institution: r.institution,
       country: r.country,
       degree: r.degree,
+      program_name: r.program_name ?? "",
       major_field: r.major_field ?? "",
     });
     setEditingId(r.id);
@@ -202,7 +205,7 @@ export function EducationSection({ rows, educationLevels }: Props) {
                 disabled={isPending}
               />
             </div>
-            <div className="col-span-12 sm:col-span-5 space-y-1">
+            <div className="col-span-12 sm:col-span-4 space-y-1">
               <Label className="text-xs">วุฒิการศึกษา *</Label>
               <Select
                 value={form.degree}
@@ -221,7 +224,16 @@ export function EducationSection({ rows, educationLevels }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-12 sm:col-span-7 space-y-1">
+            <div className="col-span-12 sm:col-span-4 space-y-1">
+              <Label className="text-xs">หลักสูตร</Label>
+              <Input
+                value={form.program_name ?? ""}
+                onChange={(e) => setForm({ ...form, program_name: e.target.value })}
+                placeholder="เช่น ศิลปศาสตรบัณฑิต, บริหารธุรกิจบัณฑิต"
+                disabled={isPending}
+              />
+            </div>
+            <div className="col-span-12 sm:col-span-4 space-y-1">
               <Label className="text-xs">สาขาวิชา</Label>
               <Input
                 value={form.major_field ?? ""}
@@ -269,6 +281,12 @@ export function EducationSection({ rows, educationLevels }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">
                     {r.degree}
+                    {r.program_name && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        · {r.program_name}
+                      </span>
+                    )}
                     {r.major_field && (
                       <span className="text-muted-foreground font-normal">
                         {" "}

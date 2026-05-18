@@ -348,6 +348,7 @@ export interface Database {
           institution: string;
           country: string | null;
           degree: string;
+          program_name: string | null;
           major_field: string | null;
           sort_order: number;
           created_at: string;
@@ -361,6 +362,7 @@ export interface Database {
           institution: string;
           country?: string | null;
           degree: string;
+          program_name?: string | null;
           major_field?: string | null;
           sort_order?: number;
           created_at?: string;
@@ -374,6 +376,7 @@ export interface Database {
           institution?: string;
           country?: string | null;
           degree?: string;
+          program_name?: string | null;
           major_field?: string | null;
           sort_order?: number;
           created_at?: string;
