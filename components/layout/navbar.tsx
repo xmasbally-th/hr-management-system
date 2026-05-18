@@ -111,10 +111,19 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
           {/* User dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-2.5 sm:pl-1 sm:pr-2 py-1 rounded-lg hover:bg-muted focus:outline-none">
-              {/* Avatar — role-tinted */}
-              <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold shadow-sm", avatarGradient)}>
-                {initials}
-              </div>
+              {/* Avatar — image when uploaded, role-tinted initials otherwise */}
+              {profile?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name ?? "avatar"}
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-border shadow-sm"
+                />
+              ) : (
+                <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold shadow-sm", avatarGradient)}>
+                  {initials}
+                </div>
+              )}
               <div className="hidden sm:flex flex-col items-start min-w-0">
                 <div className="text-sm font-semibold text-foreground leading-tight truncate max-w-[140px]">
                   {profile?.full_name ?? "Loading…"}
@@ -131,9 +140,18 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
             <DropdownMenuContent align="end" className="w-64 rounded-xl p-0 overflow-hidden shadow-lg border border-border animate-fade-in">
               <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold", avatarGradient)}>
-                    {initials}
-                  </div>
+                  {profile?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name ?? "avatar"}
+                      className="w-10 h-10 rounded-full object-cover ring-2 ring-border"
+                    />
+                  ) : (
+                    <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold", avatarGradient)}>
+                      {initials}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-foreground truncate">
                       {profile?.full_name ?? "Loading…"}

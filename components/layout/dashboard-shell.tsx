@@ -138,6 +138,17 @@ export function DashboardShell({ children }: DashboardShellProps) {
     return () => subscription.unsubscribe();
   }, [router]);
 
+  // Listen for in-page profile mutations so the navbar avatar refreshes
+  // without a full reload. AvatarUpload dispatches this on save/remove.
+  useEffect(() => {
+    function handle(e: Event) {
+      const detail = (e as CustomEvent<string | null>).detail;
+      setProfile((prev) => (prev ? { ...prev, avatar_url: detail } : prev));
+    }
+    window.addEventListener("profile-avatar-changed", handle);
+    return () => window.removeEventListener("profile-avatar-changed", handle);
+  }, []);
+
   const handleSignOut = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();

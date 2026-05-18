@@ -43,8 +43,12 @@ interface Props {
   departments: Array<{ id: string; name: string }>;
   /** From master-data catalog. Falls back to a small built-in list if empty. */
   employeeTypes: string[];
-  /** From master-data catalog. Falls back to a small built-in list if empty. */
-  educationLevels: string[];
+  /**
+   * Accepted (and forwarded into form state for preservation) but the
+   * current-degree dropdown was removed from this tab — full education
+   * history with degree + major is managed in the "ประวัติการศึกษา" tab.
+   */
+  educationLevels?: string[];
 }
 
 const TITLE_TH = ["นาย", "นาง", "นางสาว", "ผศ.", "รศ.", "ศ.", "ดร.", "ผศ.ดร.", "รศ.ดร.", "ศ.ดร."];
@@ -56,25 +60,14 @@ const FALLBACK_EMPLOYEE_TYPES = [
   "ลูกจ้างประจำ",
   "อื่น ๆ",
 ];
-const FALLBACK_EDUCATION_LEVELS = [
-  "ปริญญาตรี",
-  "ปริญญาโท",
-  "ปริญญาเอก",
-  "ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)",
-  "ประกาศนียบัตรวิชาชีพ (ปวช.)",
-  "อื่น ๆ",
-];
 
 export function IdentitySection({
   profile,
   departments,
   employeeTypes,
-  educationLevels,
 }: Props) {
   const employeeTypeOptions =
     employeeTypes.length > 0 ? employeeTypes : FALLBACK_EMPLOYEE_TYPES;
-  const educationLevelOptions =
-    educationLevels.length > 0 ? educationLevels : FALLBACK_EDUCATION_LEVELS;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -263,25 +256,19 @@ export function IdentitySection({
               onValueChange={(v) => set("department_id", v ?? "")}
               disabled={isPending}
             >
-              <SelectTrigger><SelectValue placeholder="เลือก..." /></SelectTrigger>
+              <SelectTrigger>
+                {/* Explicit child so the trigger shows the resolved name
+                    (not the UUID) regardless of Radix's internal lookup. */}
+                <SelectValue placeholder="เลือก...">
+                  {form.department_id
+                    ? departments.find((d) => d.id === form.department_id)?.name ??
+                      "เลือก..."
+                    : null}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-12 sm:col-span-6 space-y-1">
-            <Label className="text-xs">วุฒิการศึกษา (ปัจจุบัน)</Label>
-            <Select
-              value={form.education_level ?? ""}
-              onValueChange={(v) => set("education_level", v ?? "")}
-              disabled={isPending}
-            >
-              <SelectTrigger><SelectValue placeholder="เลือก..." /></SelectTrigger>
-              <SelectContent>
-                {educationLevelOptions.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

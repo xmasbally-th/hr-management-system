@@ -86,6 +86,10 @@ export function AvatarUpload({
           await updateMyAvatar(finalUrl);
           setPreviewUrl(finalUrl);
           onChange?.(finalUrl);
+          // Notify the dashboard shell so the navbar avatar refreshes too
+          window.dispatchEvent(
+            new CustomEvent("profile-avatar-changed", { detail: finalUrl }),
+          );
           toast.success("อัปเดตรูปภาพแล้ว");
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
@@ -110,6 +114,9 @@ export function AvatarUpload({
         await updateMyAvatar(null);
         setPreviewUrl(null);
         onChange?.(null);
+        window.dispatchEvent(
+          new CustomEvent("profile-avatar-changed", { detail: null }),
+        );
         toast.success("ลบรูปภาพแล้ว");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
