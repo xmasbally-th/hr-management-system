@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AvatarUpload } from "@/components/avatar-upload";
 import { Badge } from "@/components/ui/badge";
 import {
+  Eye,
   User,
   GraduationCap,
   Award,
@@ -11,6 +12,7 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProfileOverview } from "@/components/profile-overview";
 import { IdentitySection } from "./_sections/identity-section";
 import { EducationSection } from "./_sections/education-section";
 import { DecorationsSection } from "./_sections/decorations-section";
@@ -18,7 +20,13 @@ import { AdminPositionsSection } from "./_sections/admin-positions-section";
 import { NotificationsSection } from "./_sections/notifications-section";
 import type { NotificationType } from "@/lib/notification-types";
 
-type TabKey = "identity" | "education" | "decorations" | "admin" | "notifications";
+type TabKey =
+  | "overview"
+  | "identity"
+  | "education"
+  | "decorations"
+  | "admin"
+  | "notifications";
 
 // Loose profile shape — the underlying row has many optional/nullable fields
 // and a joined `department`. We accept anything matching this loose contract.
@@ -129,7 +137,7 @@ export function ProfileClient({
   decorationCatalog,
   notificationPrefs,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<TabKey>("identity");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   const completionPct = useMemo(() => {
     const filled = COMPLETION_FIELDS.filter(
@@ -155,6 +163,7 @@ export function ProfileClient({
   };
 
   const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }> = [
+    { key: "overview", label: "ภาพรวม", icon: Eye },
     { key: "identity", label: "ข้อมูลส่วนตัว", icon: User },
     { key: "education", label: "ประวัติการศึกษา", icon: GraduationCap, count: educations.length },
     { key: "decorations", label: "เครื่องราชอิสริยาภรณ์", icon: Award, count: decorations.length },
@@ -253,7 +262,20 @@ export function ProfileClient({
       </div>
 
       {/* Content */}
-      <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
+      <div className={cn(
+        "animate-fade-in",
+        activeTab === "overview"
+          ? "" // overview renders its own card sections
+          : "rounded-xl border border-border bg-card p-5 sm:p-6"
+      )}>
+        {activeTab === "overview" && (
+          <ProfileOverview
+            profile={profile}
+            educations={educations}
+            decorations={decorations}
+            adminPositions={adminPositions}
+          />
+        )}
         {activeTab === "identity" && (
           <IdentitySection
             profile={profile}

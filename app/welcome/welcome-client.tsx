@@ -11,15 +11,12 @@ import {
   Loader2,
   AlertCircle,
   Clock,
-  User,
-  Briefcase,
-  GraduationCap,
-  Award,
   Send,
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProfileOverview } from "@/components/profile-overview";
 import {
   confirmProfileAsAccurate,
   submitFirstReviewCorrection,
@@ -295,124 +292,12 @@ export function WelcomeClient({
 
         {/* Read-only profile review */}
         {(mode === "review" || mode === "awaiting") && (
-          <div className="space-y-6">
-            <ProfileSection
-              icon={<User className="size-4" />}
-              title="ข้อมูลส่วนตัว"
-              rows={[
-                ["ชื่อ-นามสกุล (ไทย)", joinThai(profile)],
-                ["ชื่อ-นามสกุล (อังกฤษ)", joinEnglish(profile)],
-                ["อีเมล", profile.email],
-                ["เบอร์โทรศัพท์", profile.phone],
-                ["เพศ", profile.gender],
-                ["วันเดือนปีเกิด", formatDate(profile.birth_date)],
-                ["ที่อยู่ปัจจุบัน", profile.current_address],
-              ]}
-            />
-
-            <ProfileSection
-              icon={<Briefcase className="size-4" />}
-              title="ข้อมูลตำแหน่ง"
-              rows={[
-                ["ตำแหน่ง", profile.position_title],
-                ["เลขที่ตำแหน่ง", profile.position_number],
-                ["ประเภทบุคลากร", profile.employee_type],
-                ["สังกัดหน่วยงาน", profile.department?.name],
-                ["วันที่เริ่มทำงาน", formatDate(profile.hire_date)],
-              ]}
-            />
-
-            <ListSection
-              icon={<GraduationCap className="size-4" />}
-              title="ประวัติการศึกษา"
-              count={educations.length}
-            >
-              {educations.length === 0 ? (
-                <EmptyRow text="ยังไม่มีประวัติการศึกษา" />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {educations.map((e) => (
-                    <li key={e.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="text-sm font-medium">
-                        {e.degree}
-                        {e.program_name && (
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            · {e.program_name}
-                          </span>
-                        )}
-                        {e.major_field && (
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            · สาขา{e.major_field}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {e.institution}
-                        {e.country && <> · {e.country}</>}
-                        {(e.entry_year || e.graduation_year) && (
-                          <> · {e.entry_year ?? "?"} – {e.graduation_year ?? "ปัจจุบัน"}</>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </ListSection>
-
-            <ListSection
-              icon={<Award className="size-4" />}
-              title="เครื่องราชอิสริยาภรณ์"
-              count={decorations.length}
-            >
-              {decorations.length === 0 ? (
-                <EmptyRow text="ยังไม่มีข้อมูล" />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {decorations.map((d) => (
-                    <li key={d.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="text-sm font-medium">
-                        {d.decoration_name}
-                        {d.abbreviation && (
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            ({d.abbreviation})
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {d.position_at_grant && <>{d.position_at_grant} · </>}
-                        {formatDate(d.approved_date)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </ListSection>
-
-            <ListSection
-              icon={<Briefcase className="size-4" />}
-              title="ประวัติการดำรงตำแหน่งบริหาร"
-              count={adminPositions.length}
-            >
-              {adminPositions.length === 0 ? (
-                <EmptyRow text="ยังไม่มีข้อมูล" />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {adminPositions.map((p) => (
-                    <li key={p.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="text-sm font-medium">{p.position_title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {p.responsible_unit && <>{p.responsible_unit} · </>}
-                        {formatDate(p.start_date)} – {formatDate(p.end_date) ?? "ปัจจุบัน"}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </ListSection>
-          </div>
+          <ProfileOverview
+            profile={profile}
+            educations={educations}
+            decorations={decorations}
+            adminPositions={adminPositions}
+          />
         )}
 
         {/* Action bar — review mode */}
@@ -559,119 +444,24 @@ export function WelcomeClient({
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function joinThai(p: Profile): string | null {
-  const parts = [p.title_th, p.first_name_th, p.last_name_th].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : null;
-}
-
-function joinEnglish(p: Profile): string | null {
-  const parts = [p.title_en, p.first_name_en, p.last_name_en].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : null;
-}
-
 /**
- * Deterministic Thai date formatter — produces identical output on both
- * server and client to avoid React hydration mismatches. Returns the form
- * "DD เดือน พ.ศ." (e.g. "15 มกราคม 2569").
+ * Deterministic Thai datetime formatter (UTC-based) — used only by the
+ * "awaiting" banner; all body data formatting is handled inside
+ * <ProfileOverview>.
  */
-const THAI_MONTHS = [
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
+const THAI_MONTHS_FULL = [
+  "มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
+  "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม",
 ];
 
-function formatDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = d.getUTCDate();
-  const month = THAI_MONTHS[d.getUTCMonth()];
-  const yearBE = d.getUTCFullYear() + 543;
-  return `${day} ${month} ${yearBE}`;
-}
-
-/**
- * Deterministic Thai datetime formatter (UTC-based to match server/client).
- * Returns "DD เดือน พ.ศ. HH:mm" (e.g. "15 มกราคม 2569 14:30").
- */
 function formatThaiDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const day = d.getUTCDate();
-  const month = THAI_MONTHS[d.getUTCMonth()];
+  const month = THAI_MONTHS_FULL[d.getUTCMonth()];
   const yearBE = d.getUTCFullYear() + 543;
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");
   return `${day} ${month} ${yearBE} ${hh}:${mm} น.`;
-}
-
-interface ProfileSectionProps {
-  icon: React.ReactNode;
-  title: string;
-  rows: Array<[string, string | null | undefined]>;
-}
-
-function ProfileSection({ icon, title, rows }: ProfileSectionProps) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <h2 className="font-semibold">{title}</h2>
-      </header>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex flex-col">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className={cn("text-sm mt-0.5", !value && "text-muted-foreground italic")}>
-              {value || "— ไม่ระบุ —"}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-interface ListSectionProps {
-  icon: React.ReactNode;
-  title: string;
-  count: number;
-  children: React.ReactNode;
-}
-
-function ListSection({ icon, title, count, children }: ListSectionProps) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <h2 className="font-semibold flex-1">{title}</h2>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-          {count} รายการ
-        </span>
-      </header>
-      {children}
-    </section>
-  );
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return (
-    <div className="text-center py-6 text-sm text-muted-foreground italic">
-      {text}
-    </div>
-  );
 }

@@ -1,0 +1,300 @@
+import { User, Briefcase, GraduationCap, Award } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/**
+ * Read-only "overview" view of the current user's profile + history.
+ *
+ * Shared between:
+ *   • /welcome     — first-login review screen
+ *   • /dashboard/profile (ภาพรวม tab) — anytime read-only summary
+ *
+ * All date formatting is deterministic UTC-based to avoid React
+ * hydration mismatches (server/client must produce identical HTML).
+ */
+
+interface Profile {
+  email: string;
+  title_th?: string | null;
+  first_name_th?: string | null;
+  last_name_th?: string | null;
+  title_en?: string | null;
+  first_name_en?: string | null;
+  last_name_en?: string | null;
+  phone?: string | null;
+  position_title?: string | null;
+  position_number?: string | null;
+  employee_type?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
+  hire_date?: string | null;
+  current_address?: string | null;
+  department?: { id: string; name: string } | null;
+}
+
+interface Props {
+  profile: Profile;
+  educations: Array<{
+    id: string;
+    entry_year: number | null;
+    graduation_year: number | null;
+    institution: string;
+    country: string | null;
+    degree: string;
+    program_name: string | null;
+    major_field: string | null;
+  }>;
+  decorations: Array<{
+    id: string;
+    decoration_name: string;
+    abbreviation: string | null;
+    approved_date: string | null;
+    position_at_grant: string | null;
+  }>;
+  adminPositions: Array<{
+    id: string;
+    position_title: string;
+    responsible_unit: string | null;
+    start_date: string;
+    end_date: string | null;
+  }>;
+}
+
+const THAI_MONTHS = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+
+function formatDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.getUTCDate();
+  const month = THAI_MONTHS[d.getUTCMonth()];
+  const yearBE = d.getUTCFullYear() + 543;
+  return `${day} ${month} ${yearBE}`;
+}
+
+function joinThai(p: Profile): string | null {
+  const parts = [p.title_th, p.first_name_th, p.last_name_th].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function joinEnglish(p: Profile): string | null {
+  const parts = [p.title_en, p.first_name_en, p.last_name_en].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+export function ProfileOverview({
+  profile,
+  educations,
+  decorations,
+  adminPositions,
+}: Props) {
+  return (
+    <div className="space-y-6">
+      <Section
+        icon={<User className="size-4" />}
+        title="ข้อมูลส่วนตัว"
+        rows={[
+          ["ชื่อ-นามสกุล (ไทย)", joinThai(profile)],
+          ["ชื่อ-นามสกุล (อังกฤษ)", joinEnglish(profile)],
+          ["อีเมล", profile.email],
+          ["เบอร์โทรศัพท์", profile.phone],
+          ["เพศ", profile.gender],
+          ["วันเดือนปีเกิด", formatDate(profile.birth_date)],
+          ["ที่อยู่ปัจจุบัน", profile.current_address],
+        ]}
+      />
+
+      <Section
+        icon={<Briefcase className="size-4" />}
+        title="ข้อมูลตำแหน่ง"
+        rows={[
+          ["ตำแหน่ง", profile.position_title],
+          ["เลขที่ตำแหน่ง", profile.position_number],
+          ["ประเภทบุคลากร", profile.employee_type],
+          ["สังกัดหน่วยงาน", profile.department?.name],
+          ["วันที่เริ่มทำงาน", formatDate(profile.hire_date)],
+        ]}
+      />
+
+      <ListBlock
+        icon={<GraduationCap className="size-4" />}
+        title="ประวัติการศึกษา"
+        count={educations.length}
+      >
+        {educations.length === 0 ? (
+          <Empty text="ยังไม่มีประวัติการศึกษา" />
+        ) : (
+          <ul className="divide-y divide-border">
+            {educations.map((e) => (
+              <li key={e.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="text-sm font-medium">
+                  {e.degree}
+                  {e.program_name && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      · {e.program_name}
+                    </span>
+                  )}
+                  {e.major_field && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      · สาขา{e.major_field}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {e.institution}
+                  {e.country && <> · {e.country}</>}
+                  {(e.entry_year || e.graduation_year) && (
+                    <>
+                      {" "}
+                      · {e.entry_year ?? "?"} – {e.graduation_year ?? "ปัจจุบัน"}
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ListBlock>
+
+      <ListBlock
+        icon={<Award className="size-4" />}
+        title="เครื่องราชอิสริยาภรณ์"
+        count={decorations.length}
+      >
+        {decorations.length === 0 ? (
+          <Empty text="ยังไม่มีข้อมูล" />
+        ) : (
+          <ul className="divide-y divide-border">
+            {decorations.map((d) => (
+              <li key={d.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="text-sm font-medium">
+                  {d.decoration_name}
+                  {d.abbreviation && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      ({d.abbreviation})
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {d.position_at_grant && <>{d.position_at_grant} · </>}
+                  {formatDate(d.approved_date)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ListBlock>
+
+      <ListBlock
+        icon={<Briefcase className="size-4" />}
+        title="ประวัติการดำรงตำแหน่งบริหาร"
+        count={adminPositions.length}
+      >
+        {adminPositions.length === 0 ? (
+          <Empty text="ยังไม่มีข้อมูล" />
+        ) : (
+          <ul className="divide-y divide-border">
+            {adminPositions.map((p) => (
+              <li key={p.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="text-sm font-medium">{p.position_title}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {p.responsible_unit && <>{p.responsible_unit} · </>}
+                  {formatDate(p.start_date)} –{" "}
+                  {formatDate(p.end_date) ?? "ปัจจุบัน"}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ListBlock>
+    </div>
+  );
+}
+
+// ─── Internal sub-components ────────────────────────────────────────
+
+function Section({
+  icon,
+  title,
+  rows,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  rows: Array<[string, string | null | undefined]>;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
+        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
+          {icon}
+        </div>
+        <h2 className="font-semibold">{title}</h2>
+      </header>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd
+              className={cn(
+                "text-sm mt-0.5",
+                !value && "text-muted-foreground italic",
+              )}
+            >
+              {value || "— ไม่ระบุ —"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function ListBlock({
+  icon,
+  title,
+  count,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
+        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
+          {icon}
+        </div>
+        <h2 className="font-semibold flex-1">{title}</h2>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+          {count} รายการ
+        </span>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="text-center py-6 text-sm text-muted-foreground italic">
+      {text}
+    </div>
+  );
+}
