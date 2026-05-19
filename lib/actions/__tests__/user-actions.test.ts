@@ -232,7 +232,10 @@ describe("createUserByAdmin", () => {
     fullName: "New User",
     role: "employee" as never,
     departmentId: "dept-1",
-    positionId: "pos-1",
+    // Cross-field validation tested in a dedicated case below — keep
+    // the shared fixture position-free so generic flows don't trip the
+    // positions lookup.
+    positionId: null,
   };
 
   it("creates auth user + profile", async () => {
@@ -285,5 +288,53 @@ describe("createUserByAdmin", () => {
     });
 
     await expect(createUserByAdmin(newUserData)).rejects.toThrow("อีเมลนี้มีอยู่ในระบบแล้ว");
+  });
+
+  it("rejects positionId without departmentId", async () => {
+    setHrClient();
+    await expect(
+      createUserByAdmin({ ...newUserData, departmentId: null, positionId: "pos-1" }),
+    ).rejects.toThrow("ต้องเลือกแผนกก่อน");
+  });
+
+  it("rejects position not belonging to selected department", async () => {
+    // Position belongs to dept-2 but user picked dept-1
+    setSupabase({
+      authUser: { id: "hr-1" },
+      fromOverrides: {
+        profiles: createMockChain({ data: profileRow("hr") }),
+        positions: createMockChain({
+          data: { id: "pos-1", department_id: "dept-2" },
+        }),
+      },
+    });
+
+    await expect(
+      createUserByAdmin({
+        ...newUserData,
+        departmentId: "dept-1",
+        positionId: "pos-1",
+      }),
+    ).rejects.toThrow("ตำแหน่งที่เลือกไม่ได้อยู่ในแผนกที่เลือก");
+  });
+
+  it("accepts position that does belong to selected department", async () => {
+    setSupabase({
+      authUser: { id: "hr-1" },
+      fromOverrides: {
+        profiles: createMockChain({ data: profileRow("hr") }),
+        positions: createMockChain({
+          data: { id: "pos-1", department_id: "dept-1" },
+        }),
+      },
+    });
+    setAdminSupabase();
+
+    const result = await createUserByAdmin({
+      ...newUserData,
+      departmentId: "dept-1",
+      positionId: "pos-1",
+    });
+    expect(result).toEqual({ success: true });
   });
 });

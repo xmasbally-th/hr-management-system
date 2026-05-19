@@ -29,6 +29,20 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
     ? positions.filter(p => p.department_id === formData.departmentId)
     : [];
 
+  // Cross-field consistency: if a position is selected, it must belong
+  // to the selected department. The select widget already filters the
+  // dropdown but this guards against stale state if the user picks a
+  // position then changes department in another tab.
+  const positionMismatch =
+    formData.positionId !== "none" &&
+    formData.departmentId !== "none" &&
+    !filteredPositions.some((p) => p.id === formData.positionId);
+
+  const canSubmit =
+    formData.fullName.trim().length > 0 &&
+    formData.email.trim().length > 0 &&
+    !positionMismatch;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -113,8 +127,8 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
 
         <div className="space-y-2">
           <Label>ตำแหน่ง</Label>
-          <Select 
-            value={formData.positionId} 
+          <Select
+            value={formData.positionId}
             onValueChange={(val) => setFormData({ ...formData, positionId: val || "none" })}
             disabled={isPending || formData.departmentId === "none"}
           >
@@ -128,6 +142,16 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
               ))}
             </SelectContent>
           </Select>
+          {formData.departmentId === "none" && (
+            <p className="text-xs text-muted-foreground">
+              เลือกแผนกก่อนเพื่อระบุตำแหน่ง
+            </p>
+          )}
+          {positionMismatch && (
+            <p className="text-xs text-destructive">
+              ⚠ ตำแหน่งที่เลือกไม่อยู่ในแผนกใหม่ — กรุณาเลือกใหม่
+            </p>
+          )}
         </div>
 
         <div className="space-y-2 md:col-span-2">
@@ -159,7 +183,7 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
         >
           ยกเลิก
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || !canSubmit}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           บันทึกพนักงานใหม่
         </Button>

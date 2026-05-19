@@ -232,6 +232,39 @@ export async function createUserByAdmin(data: {
   const actorId = await checkHrAdminRole(supabase);
   checkRateLimit(actorId);
 
+  // Basic input checks
+  const email = data.email?.trim().toLowerCase();
+  const fullName = data.fullName?.trim();
+  if (!email || !fullName) {
+    throw new Error("กรุณากรอกชื่อและอีเมลให้ครบถ้วน");
+  }
+
+  // Domain allowlist — same gate used at sign-in time, so admins can't
+  // create users that would later be blocked from logging in.
+  if (!(await isEmailAllowed(email))) {
+    throw new Error("โดเมนอีเมลไม่อยู่ในรายการที่อนุญาต");
+  }
+
+  // Cross-field validation: if a position is supplied, it must belong to
+  // the chosen department. Prevents inconsistency when bypassing the
+  // client-side dropdown filter.
+  if (data.positionId) {
+    if (!data.departmentId) {
+      throw new Error("ต้องเลือกแผนกก่อนจึงจะระบุตำแหน่งได้");
+    }
+    const { data: pos, error: posError } = await supabase
+      .from("positions")
+      .select("id, department_id")
+      .eq("id", data.positionId)
+      .maybeSingle();
+    if (posError || !pos) {
+      throw new Error("ตำแหน่งที่ระบุไม่ถูกต้อง");
+    }
+    if (pos.department_id !== data.departmentId) {
+      throw new Error("ตำแหน่งที่เลือกไม่ได้อยู่ในแผนกที่เลือก");
+    }
+  }
+
   const supabaseAdmin = createSupabaseClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY,
@@ -247,11 +280,11 @@ export async function createUserByAdmin(data: {
   const tempPassword = Math.random().toString(36).slice(-12) + "A1!";
   
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: data.email,
+    email,
     password: tempPassword,
     email_confirm: true, // Auto-confirm email
     user_metadata: {
-      full_name: data.fullName,
+      full_name: fullName,
     },
   });
 
@@ -271,8 +304,8 @@ export async function createUserByAdmin(data: {
   // 2. Insert into profiles with 'approved' status
   const { error: profileError } = await supabaseAdmin.from("profiles").insert({
     id: authData.user.id,
-    email: data.email,
-    full_name: data.fullName,
+    email,
+    full_name: fullName,
     role: data.role,
     status: "approved",
     department_id: data.departmentId,
@@ -286,7 +319,7 @@ export async function createUserByAdmin(data: {
     throw new Error("บันทึกข้อมูลพนักงานไม่สำเร็จ กรุณาลองใหม่");
   }
 
-  await logAudit(supabase, actorId, "create_user", "profile", authData.user.id, { email: data.email, role: data.role });
+  await logAudit(supabase, actorId, "create_user", "profile", authData.user.id, { email, role: data.role });
   revalidatePath("/dashboard/hr/users");
 
   return { success: true };
