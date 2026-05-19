@@ -69,6 +69,8 @@ export function CorrectionStatusBanner({ corrections }: Props) {
       try {
         await cancelMyCorrectionRequest(id);
         toast.success("ยกเลิกคำขอแล้ว");
+        // Refresh HR/Admin sidebar badge in case they're viewing same window
+        window.dispatchEvent(new CustomEvent("corrections-updated"));
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "ยกเลิกไม่สำเร็จ");

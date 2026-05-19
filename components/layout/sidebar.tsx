@@ -56,9 +56,12 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  /** Optional badge overrides keyed by NavItem.href. Takes precedence
+   *  over item.badge from the static config. */
+  badges?: Record<string, string>;
 }
 
-export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobileClose, badges }: SidebarProps) {
   const pathname = usePathname();
   const groups = getNavigationForRole(role);
   const widthClass = collapsed ? "w-[76px]" : "w-[264px]";
@@ -146,6 +149,7 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
                   const isActive =
                     pathname === item.href ||
                     (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+                  const effectiveBadge = badges?.[item.href] ?? item.badge;
 
                   return (
                     <Link
@@ -167,16 +171,16 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
                       {!collapsed && (
                         <span className="flex-1 flex items-center justify-between min-w-0 animate-fade-in">
                           <span className="truncate">{item.title}</span>
-                          {item.badge && (
+                          {effectiveBadge && (
                             <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-white text-[0.625rem] font-semibold">
-                              {item.badge}
+                              {effectiveBadge}
                             </span>
                           )}
                         </span>
                       )}
-                      {collapsed && item.badge && (
+                      {collapsed && effectiveBadge && (
                         <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-white text-[0.625rem] font-semibold grid place-items-center">
-                          {item.badge}
+                          {effectiveBadge}
                         </span>
                       )}
                     </Link>

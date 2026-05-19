@@ -123,6 +123,8 @@ export function ProfileCorrectionsClient({
         toast.success("ทำเครื่องหมายเสร็จสิ้นแล้ว");
         setResolveOpen(null);
         setResolveNote("");
+        // Tell DashboardShell to refresh the sidebar badge count
+        window.dispatchEvent(new CustomEvent("corrections-updated"));
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
@@ -143,6 +145,7 @@ export function ProfileCorrectionsClient({
         toast.success("ปฏิเสธคำขอแล้ว");
         setRejectOpen(null);
         setRejectNote("");
+        window.dispatchEvent(new CustomEvent("corrections-updated"));
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");

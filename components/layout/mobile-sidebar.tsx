@@ -60,12 +60,15 @@ interface MobileSidebarProps {
   role: UserRole;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Optional badge overrides keyed by NavItem.href. */
+  badges?: Record<string, string>;
 }
 
 export function MobileSidebar({
   role,
   open,
   onOpenChange,
+  badges,
 }: MobileSidebarProps) {
   const pathname = usePathname();
   const groups = getNavigationForRole(role);
@@ -93,6 +96,7 @@ export function MobileSidebar({
                 pathname={pathname}
                 isFirst={groupIdx === 0}
                 onNavigate={() => onOpenChange(false)}
+                badges={badges}
               />
             ))}
           </nav>
@@ -107,11 +111,13 @@ function MobileNavGroup({
   pathname,
   isFirst,
   onNavigate,
+  badges,
 }: {
   group: NavGroup;
   pathname: string;
   isFirst: boolean;
   onNavigate: () => void;
+  badges?: Record<string, string>;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -126,6 +132,7 @@ function MobileNavGroup({
         const isActive =
           pathname === item.href ||
           (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+        const effectiveBadge = badges?.[item.href] ?? item.badge;
 
         return (
           <Link
@@ -150,7 +157,12 @@ function MobileNavGroup({
                 )}
               />
             )}
-            <span>{item.title}</span>
+            <span className="flex-1">{item.title}</span>
+            {effectiveBadge && (
+              <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-destructive text-white text-[0.625rem] font-semibold">
+                {effectiveBadge}
+              </span>
+            )}
           </Link>
         );
       })}

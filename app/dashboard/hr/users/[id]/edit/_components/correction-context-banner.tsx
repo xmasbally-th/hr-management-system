@@ -96,6 +96,7 @@ export function CorrectionContextBanner({ correction, hasSavedSinceMount }: Prop
           resolveNote.trim() || undefined,
         );
         toast.success("ทำเครื่องหมายเสร็จสิ้นและแจ้งผู้ใช้แล้ว");
+        window.dispatchEvent(new CustomEvent("corrections-updated"));
         router.push("/dashboard/hr/profile-corrections?status=pending");
         router.refresh();
       } catch (err) {

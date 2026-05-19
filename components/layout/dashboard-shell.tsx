@@ -7,6 +7,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getPendingCorrectionCount } from "@/lib/actions/correction-actions";
 import type { Profile } from "@/types/supabase";
 
 interface DashboardShellProps {
@@ -31,6 +32,9 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  /** Map of nav href → badge value (count as string). Currently populated
+   *  with the pending profile-corrections count for HR/Admin. */
+  const [navBadges, setNavBadges] = useState<Record<string, string>>({});
 
   // Fetch user profile on mount
   useEffect(() => {
@@ -149,6 +153,44 @@ export function DashboardShell({ children }: DashboardShellProps) {
     return () => window.removeEventListener("profile-avatar-changed", handle);
   }, []);
 
+  // Sidebar badges — currently only the pending profile-corrections count
+  // for HR/Admin. Fetches on mount, then refreshes on a custom
+  // 'corrections-updated' event dispatched by the queue resolve/reject flow.
+  useEffect(() => {
+    const role = profile?.role;
+    if (role !== "hr" && role !== "admin") {
+      setNavBadges({});
+      return;
+    }
+
+    async function refreshCount() {
+      try {
+        const count = await getPendingCorrectionCount();
+        setNavBadges((prev) => {
+          const next = { ...prev };
+          if (count > 0) {
+            next["/dashboard/hr/profile-corrections"] =
+              count > 99 ? "99+" : String(count);
+          } else {
+            delete next["/dashboard/hr/profile-corrections"];
+          }
+          return next;
+        });
+      } catch {
+        // ignore — badge is best-effort
+      }
+    }
+
+    refreshCount();
+
+    // Refresh after resolve/reject from inside the queue UI
+    function onUpdated() {
+      void refreshCount();
+    }
+    window.addEventListener("corrections-updated", onUpdated);
+    return () => window.removeEventListener("corrections-updated", onUpdated);
+  }, [profile?.role]);
+
   const handleSignOut = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -189,6 +231,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             role={profile?.role ?? "employee"}
             collapsed={sidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
+            badges={navBadges}
           />
         </div>
 
@@ -197,6 +240,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           role={profile?.role ?? "employee"}
           open={mobileOpen}
           onOpenChange={setMobileOpen}
+          badges={navBadges}
         />
 
         {/* Main content wrapper */}
