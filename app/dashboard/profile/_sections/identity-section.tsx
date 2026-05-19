@@ -56,9 +56,31 @@ interface Props {
    * section saves to the current authenticated user.
    */
   targetUserId?: string;
+  /** Optional set of field keys the user flagged in a correction request.
+   *  Fields in this set get a "⭐ ขอแก้" badge and a yellow ring. */
+  highlightFields?: Set<string> | null;
 }
 
 const TITLE_TH = ["นาย", "นาง", "นางสาว", "ผศ.", "รศ.", "ศ.", "ดร.", "ผศ.ดร.", "รศ.ดร.", "ศ.ดร."];
+
+const FIELD_LABELS_FOR_BANNER: Record<string, string> = {
+  title_th: "คำนำหน้า (ไทย)",
+  first_name_th: "ชื่อ (ไทย)",
+  last_name_th: "นามสกุล (ไทย)",
+  title_en: "คำนำหน้า (อังกฤษ)",
+  first_name_en: "ชื่อ (อังกฤษ)",
+  last_name_en: "นามสกุล (อังกฤษ)",
+  phone: "เบอร์โทรศัพท์",
+  position_title: "ตำแหน่ง",
+  position_number: "เลขที่ตำแหน่ง",
+  employee_type: "ประเภทบุคลากร",
+  department_id: "สังกัดหน่วยงาน",
+  gender: "เพศ",
+  birth_date: "วันเดือนปีเกิด",
+  hire_date: "วันที่เริ่มทำงาน",
+  current_address: "ที่อยู่ปัจจุบัน",
+  education_level: "วุฒิการศึกษา",
+};
 const FALLBACK_EMPLOYEE_TYPES = [
   "ข้าราชการ",
   "พนักงานมหาวิทยาลัย",
@@ -73,6 +95,7 @@ export function IdentitySection({
   departments,
   employeeTypes,
   targetUserId,
+  highlightFields,
 }: Props) {
   const employeeTypeOptions =
     employeeTypes.length > 0 ? employeeTypes : FALLBACK_EMPLOYEE_TYPES;
@@ -108,6 +131,9 @@ export function IdentitySection({
       try {
         if (targetUserId) {
           await updateProfileAsHr(targetUserId, form);
+          // Tell EditUserClient that an HR save happened so its
+          // correction-context banner can switch to CTA mode.
+          window.dispatchEvent(new CustomEvent("hr-profile-saved"));
         } else {
           await updateMyProfile(form);
         }
@@ -119,8 +145,32 @@ export function IdentitySection({
     });
   }
 
+  const flaggedInThisSection = highlightFields
+    ? Array.from(highlightFields).filter((k) =>
+        Object.prototype.hasOwnProperty.call(form, k),
+      )
+    : [];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {flaggedInThisSection.length > 0 && (
+        <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="font-medium mb-1">
+            ⭐ ผู้ใช้แจ้งขอแก้ฟิลด์เหล่านี้ในแท็บนี้:
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {flaggedInThisSection.map((k) => (
+              <span
+                key={k}
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-amber-100 border border-amber-200"
+              >
+                {FIELD_LABELS_FOR_BANNER[k] ?? k}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <section className="space-y-4">
         <h3 className="font-semibold text-sm">ข้อมูลพื้นฐาน</h3>
         <div className="grid grid-cols-12 gap-3">

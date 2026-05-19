@@ -52,6 +52,9 @@ interface Props {
   educationLevels: string[];
   /** When provided, mutations call HR actions targeting this user. */
   targetUserId?: string;
+  /** True when the user's correction request flagged "educations" — adds
+   *  a yellow banner at the top of the section. */
+  highlightFlagged?: boolean;
 }
 
 const FALLBACK_LEVELS = [
@@ -73,7 +76,12 @@ const BLANK: EducationInput = {
   major_field: "",
 };
 
-export function EducationSection({ rows, educationLevels, targetUserId }: Props) {
+export function EducationSection({
+  rows,
+  educationLevels,
+  targetUserId,
+  highlightFlagged,
+}: Props) {
   const levelOptions = educationLevels.length > 0 ? educationLevels : FALLBACK_LEVELS;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -112,6 +120,7 @@ export function EducationSection({ rows, educationLevels, targetUserId }: Props)
         if (editingId) {
           if (targetUserId) {
             await updateEducationAsHr(targetUserId, editingId, form);
+            window.dispatchEvent(new CustomEvent("hr-profile-saved"));
           } else {
             await updateEducation(editingId, form);
           }
@@ -119,6 +128,7 @@ export function EducationSection({ rows, educationLevels, targetUserId }: Props)
         } else {
           if (targetUserId) {
             await addEducationAsHr(targetUserId, form);
+            window.dispatchEvent(new CustomEvent("hr-profile-saved"));
           } else {
             await addEducation(form);
           }
@@ -140,6 +150,7 @@ export function EducationSection({ rows, educationLevels, targetUserId }: Props)
       try {
         if (targetUserId) {
           await deleteEducationAsHr(targetUserId, id);
+          window.dispatchEvent(new CustomEvent("hr-profile-saved"));
         } else {
           await deleteEducation(id);
         }
@@ -155,6 +166,11 @@ export function EducationSection({ rows, educationLevels, targetUserId }: Props)
 
   return (
     <div className="space-y-4">
+      {highlightFlagged && (
+        <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          ⭐ ผู้ใช้แจ้งขอแก้ไขข้อมูลในส่วน &quot;ประวัติการศึกษา&quot;
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="font-semibold">ประวัติการศึกษา</h3>

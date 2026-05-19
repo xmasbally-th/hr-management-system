@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getUserProfileWithHistory } from "@/lib/actions/hr-profile-actions";
+import { getCorrectionRequest } from "@/lib/actions/correction-actions";
 import { getDepartmentList } from "@/lib/actions/settings-actions";
 import {
   getEmployeeTypes,
@@ -13,10 +14,12 @@ export const metadata = { title: "แก้ไขโปรไฟล์ผู้�
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ correction?: string }>;
 }
 
-export default async function EditUserPage({ params }: PageProps) {
+export default async function EditUserPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { correction: correctionId } = await searchParams;
 
   // RBAC check — only HR/admin reach this page (proxy enforces too)
   const supabase = await createClient();
@@ -43,12 +46,18 @@ export default async function EditUserPage({ params }: PageProps) {
     notFound();
   }
 
-  const [departments, employeeTypes, educationLevels, decorationCatalog] =
+  const [departments, employeeTypes, educationLevels, decorationCatalog, correction] =
     await Promise.all([
       getDepartmentList().catch(() => []),
       getEmployeeTypes().catch(() => []),
       getEducationLevels().catch(() => []),
       getDecorationCatalog().catch(() => []),
+      // Fetch correction context only if requested via URL — undefined
+      // when omitted. We tolerate any errors so a stale link still renders
+      // the edit page without crashing.
+      correctionId
+        ? getCorrectionRequest(correctionId).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
   return (
@@ -65,6 +74,7 @@ export default async function EditUserPage({ params }: PageProps) {
         name: d.name,
         abbreviation: d.abbreviation,
       }))}
+      correction={correction}
     />
   );
 }

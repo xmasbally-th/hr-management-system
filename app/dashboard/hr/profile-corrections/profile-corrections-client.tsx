@@ -330,7 +330,7 @@ export function ProfileCorrectionsClient({
                       <td className="px-4 py-3 align-top text-right">
                         <div className="inline-flex flex-col gap-1">
                           <Link
-                            href={`/dashboard/hr/users/${r.target_user_id}/edit`}
+                            href={`/dashboard/hr/users/${r.target_user_id}/edit?correction=${r.id}`}
                             className="inline-flex items-center justify-end gap-1 text-xs text-primary hover:underline"
                           >
                             <ExternalLink className="size-3" />

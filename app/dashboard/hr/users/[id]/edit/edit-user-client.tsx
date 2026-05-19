@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +18,8 @@ import { IdentitySection } from "@/app/dashboard/profile/_sections/identity-sect
 import { EducationSection } from "@/app/dashboard/profile/_sections/education-section";
 import { DecorationsSection } from "@/app/dashboard/profile/_sections/decorations-section";
 import { AdminPositionsSection } from "@/app/dashboard/profile/_sections/admin-positions-section";
+import { CorrectionContextBanner } from "./_components/correction-context-banner";
+import type { CorrectionListRow } from "@/lib/actions/correction-actions";
 
 type TabKey =
   | "overview"
@@ -85,6 +87,10 @@ interface Props {
   employeeTypes: string[];
   educationLevels: string[];
   decorationCatalog: Array<{ name: string; abbreviation: string | null }>;
+  /** Optional — when HR navigated via ?correction=<id> from the
+   *  corrections queue, the request is fetched server-side and passed
+   *  here to drive the context banner + flagged-field highlighting. */
+  correction?: CorrectionListRow | null;
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -113,8 +119,26 @@ export function EditUserClient({
   employeeTypes,
   educationLevels,
   decorationCatalog,
+  correction,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  /** Has a section dispatched 'hr-profile-saved' since this client
+   *  mounted? Drives the correction banner CTA mode. */
+  const [hasSavedSinceMount, setHasSavedSinceMount] = useState(false);
+
+  useEffect(() => {
+    function onSaved() {
+      setHasSavedSinceMount(true);
+    }
+    window.addEventListener("hr-profile-saved", onSaved);
+    return () => window.removeEventListener("hr-profile-saved", onSaved);
+  }, []);
+
+  // Flagged-field set for highlight in overview + sections
+  const flaggedFields =
+    correction?.fields_flagged?.length
+      ? new Set<string>(correction.fields_flagged)
+      : null;
 
   const status = STATUS_LABEL[profile.status as string] ?? {
     label: profile.status,
@@ -153,6 +177,14 @@ export function EditUserClient({
           และส่งการแจ้งเตือนให้ผู้ใช้ทราบ
         </p>
       </div>
+
+      {/* Correction context banner — only when ?correction= is set */}
+      {correction && (
+        <CorrectionContextBanner
+          correction={correction}
+          hasSavedSinceMount={hasSavedSinceMount}
+        />
+      )}
 
       {/* HR notice banner */}
       <div className="rounded-xl border-2 border-amber-200 bg-amber-50/60 p-4">
@@ -247,6 +279,7 @@ export function EditUserClient({
             educations={educations}
             decorations={decorations}
             adminPositions={adminPositions}
+            highlightFields={flaggedFields}
             onSectionEditClick={(section) => {
               // Map section keys to tabs
               if (section === "identity" || section === "position") {
@@ -272,6 +305,7 @@ export function EditUserClient({
               employeeTypes={employeeTypes}
               educationLevels={educationLevels}
               targetUserId={targetUserId}
+              highlightFields={flaggedFields}
             />
           )}
           {activeTab === "education" && (
@@ -279,6 +313,7 @@ export function EditUserClient({
               rows={educations}
               educationLevels={educationLevels}
               targetUserId={targetUserId}
+              highlightFlagged={flaggedFields?.has("educations") ?? false}
             />
           )}
           {activeTab === "decorations" && (
@@ -286,12 +321,14 @@ export function EditUserClient({
               rows={decorations}
               catalog={decorationCatalog}
               targetUserId={targetUserId}
+              highlightFlagged={flaggedFields?.has("decorations") ?? false}
             />
           )}
           {activeTab === "admin" && (
             <AdminPositionsSection
               rows={adminPositions}
               targetUserId={targetUserId}
+              highlightFlagged={flaggedFields?.has("admin_positions") ?? false}
             />
           )}
         </div>

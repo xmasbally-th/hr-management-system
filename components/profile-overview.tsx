@@ -65,6 +65,10 @@ interface Props {
   editDisabled?: boolean;
   /** Tooltip shown when the section edit button is disabled. */
   editDisabledReason?: string;
+  /** Field keys that the user flagged in a correction request. Each
+   *  section header surfaces a "⭐ คำขอแก้ฟิลด์นี้" badge when one of
+   *  its fields is in this set. Null/undefined disables highlighting. */
+  highlightFields?: Set<string> | null;
 }
 
 export type SectionKey =
@@ -109,6 +113,23 @@ function joinEnglish(p: Profile): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+// Section → which field keys belong to it (used to compute the
+// "any flagged?" badge for each header in the read-only overview).
+const SECTION_FIELD_GROUPS: Record<SectionKey, string[]> = {
+  identity: [
+    "title_th","first_name_th","last_name_th",
+    "title_en","first_name_en","last_name_en",
+    "phone","gender","birth_date","current_address",
+  ],
+  position: [
+    "position_title","position_number","employee_type",
+    "department_id","hire_date",
+  ],
+  educations: ["educations"],
+  decorations: ["decorations"],
+  admin_positions: ["admin_positions"],
+};
+
 export function ProfileOverview({
   profile,
   educations,
@@ -117,17 +138,24 @@ export function ProfileOverview({
   onSectionEditClick,
   editDisabled,
   editDisabledReason,
+  highlightFields,
 }: Props) {
   const editFor = (key: SectionKey) =>
     onSectionEditClick
       ? () => onSectionEditClick(key)
       : undefined;
 
+  const isFlagged = (key: SectionKey): boolean => {
+    if (!highlightFields || highlightFields.size === 0) return false;
+    return SECTION_FIELD_GROUPS[key].some((f) => highlightFields.has(f));
+  };
+
   return (
     <div className="space-y-6">
       <Section
         icon={<User className="size-4" />}
         title="ข้อมูลส่วนตัว"
+        flagged={isFlagged("identity")}
         onEditClick={editFor("identity")}
         editDisabled={editDisabled}
         editDisabledReason={editDisabledReason}
@@ -145,6 +173,7 @@ export function ProfileOverview({
       <Section
         icon={<Briefcase className="size-4" />}
         title="ข้อมูลตำแหน่ง"
+        flagged={isFlagged("position")}
         onEditClick={editFor("position")}
         editDisabled={editDisabled}
         editDisabledReason={editDisabledReason}
@@ -161,6 +190,7 @@ export function ProfileOverview({
         icon={<GraduationCap className="size-4" />}
         title="ประวัติการศึกษา"
         count={educations.length}
+        flagged={isFlagged("educations")}
         onEditClick={editFor("educations")}
         editDisabled={editDisabled}
         editDisabledReason={editDisabledReason}
@@ -206,6 +236,7 @@ export function ProfileOverview({
         icon={<Award className="size-4" />}
         title="เครื่องราชอิสริยาภรณ์"
         count={decorations.length}
+        flagged={isFlagged("decorations")}
         onEditClick={editFor("decorations")}
         editDisabled={editDisabled}
         editDisabledReason={editDisabledReason}
@@ -239,6 +270,7 @@ export function ProfileOverview({
         icon={<Briefcase className="size-4" />}
         title="ประวัติการดำรงตำแหน่งบริหาร"
         count={adminPositions.length}
+        flagged={isFlagged("admin_positions")}
         onEditClick={editFor("admin_positions")}
         editDisabled={editDisabled}
         editDisabledReason={editDisabledReason}
@@ -270,6 +302,7 @@ function Section({
   icon,
   title,
   rows,
+  flagged,
   onEditClick,
   editDisabled,
   editDisabledReason,
@@ -277,17 +310,38 @@ function Section({
   icon: React.ReactNode;
   title: string;
   rows: Array<[string, string | null | undefined]>;
+  flagged?: boolean;
   onEditClick?: () => void;
   editDisabled?: boolean;
   editDisabledReason?: string;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section
+      className={cn(
+        "rounded-xl border bg-card p-5",
+        flagged ? "border-amber-300 ring-2 ring-amber-100" : "border-border",
+      )}
+    >
       <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
+        <div
+          className={cn(
+            "size-8 grid place-items-center rounded-lg",
+            flagged
+              ? "bg-amber-100 text-amber-700"
+              : "bg-primary/10 text-primary",
+          )}
+        >
           {icon}
         </div>
         <h2 className="font-semibold flex-1">{title}</h2>
+        {flagged && (
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border bg-amber-50 text-amber-800 border-amber-200"
+            title="ผู้ใช้แจ้งขอแก้ไขข้อมูลในส่วนนี้"
+          >
+            ⭐ คำขอแก้
+          </span>
+        )}
         <EditButton
           onClick={onEditClick}
           disabled={editDisabled}
@@ -318,6 +372,7 @@ function ListBlock({
   title,
   count,
   children,
+  flagged,
   onEditClick,
   editDisabled,
   editDisabledReason,
@@ -326,20 +381,41 @@ function ListBlock({
   title: string;
   count: number;
   children: React.ReactNode;
+  flagged?: boolean;
   onEditClick?: () => void;
   editDisabled?: boolean;
   editDisabledReason?: string;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
+    <section
+      className={cn(
+        "rounded-xl border bg-card p-5",
+        flagged ? "border-amber-300 ring-2 ring-amber-100" : "border-border",
+      )}
+    >
       <header className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-        <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
+        <div
+          className={cn(
+            "size-8 grid place-items-center rounded-lg",
+            flagged
+              ? "bg-amber-100 text-amber-700"
+              : "bg-primary/10 text-primary",
+          )}
+        >
           {icon}
         </div>
         <h2 className="font-semibold flex-1">{title}</h2>
         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
           {count} รายการ
         </span>
+        {flagged && (
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border bg-amber-50 text-amber-800 border-amber-200"
+            title="ผู้ใช้แจ้งขอแก้ไขข้อมูลในส่วนนี้"
+          >
+            ⭐ คำขอแก้
+          </span>
+        )}
         <EditButton
           onClick={onEditClick}
           disabled={editDisabled}

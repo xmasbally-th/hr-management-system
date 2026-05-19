@@ -41,6 +41,8 @@ interface Props {
   rows: AdminPositionRow[];
   /** When provided, mutations call HR actions targeting this user. */
   targetUserId?: string;
+  /** True when the user's correction request flagged "admin_positions". */
+  highlightFlagged?: boolean;
 }
 
 const BLANK: AdminPositionInput = {
@@ -51,7 +53,11 @@ const BLANK: AdminPositionInput = {
   end_date: "",
 };
 
-export function AdminPositionsSection({ rows, targetUserId }: Props) {
+export function AdminPositionsSection({
+  rows,
+  targetUserId,
+  highlightFlagged,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -87,6 +93,7 @@ export function AdminPositionsSection({ rows, targetUserId }: Props) {
         if (editingId) {
           if (targetUserId) {
             await updateAdminPositionAsHr(targetUserId, editingId, form);
+            window.dispatchEvent(new CustomEvent("hr-profile-saved"));
           } else {
             await updateAdminPosition(editingId, form);
           }
@@ -94,6 +101,7 @@ export function AdminPositionsSection({ rows, targetUserId }: Props) {
         } else {
           if (targetUserId) {
             await addAdminPositionAsHr(targetUserId, form);
+            window.dispatchEvent(new CustomEvent("hr-profile-saved"));
           } else {
             await addAdminPosition(form);
           }
@@ -115,6 +123,7 @@ export function AdminPositionsSection({ rows, targetUserId }: Props) {
       try {
         if (targetUserId) {
           await deleteAdminPositionAsHr(targetUserId, id);
+          window.dispatchEvent(new CustomEvent("hr-profile-saved"));
         } else {
           await deleteAdminPosition(id);
         }
@@ -130,6 +139,11 @@ export function AdminPositionsSection({ rows, targetUserId }: Props) {
 
   return (
     <div className="space-y-4">
+      {highlightFlagged && (
+        <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          ⭐ ผู้ใช้แจ้งขอแก้ไขข้อมูลในส่วน &quot;ประวัติการดำรงตำแหน่งบริหาร&quot;
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="font-semibold">ประวัติการบริหาร</h3>
