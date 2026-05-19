@@ -17,6 +17,8 @@ export const ALLOWED_NOTIFICATION_TYPES = [
   "account_rejected",
   "account_pending",
   "profile_edited_by_hr",
+  "correction_resolved",
+  "correction_rejected",
 ] as const;
 
 export type NotificationType = (typeof ALLOWED_NOTIFICATION_TYPES)[number];
@@ -47,4 +49,6 @@ export const NOTIFICATION_TYPE_META: NotificationTypeMeta[] = [
   { type: "account_rejected", label: "บัญชีของฉันถูกระงับ", description: "แจ้งเมื่อบัญชีของคุณถูกระงับการใช้งาน", group: "account" },
   { type: "account_pending", label: "บัญชีของฉันกลับเป็นรออนุมัติ", description: "แจ้งเมื่อสถานะบัญชีของคุณเปลี่ยนกลับเป็น pending", group: "account" },
   { type: "profile_edited_by_hr", label: "ฝ่ายบุคคลแก้ไขข้อมูลโปรไฟล์ของฉัน", description: "แจ้งเมื่อ HR/Admin มีการแก้ไขข้อมูลในโปรไฟล์ของคุณ", group: "profile" },
+  { type: "correction_resolved", label: "คำขอแก้ไขของฉันได้รับการดำเนินการ", description: "แจ้งเมื่อ HR ดำเนินการคำขอแก้ไขข้อมูลของคุณเสร็จสิ้น", group: "profile" },
+  { type: "correction_rejected", label: "คำขอแก้ไขของฉันถูกปฏิเสธ", description: "แจ้งเมื่อ HR ปฏิเสธคำขอแก้ไขข้อมูลของคุณ", group: "profile" },
 ];

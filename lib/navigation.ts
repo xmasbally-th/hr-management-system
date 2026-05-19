@@ -91,6 +91,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
+        title: "อนุมัติคำขอแก้ไขข้อมูล",
+        href: "/dashboard/hr/profile-corrections",
+        icon: "FileCheck2",
+        roles: ["admin", "hr"],
+      },
+      {
         title: "จัดการการลา",
         href: "/dashboard/hr/leaves",
         icon: "CalendarRange",
