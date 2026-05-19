@@ -4,9 +4,21 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Check, X, Loader2, Clock } from "lucide-react";
+import {
+  Check,
+  X,
+  Loader2,
+  Clock,
+  ArrowRight,
+  ClipboardCheck,
+  AlertTriangle,
+  Rocket,
+  HandIcon,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ProfileOverview } from "@/components/profile-overview";
+import { cn } from "@/lib/utils";
 import {
   CorrectionRequestForm,
   FIELD_LABELS,
@@ -74,7 +86,17 @@ interface Props {
   pendingCorrection: PendingCorrection | null;
 }
 
-type Mode = "review" | "correction-form" | "awaiting";
+type Mode = "intro" | "review" | "correction-form" | "awaiting";
+
+/**
+ * Decide which mode to start on:
+ *   - awaiting_correction → "awaiting" (legacy path — user has pending request)
+ *   - otherwise           → "intro" (first-time wizard)
+ */
+function getInitialMode(status: string): Mode {
+  if (status === "awaiting_correction") return "awaiting";
+  return "intro";
+}
 
 export function WelcomeClient({
   profile,
@@ -85,10 +107,24 @@ export function WelcomeClient({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const initialMode: Mode =
-    profile.status === "awaiting_correction" ? "awaiting" : "review";
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useState<Mode>(getInitialMode(profile.status));
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Step indicator — only show during onboarding wizard (intro/review/form)
+  const stepIndex =
+    mode === "intro" ? 0 : mode === "review" ? 1 : mode === "correction-form" ? 2 : -1;
+  const wizardSteps = [
+    { label: "ทักทาย", icon: HandIcon },
+    { label: "ตรวจสอบ", icon: ClipboardCheck },
+    { label: "ดำเนินการ", icon: Rocket },
+  ];
+
+  // First-name fallback used by the intro greeting
+  const firstName =
+    profile.first_name_th?.trim() ||
+    profile.full_name?.split(" ")[0] ||
+    profile.email?.split("@")[0] ||
+    "คุณ";
 
   function handleAccurate() {
     startTransition(async () => {
@@ -120,18 +156,141 @@ export function WelcomeClient({
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50/30 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <header className="mb-8 text-center">
+        <header className="mb-6 text-center">
           <div className="inline-flex w-14 h-14 items-center justify-center rounded-2xl bg-primary shadow-lg mb-4">
             <span className="text-xl font-bold text-primary-foreground">HR</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            ตรวจสอบข้อมูลโปรไฟล์ของคุณ
+            {mode === "intro"
+              ? "ยินดีต้อนรับสู่ระบบ HR"
+              : mode === "correction-form"
+                ? "แจ้งข้อมูลที่ต้องแก้ไข"
+                : "ตรวจสอบข้อมูลโปรไฟล์ของคุณ"}
           </h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl mx-auto">
-            ฝ่ายบุคคลได้นำเข้าข้อมูลของคุณไว้ในระบบแล้ว
-            กรุณาตรวจสอบความถูกต้องก่อนเริ่มใช้งาน
+            {mode === "intro"
+              ? "เริ่มต้นใช้งานง่าย ๆ ผ่านขั้นตอนสั้น ๆ"
+              : mode === "correction-form"
+                ? "ระบุข้อมูลที่ต้องการให้ฝ่ายบุคคลแก้ไข"
+                : "ฝ่ายบุคคลได้นำเข้าข้อมูลของคุณไว้ในระบบแล้ว — กรุณาตรวจสอบความถูกต้องก่อนเริ่มใช้งาน"}
           </p>
         </header>
+
+        {/* Step indicator — shown during the wizard, hidden during awaiting */}
+        {stepIndex >= 0 && (
+          <ol className="flex items-center justify-center gap-1 sm:gap-3 mb-8">
+            {wizardSteps.map((step, i) => {
+              const Icon = step.icon;
+              const reached = i <= stepIndex;
+              const active = i === stepIndex;
+              return (
+                <li key={step.label} className="flex items-center gap-1 sm:gap-3">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium border transition",
+                      active
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : reached
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : "bg-muted text-muted-foreground border-border",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "size-5 rounded-full grid place-items-center text-[0.625rem] font-bold",
+                        active
+                          ? "bg-primary-foreground/20"
+                          : reached
+                            ? "bg-emerald-200/80"
+                            : "bg-background",
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                    <Icon className="size-3.5" />
+                    <span className="hidden sm:inline">{step.label}</span>
+                  </div>
+                  {i < wizardSteps.length - 1 && (
+                    <div
+                      className={cn(
+                        "w-4 sm:w-8 h-px",
+                        i < stepIndex ? "bg-emerald-300" : "bg-border",
+                      )}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        {/* Intro step */}
+        {mode === "intro" && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border-2 border-primary/20 bg-card p-6 sm:p-8 text-center space-y-4">
+              <div className="inline-flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="size-7" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">
+                  สวัสดีคุณ {firstName}!
+                </h2>
+                <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto">
+                  ก่อนเริ่มใช้งาน ขอเวลาสั้น ๆ ในการตรวจสอบข้อมูลที่ฝ่ายบุคคล
+                  กรอกไว้ให้คุณ — เพื่อให้แน่ใจว่าข้อมูลทั้งหมดถูกต้อง
+                </p>
+              </div>
+
+              <ul className="text-left max-w-md mx-auto space-y-3 text-sm pt-2">
+                <li className="flex items-start gap-3">
+                  <span className="size-6 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center text-xs font-bold shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <div>
+                    <div className="font-medium">ตรวจสอบข้อมูล</div>
+                    <div className="text-xs text-muted-foreground">
+                      ดู ชื่อ-นามสกุล · ตำแหน่ง · ประวัติการศึกษา ที่ระบบมี
+                    </div>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="size-6 rounded-full bg-amber-100 text-amber-700 grid place-items-center text-xs font-bold shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <div>
+                    <div className="font-medium">แจ้งสิ่งที่ต้องแก้ (ถ้ามี)</div>
+                    <div className="text-xs text-muted-foreground">
+                      ส่งคำขอให้ฝ่ายบุคคลแก้ไขข้อมูลที่ไม่ถูกต้อง
+                    </div>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="size-6 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-bold shrink-0 mt-0.5">
+                    3
+                  </span>
+                  <div>
+                    <div className="font-medium">เริ่มใช้งานระบบ</div>
+                    <div className="text-xs text-muted-foreground">
+                      ยื่นใบลา · ขออนุญาตเดินทาง · ดูประวัติของคุณ
+                    </div>
+                  </div>
+                </li>
+              </ul>
+
+              <div className="pt-4">
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => setMode("review")}
+                  disabled={isPending}
+                >
+                  เริ่มตรวจสอบข้อมูล
+                  <ArrowRight className="size-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Awaiting correction banner — legacy path; rarely shown after the
             UX change that immediately marks users approved on submit. */}
