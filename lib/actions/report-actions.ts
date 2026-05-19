@@ -8,6 +8,63 @@ async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   return user;
 }
 
+/**
+ * Lightweight fetch of recent pending profile-correction requests for
+ * the HR/Admin dashboard panels. Returns 5 most-recent + total count.
+ * No role check here — caller (getHrDashboardData / getAdminDashboardData)
+ * has already verified the user is hr/admin.
+ */
+async function fetchPendingCorrectionsForPanel(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{
+  total: number;
+  recent: Array<{
+    id: string;
+    target_user_id: string;
+    user_name: string | null;
+    department: string | null;
+    reason_excerpt: string;
+    fields_count: number;
+    created_at: string;
+  }>;
+}> {
+  const [{ count }, { data }] = await Promise.all([
+    supabase
+      .from("profile_correction_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("profile_correction_requests")
+      .select(
+        `id, target_user_id, reason_text, fields_flagged, created_at,
+         target:profiles!profile_correction_requests_target_user_id_fkey(
+           full_name, department:departments(name)
+         )`,
+      )
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+
+  const recent = (data ?? []).map((r) => {
+    const t = Array.isArray(r.target) ? r.target[0] : r.target;
+    const dept = t && (Array.isArray(t.department) ? t.department[0] : t.department);
+    const reasonText = (r.reason_text ?? "").trim();
+    return {
+      id: r.id,
+      target_user_id: r.target_user_id,
+      user_name: t?.full_name ?? null,
+      department: dept?.name ?? null,
+      reason_excerpt:
+        reasonText.length > 80 ? reasonText.slice(0, 80) + "…" : reasonText,
+      fields_count: Array.isArray(r.fields_flagged) ? r.fields_flagged.length : 0,
+      created_at: r.created_at,
+    };
+  });
+
+  return { total: count ?? 0, recent };
+}
+
 async function getRole(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data, error } = await supabase
     .from("profiles")
@@ -500,6 +557,18 @@ export interface HrDashboardData {
     createdAt: string;
   }>;
   departments: Array<{ name: string; total: number }>;
+  pendingCorrections: {
+    total: number;
+    recent: Array<{
+      id: string;
+      target_user_id: string;
+      user_name: string | null;
+      department: string | null;
+      reason_excerpt: string;
+      fields_count: number;
+      created_at: string;
+    }>;
+  };
 }
 
 export async function getHrDashboardData(): Promise<HrDashboardData> {
@@ -620,6 +689,10 @@ export async function getHrDashboardData(): Promise<HrDashboardData> {
     total: ((d as { profiles?: unknown[] }).profiles ?? []).length,
   }));
 
+  const pendingCorrections = await fetchPendingCorrectionsForPanel(supabase).catch(
+    () => ({ total: 0, recent: [] }),
+  );
+
   return {
     totalEmployees: totalEmpRes.count ?? 0,
     pendingLeavesCount: pendingLeavesRes.count ?? 0,
@@ -630,6 +703,7 @@ export async function getHrDashboardData(): Promise<HrDashboardData> {
     pipeline,
     recentDocs,
     departments,
+    pendingCorrections,
   };
 }
 
@@ -646,6 +720,7 @@ export interface AdminDashboardData {
   }>;
   alertsCount: number;
   apiCalls24h: number;
+  pendingCorrections: HrDashboardData["pendingCorrections"];
 }
 
 async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -718,11 +793,16 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     };
   });
 
+  const pendingCorrections = await fetchPendingCorrectionsForPanel(supabase).catch(
+    () => ({ total: 0, recent: [] }),
+  );
+
   return {
     totalUsers: usersRes.count ?? 0,
     rolesDistribution: Object.entries(roleCounts).map(([role, count]) => ({ role, count })),
     recentAuditLogs,
     alertsCount: 0,
     apiCalls24h: apiCallsRes.count ?? 0,
+    pendingCorrections,
   };
 }

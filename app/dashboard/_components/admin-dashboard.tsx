@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users, Database, Activity, AlertCircle, ArrowRight } from "lucide-react";
 import { StatCard, Panel } from "./dashboard-primitives";
+import { CorrectionsPanel } from "./corrections-panel";
 import type { AdminDashboardData } from "@/lib/actions/report-actions";
 
 interface Props {
@@ -208,6 +209,9 @@ export function AdminDashboard({ data }: Props) {
           </div>
         </Panel>
       </div>
+
+      {/* Pending correction-request panel — surfaces HR's queue depth */}
+      <CorrectionsPanel data={data.pendingCorrections} />
     </div>
   );
 }

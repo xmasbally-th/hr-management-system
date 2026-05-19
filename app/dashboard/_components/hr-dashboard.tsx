@@ -11,6 +11,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { StatCard, Panel } from "./dashboard-primitives";
+import { CorrectionsPanel } from "./corrections-panel";
 import type { HrDashboardData } from "@/lib/actions/report-actions";
 
 interface Props {
@@ -291,6 +292,9 @@ export function HrDashboard({ data }: Props) {
           </div>
         </Panel>
       )}
+
+      {/* Pending correction-request panel */}
+      <CorrectionsPanel data={data.pendingCorrections} />
     </div>
   );
 }
