@@ -12,6 +12,7 @@ import {
   type CorrectionListRow,
   type ListResult,
 } from "@/lib/actions/correction-actions";
+import { getAgingInfo } from "@/lib/correction-aging";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -490,6 +491,27 @@ export function ProfileCorrectionsClient({
                       </td>
                       <td className="px-4 py-3 align-top whitespace-nowrap text-xs text-muted-foreground font-mono">
                         <div>ส่ง {formatDate(r.created_at)}</div>
+                        {r.status === "pending" && (() => {
+                          const aging = getAgingInfo(r.created_at);
+                          return (
+                            <span
+                              className={cn(
+                                "inline-flex items-center px-1.5 py-px rounded text-[0.6875rem] font-mono mt-1",
+                                aging.chipClassName,
+                                aging.pulse && "animate-pulse",
+                              )}
+                              title={
+                                aging.tone === "overdue"
+                                  ? "ค้างนานเกิน 7 วัน — ควรรีบดำเนินการ"
+                                  : aging.tone === "stale"
+                                    ? "ค้าง 3 วันขึ้นไป"
+                                    : "เพิ่งส่ง"
+                              }
+                            >
+                              ⏱ {aging.shortLabel}
+                            </span>
+                          );
+                        })()}
                         {r.resolved_at && (
                           <div className="text-muted-foreground/70">
                             จบ {formatDate(r.resolved_at)}

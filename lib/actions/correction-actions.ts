@@ -94,7 +94,12 @@ export async function listProfileCorrections(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  // Build the joined query — fetch target user info via FK
+  // Build the joined query — fetch target user info via FK.
+  // For the "pending" view we sort oldest-first so HR works through
+  // stale requests before fresh ones. All other statuses (resolved /
+  // rejected / cancelled / all) keep newest-first since they're audit
+  // logs, not work queues.
+  const pendingMode = !params.status || params.status === "pending";
   let query = supabase
     .from("profile_correction_requests")
     .select(
@@ -105,7 +110,7 @@ export async function listProfileCorrections(
        )`,
       { count: "exact" },
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: pendingMode });
 
   if (params.status && params.status !== "all") {
     query = query.eq("status", params.status);

@@ -42,7 +42,9 @@ async function fetchPendingCorrectionsForPanel(
          )`,
       )
       .eq("status", "pending")
-      .order("created_at", { ascending: false })
+      // Oldest-first so the dashboard panel surfaces the most stale
+      // requests at the top — matches the queue's pending-mode sort.
+      .order("created_at", { ascending: true })
       .limit(5),
   ]);
 

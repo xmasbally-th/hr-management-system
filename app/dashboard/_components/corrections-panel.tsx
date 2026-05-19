@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, FileCheck2, Inbox } from "lucide-react";
 import { Panel } from "./dashboard-primitives";
+import { getAgingInfo } from "@/lib/correction-aging";
+import { cn } from "@/lib/utils";
 
 interface Props {
   data: {
@@ -96,6 +98,27 @@ export function CorrectionsPanel({ data, className }: Props) {
                 )}
                 <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground font-mono">
                   <span>{formatShortDate(r.created_at)}</span>
+                  {(() => {
+                    const aging = getAgingInfo(r.created_at);
+                    return (
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-1 rounded text-[0.6875rem]",
+                          aging.chipClassName,
+                          aging.pulse && "animate-pulse",
+                        )}
+                        title={
+                          aging.tone === "overdue"
+                            ? "ค้างนานเกิน 7 วัน"
+                            : aging.tone === "stale"
+                              ? "ค้าง 3 วันขึ้นไป"
+                              : "เพิ่งส่ง"
+                        }
+                      >
+                        ⏱ {aging.shortLabel}
+                      </span>
+                    );
+                  })()}
                   {r.fields_count > 0 && (
                     <span className="inline-flex items-center gap-0.5 px-1 rounded bg-amber-50 text-amber-800 border border-amber-200">
                       <FileCheck2 className="size-3" />
