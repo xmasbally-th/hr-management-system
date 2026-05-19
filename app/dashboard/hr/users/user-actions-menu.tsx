@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   updateUserStatus,
   updateUserRole
@@ -58,35 +59,35 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={isPending}
-        className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+    <>
+      {/* Edit profile link — kept outside the dropdown to avoid a
+          Base UI Menu/Next.js Link prefetch interaction (Base UI #31) */}
+      <Link
+        href={`/dashboard/hr/users/${profile.id}/edit`}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primary hover:bg-muted"
+        title="แก้ไขโปรไฟล์"
+        aria-label="แก้ไขโปรไฟล์"
       >
-        <span className="sr-only">เปิดเมนู</span>
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <MoreHorizontal className="h-4 w-4" />
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>จัดการผู้ใช้</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        <Pencil className="h-4 w-4" />
+      </Link>
 
-        <DropdownMenuItem
-          onClick={() => {
-            window.location.href = `/dashboard/hr/users/${profile.id}/edit`;
-          }}
-          className="cursor-pointer"
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={isPending}
+          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
         >
-          <Pencil className="mr-2 h-4 w-4 text-primary" />
-          แก้ไขโปรไฟล์
-        </DropdownMenuItem>
+          <span className="sr-only">เปิดเมนู</span>
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <MoreHorizontal className="h-4 w-4" />
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuLabel>จัดการผู้ใช้</DropdownMenuLabel>
+          <DropdownMenuSeparator />
 
-        <DropdownMenuSeparator />
-
-        {/* Status Actions */}
+          {/* Status Actions */}
         {profile.status === "pending" && (
           <DropdownMenuItem onClick={() => setConfirmAction({ type: "status", value: "approved", label: "อนุมัติผู้ใช้งาน" })}>
             <UserCheck className="mr-2 h-4 w-4 text-emerald-600" />
@@ -129,18 +130,19 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
-      </DropdownMenuContent>
+        </DropdownMenuContent>
 
-      {/* Confirmation dialog */}
-      <ConfirmDialog
-        open={confirmAction !== null}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={`ยืนยัน: ${confirmAction?.label ?? ""}`}
-        description={`คุณต้องการ${confirmAction?.label ?? ""}สำหรับ ${profile.full_name ?? "ผู้ใช้นี้"} ใช่หรือไม่?`}
-        confirmLabel="ยืนยัน"
-        variant={confirmAction?.value === "rejected" ? "destructive" : "default"}
-        onConfirm={handleConfirm}
-      />
-    </DropdownMenu>
+        {/* Confirmation dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => !open && setConfirmAction(null)}
+          title={`ยืนยัน: ${confirmAction?.label ?? ""}`}
+          description={`คุณต้องการ${confirmAction?.label ?? ""}สำหรับ ${profile.full_name ?? "ผู้ใช้นี้"} ใช่หรือไม่?`}
+          confirmLabel="ยืนยัน"
+          variant={confirmAction?.value === "rejected" ? "destructive" : "default"}
+          onConfirm={handleConfirm}
+        />
+      </DropdownMenu>
+    </>
   );
 }
