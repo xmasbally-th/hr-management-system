@@ -102,8 +102,8 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
 
         {/* Right cluster */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Notifications */}
-          <NotificationBell />
+          {/* Notifications — passes role+id so HR/Admin get Realtime push */}
+          <NotificationBell role={profile?.role} userId={profile?.id} />
 
           {/* Divider */}
           <div className="hidden sm:block w-px h-6 bg-border mx-1"></div>

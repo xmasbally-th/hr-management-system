@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { Bell, Check, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -8,7 +8,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { getMyNotifications, markAsRead, markAllAsRead, deleteNotification } from "@/lib/actions/notification-actions";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import {
+  getMyNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+} from "@/lib/actions/notification-actions";
+import { NOTIFICATION_TYPE_META } from "@/lib/notification-types";
 
 interface NotificationItem {
   id: string;
@@ -18,15 +26,40 @@ interface NotificationItem {
   created_at: string;
 }
 
-export function NotificationBell() {
+interface Props {
+  /** Current user's role + id — required to enable HR/Admin Realtime
+   *  subscription. Other roles still get the on-mount fetch. */
+  role?: string | null;
+  userId?: string | null;
+}
+
+const REALTIME_ROLES = new Set(["hr", "admin"]);
+
+// Types that belong to the "hr_inbox" group surface as toast popups in
+// addition to landing in the bell list. Looked up via NOTIFICATION_TYPE_META
+// so the source of truth stays in one place.
+const HR_INBOX_TYPES = new Set<string>(
+  NOTIFICATION_TYPE_META
+    .filter((m) => m.group === "hr_inbox")
+    .map((m) => m.type),
+);
+
+export function NotificationBell({ role, userId }: Props) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  // Tab title flicker — store original title once so we can restore.
+  const originalTitleRef = useRef<string>("");
+  const flickerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     loadNotifications();
+    if (typeof document !== "undefined") {
+      originalTitleRef.current = document.title;
+    }
   }, []);
 
   function loadNotifications() {
@@ -38,6 +71,95 @@ export function NotificationBell() {
         // Silently fail — user may not have notifications table
       }
     });
+  }
+
+  // Real-time subscription — HR/Admin only. Listens for new rows in
+  // notifications filtered to this user, prepends them, fires toast for
+  // hr_inbox types, and triggers title flicker if the tab is hidden.
+  useEffect(() => {
+    if (!userId || !role || !REALTIME_ROLES.has(role)) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`notif-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newNotif = payload.new as NotificationItem;
+          if (!newNotif?.id) return;
+
+          // Prepend to state (avoid duplicates if optimistic race)
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === newNotif.id)) return prev;
+            return [newNotif, ...prev];
+          });
+
+          // Toast popup for HR-inbox group only — leave personal alerts
+          // to be discovered via the bell dropdown to avoid spam.
+          if (HR_INBOX_TYPES.has(newNotif.type)) {
+            toast.info(newNotif.message, {
+              duration: 6000,
+            });
+          }
+
+          // Tab title flicker when tab is not visible
+          if (typeof document !== "undefined" && document.hidden) {
+            startTitleFlicker(newNotif.message);
+          }
+        },
+      )
+      .on("system", { event: "SUBSCRIBED" }, () => {
+        // After (re)connect, sync state from server — covers
+        // notifications missed during disconnect.
+        loadNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      stopTitleFlicker();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, role]);
+
+  // Stop flicker when the tab regains focus
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    function onVisibility() {
+      if (!document.hidden) stopTitleFlicker();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  function startTitleFlicker(msg: string) {
+    if (typeof document === "undefined") return;
+    stopTitleFlicker();
+    const original = originalTitleRef.current || document.title;
+    const truncated = msg.length > 30 ? msg.slice(0, 30) + "…" : msg;
+    let flip = false;
+    flickerTimerRef.current = setInterval(() => {
+      document.title = flip ? original : `🔔 ${truncated}`;
+      flip = !flip;
+    }, 1200);
+  }
+
+  function stopTitleFlicker() {
+    if (flickerTimerRef.current) {
+      clearInterval(flickerTimerRef.current);
+      flickerTimerRef.current = null;
+    }
+    if (typeof document !== "undefined" && originalTitleRef.current) {
+      document.title = originalTitleRef.current;
+    }
   }
 
   function handleMarkRead(id: string) {
@@ -81,7 +203,7 @@ export function NotificationBell() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (isOpen) loadNotifications(); }}>
+    <DropdownMenu open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (isOpen) { loadNotifications(); stopTitleFlicker(); } }}>
       <DropdownMenuTrigger className="relative w-10 h-10 rounded-lg text-foreground/70 hover:bg-muted grid place-items-center" aria-label="Notifications">
         <Bell className="size-[19px]" />
         {unreadCount > 0 && (
