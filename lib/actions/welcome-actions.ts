@@ -126,8 +126,21 @@ export async function submitCorrectionRequest(
     .single();
 
   if (!profile) throw new Error("ไม่พบโปรไฟล์");
-  if (!ONBOARDING_STATUSES.has(profile.status)) {
-    throw new Error(`สถานะบัญชี (${profile.status}) ไม่อยู่ในขั้นตอนยืนยัน`);
+  // Scope-specific status guard:
+  //   first_review  → only valid while still in onboarding (pre/awaiting)
+  //   post_approval → only valid after the user is approved
+  if (input.scope === "first_review") {
+    if (!ONBOARDING_STATUSES.has(profile.status)) {
+      throw new Error(
+        `สถานะบัญชี (${profile.status}) ไม่อยู่ในขั้นตอนยืนยันครั้งแรก`,
+      );
+    }
+  } else {
+    if (profile.status !== "approved") {
+      throw new Error(
+        `สถานะบัญชี (${profile.status}) ยังไม่อนุญาตให้ส่งคำขอแก้ไขเพิ่มเติม`,
+      );
+    }
   }
 
   // Insert correction request
