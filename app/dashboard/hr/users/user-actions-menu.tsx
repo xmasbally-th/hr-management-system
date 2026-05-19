@@ -9,6 +9,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -84,7 +85,9 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuLabel>จัดการผู้ใช้</DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>จัดการผู้ใช้</DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
 
           {/* Status Actions */}

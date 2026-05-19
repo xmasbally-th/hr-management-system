@@ -113,6 +113,10 @@ export async function updateProfileAsHr(
       ? [titleTh, firstTh, lastTh].filter(Boolean).join(" ").replace(/\s+/g, " ")
       : null;
 
+  // Coerce empty string → null for FK and trimmed optional fields, so
+  // an unfilled dropdown doesn't violate the departments FK constraint.
+  const deptId = trim(input.department_id);
+
   const patch = {
     title_th: titleTh,
     first_name_th: firstTh,
@@ -124,7 +128,7 @@ export async function updateProfileAsHr(
     position_title: trim(input.position_title),
     position_number: trim(input.position_number),
     employee_type: trim(input.employee_type),
-    department_id: input.department_id ?? null,
+    department_id: deptId,
     gender: trim(input.gender),
     birth_date: trim(input.birth_date),
     hire_date: trim(input.hire_date),
