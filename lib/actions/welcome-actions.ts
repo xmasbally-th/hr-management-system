@@ -71,20 +71,38 @@ export async function confirmProfileAsAccurate(): Promise<void> {
   revalidatePath("/dashboard");
 }
 
-export interface FirstReviewCorrectionInput {
+export interface CorrectionRequestInput {
   /** Field keys ที่ user flag ว่าผิด (เช่น ["phone","department_id"]) */
   fields_flagged: string[];
   /** ข้อความที่ user พิมพ์ระบุรายละเอียดที่ต้องแก้ */
   reason_text: string;
+  /** first_review = ตอนยืนยันครั้งแรกที่ /welcome
+   *  post_approval = หลัง approved แล้ว แก้ผ่าน /dashboard/profile */
+  scope: "first_review" | "post_approval";
 }
 
 /**
- * Submit a first-review correction request — user says HR's imported data
- * is wrong. Sets status='awaiting_correction' so the proxy keeps them at
- * /welcome until HR resolves the request.
+ * @deprecated — use submitCorrectionRequest({ scope: "first_review" })
  */
 export async function submitFirstReviewCorrection(
-  input: FirstReviewCorrectionInput,
+  input: Omit<CorrectionRequestInput, "scope">,
+): Promise<{ id: string }> {
+  return submitCorrectionRequest({ ...input, scope: "first_review" });
+}
+
+/**
+ * Submit a correction request — user is asking HR to update their data.
+ *
+ * Behavior by scope:
+ *   • first_review  — user reviewed HR-imported data at /welcome and
+ *                     flagged issues. Sets status='approved' +
+ *                     profile_completed_at=now() so they can use the
+ *                     system while HR processes the request.
+ *   • post_approval — user is already approved. Just insert the request;
+ *                     no status change. Dashboard banner surfaces it.
+ */
+export async function submitCorrectionRequest(
+  input: CorrectionRequestInput,
 ): Promise<{ id: string }> {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
@@ -121,7 +139,7 @@ export async function submitFirstReviewCorrection(
       reason_text: reason,
       fields_flagged: fields,
       proposed_payload: null,
-      scope: "first_review",
+      scope: input.scope,
       status: "pending",
     })
     .select("id")
@@ -129,7 +147,7 @@ export async function submitFirstReviewCorrection(
 
   if (insertError || !inserted) {
     console.error(
-      "[welcome-actions] submitFirstReviewCorrection failed:",
+      "[welcome-actions] submitCorrectionRequest failed:",
       insertError,
     );
     throw new Error(
@@ -137,30 +155,33 @@ export async function submitFirstReviewCorrection(
     );
   }
 
-  // User has reviewed the data and noted required corrections — treat as
-  // "approved for use". Pending correction request stays in queue for HR.
-  const now = new Date().toISOString();
-  const { error: statusError } = await supabase
-    .from("profiles")
-    .update({
-      status: "approved",
-      profile_completed_at: now,
-      updated_at: now,
-    })
-    .eq("id", user.id);
+  // First-review only: bootstrap user into 'approved' state so they can
+  // use the system while HR processes the request. Post-approval users
+  // are already approved — no status change.
+  if (input.scope === "first_review") {
+    const now = new Date().toISOString();
+    const { error: statusError } = await supabase
+      .from("profiles")
+      .update({
+        status: "approved",
+        profile_completed_at: now,
+        updated_at: now,
+      })
+      .eq("id", user.id);
 
-  if (statusError) {
-    console.error(
-      "[welcome-actions] failed to set approved after correction:",
-      statusError,
-    );
-    // Continue — the request is in DB; HR can still resolve it
+    if (statusError) {
+      console.error(
+        "[welcome-actions] failed to set approved after correction:",
+        statusError,
+      );
+      // Continue — the request is in DB; HR can still resolve it
+    }
   }
 
   await logAudit(
     supabase,
     user.id,
-    "submit_correction_first_review",
+    `submit_correction_${input.scope}`,
     "profile_correction_requests",
     inserted.id,
     { fields_flagged: fields, reason_length: reason.length },
@@ -168,6 +189,7 @@ export async function submitFirstReviewCorrection(
 
   revalidatePath("/welcome");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/profile");
   return { id: inserted.id };
 }
 
@@ -250,6 +272,41 @@ export async function getMyPendingCorrections(): Promise<
 
   if (error) {
     console.error("[welcome-actions] getMyPendingCorrections:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+/**
+ * Recent correction request history (all statuses) — for the
+ * "ประวัติคำขอ" panel on /dashboard/profile.
+ */
+export async function getMyCorrectionHistory(limit = 10): Promise<
+  Array<{
+    id: string;
+    reason_text: string;
+    fields_flagged: string[];
+    scope: "first_review" | "post_approval";
+    status: "pending" | "resolved" | "rejected" | "cancelled";
+    resolver_note: string | null;
+    resolved_at: string | null;
+    created_at: string;
+  }>
+> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  const { data, error } = await supabase
+    .from("profile_correction_requests")
+    .select(
+      "id, reason_text, fields_flagged, scope, status, resolver_note, resolved_at, created_at",
+    )
+    .eq("target_user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[welcome-actions] getMyCorrectionHistory:", error);
     return [];
   }
   return data ?? [];

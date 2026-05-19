@@ -1,4 +1,4 @@
-import { User, Briefcase, GraduationCap, Award } from "lucide-react";
+import { User, Briefcase, GraduationCap, Award, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,7 +57,22 @@ interface Props {
     start_date: string;
     end_date: string | null;
   }>;
+  /** When provided, each section header gets a small "ขอแก้" button that
+   *  pre-fills the correction form with that section's field keys. */
+  onSectionEditClick?: (sectionKey: SectionKey) => void;
+  /** Disable section edit buttons (e.g. when a pending request already
+   *  exists — user shouldn't queue duplicates). */
+  editDisabled?: boolean;
+  /** Tooltip shown when the section edit button is disabled. */
+  editDisabledReason?: string;
 }
+
+export type SectionKey =
+  | "identity"
+  | "position"
+  | "educations"
+  | "decorations"
+  | "admin_positions";
 
 const THAI_MONTHS = [
   "มกราคม",
@@ -99,12 +114,23 @@ export function ProfileOverview({
   educations,
   decorations,
   adminPositions,
+  onSectionEditClick,
+  editDisabled,
+  editDisabledReason,
 }: Props) {
+  const editFor = (key: SectionKey) =>
+    onSectionEditClick
+      ? () => onSectionEditClick(key)
+      : undefined;
+
   return (
     <div className="space-y-6">
       <Section
         icon={<User className="size-4" />}
         title="ข้อมูลส่วนตัว"
+        onEditClick={editFor("identity")}
+        editDisabled={editDisabled}
+        editDisabledReason={editDisabledReason}
         rows={[
           ["ชื่อ-นามสกุล (ไทย)", joinThai(profile)],
           ["ชื่อ-นามสกุล (อังกฤษ)", joinEnglish(profile)],
@@ -119,6 +145,9 @@ export function ProfileOverview({
       <Section
         icon={<Briefcase className="size-4" />}
         title="ข้อมูลตำแหน่ง"
+        onEditClick={editFor("position")}
+        editDisabled={editDisabled}
+        editDisabledReason={editDisabledReason}
         rows={[
           ["ตำแหน่ง", profile.position_title],
           ["เลขที่ตำแหน่ง", profile.position_number],
@@ -132,6 +161,9 @@ export function ProfileOverview({
         icon={<GraduationCap className="size-4" />}
         title="ประวัติการศึกษา"
         count={educations.length}
+        onEditClick={editFor("educations")}
+        editDisabled={editDisabled}
+        editDisabledReason={editDisabledReason}
       >
         {educations.length === 0 ? (
           <Empty text="ยังไม่มีประวัติการศึกษา" />
@@ -174,6 +206,9 @@ export function ProfileOverview({
         icon={<Award className="size-4" />}
         title="เครื่องราชอิสริยาภรณ์"
         count={decorations.length}
+        onEditClick={editFor("decorations")}
+        editDisabled={editDisabled}
+        editDisabledReason={editDisabledReason}
       >
         {decorations.length === 0 ? (
           <Empty text="ยังไม่มีข้อมูล" />
@@ -204,6 +239,9 @@ export function ProfileOverview({
         icon={<Briefcase className="size-4" />}
         title="ประวัติการดำรงตำแหน่งบริหาร"
         count={adminPositions.length}
+        onEditClick={editFor("admin_positions")}
+        editDisabled={editDisabled}
+        editDisabledReason={editDisabledReason}
       >
         {adminPositions.length === 0 ? (
           <Empty text="ยังไม่มีข้อมูล" />
@@ -232,10 +270,16 @@ function Section({
   icon,
   title,
   rows,
+  onEditClick,
+  editDisabled,
+  editDisabledReason,
 }: {
   icon: React.ReactNode;
   title: string;
   rows: Array<[string, string | null | undefined]>;
+  onEditClick?: () => void;
+  editDisabled?: boolean;
+  editDisabledReason?: string;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5">
@@ -243,7 +287,12 @@ function Section({
         <div className="size-8 grid place-items-center rounded-lg bg-primary/10 text-primary">
           {icon}
         </div>
-        <h2 className="font-semibold">{title}</h2>
+        <h2 className="font-semibold flex-1">{title}</h2>
+        <EditButton
+          onClick={onEditClick}
+          disabled={editDisabled}
+          disabledReason={editDisabledReason}
+        />
       </header>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
         {rows.map(([label, value]) => (
@@ -269,11 +318,17 @@ function ListBlock({
   title,
   count,
   children,
+  onEditClick,
+  editDisabled,
+  editDisabledReason,
 }: {
   icon: React.ReactNode;
   title: string;
   count: number;
   children: React.ReactNode;
+  onEditClick?: () => void;
+  editDisabled?: boolean;
+  editDisabledReason?: string;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-5">
@@ -285,9 +340,44 @@ function ListBlock({
         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
           {count} รายการ
         </span>
+        <EditButton
+          onClick={onEditClick}
+          disabled={editDisabled}
+          disabledReason={editDisabledReason}
+        />
       </header>
       {children}
     </section>
+  );
+}
+
+function EditButton({
+  onClick,
+  disabled,
+  disabledReason,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  if (!onClick) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? disabledReason : "ขอแก้ไขข้อมูลในส่วนนี้"}
+      aria-label="ขอแก้ไขข้อมูลในส่วนนี้"
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition",
+        disabled
+          ? "border-border bg-muted/30 text-muted-foreground cursor-not-allowed"
+          : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
+      )}
+    >
+      <Pencil className="size-3" />
+      ขอแก้
+    </button>
   );
 }
 

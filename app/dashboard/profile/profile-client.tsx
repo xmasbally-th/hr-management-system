@@ -3,33 +3,32 @@
 import { useMemo, useState } from "react";
 import { AvatarUpload } from "@/components/avatar-upload";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Eye,
-  User,
-  GraduationCap,
-  Award,
-  Briefcase,
   Bell,
+  Pencil,
+  History,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ProfileOverview } from "@/components/profile-overview";
-import { IdentitySection } from "./_sections/identity-section";
-import { EducationSection } from "./_sections/education-section";
-import { DecorationsSection } from "./_sections/decorations-section";
-import { AdminPositionsSection } from "./_sections/admin-positions-section";
+import {
+  ProfileOverview,
+  type SectionKey,
+} from "@/components/profile-overview";
+import {
+  CorrectionRequestForm,
+  FIELD_LABELS,
+  SECTION_FIELDS,
+} from "@/components/correction-request-form";
 import { NotificationsSection } from "./_sections/notifications-section";
 import type { NotificationType } from "@/lib/notification-types";
 
-type TabKey =
-  | "overview"
-  | "identity"
-  | "education"
-  | "decorations"
-  | "admin"
-  | "notifications";
+type TabKey = "overview" | "history" | "notifications";
 
-// Loose profile shape — the underlying row has many optional/nullable fields
-// and a joined `department`. We accept anything matching this loose contract.
 interface Profile {
   id: string;
   email: string;
@@ -55,6 +54,17 @@ interface Profile {
   current_address?: string | null;
   department?: { id: string; name: string } | null;
   [key: string]: unknown;
+}
+
+interface HistoryItem {
+  id: string;
+  reason_text: string;
+  fields_flagged: string[];
+  scope: "first_review" | "post_approval";
+  status: "pending" | "resolved" | "rejected" | "cancelled";
+  resolver_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
 }
 
 interface Props {
@@ -85,11 +95,11 @@ interface Props {
     start_date: string;
     end_date: string | null;
   }>;
-  departments: Array<{ id: string; name: string }>;
-  employeeTypes: string[];
-  educationLevels: string[];
-  decorationCatalog: Array<{ name: string; abbreviation: string | null }>;
   notificationPrefs: Record<NotificationType, boolean>;
+  /** Pending correction-request count — drives disable state of "ขอแก้" buttons */
+  pendingCorrectionsCount: number;
+  /** Most-recent correction requests (any status) — for the "ประวัติคำขอ" tab */
+  correctionHistory: HistoryItem[];
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -103,41 +113,56 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   approved: { label: "ใช้งานปกติ", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   pending: { label: "รออนุมัติ", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   rejected: { label: "ระงับ", cls: "bg-rose-50 text-rose-700 border-rose-200" },
+  awaiting_confirmation: { label: "รอยืนยันข้อมูล", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  pre_registered: { label: "ยังไม่เข้าระบบ", cls: "bg-slate-50 text-slate-700 border-slate-200" },
 };
 
-// Track which optional fields contribute to completion %
 const COMPLETION_FIELDS = [
-  "title_th",
-  "first_name_th",
-  "last_name_th",
-  "title_en",
-  "first_name_en",
-  "last_name_en",
-  "phone",
-  "position_number",
-  "position_title",
-  "employee_type",
-  "department_id",
-  "education_level",
-  "birth_date",
-  "hire_date",
-  "gender",
-  "current_address",
-  "avatar_url",
+  "title_th","first_name_th","last_name_th",
+  "title_en","first_name_en","last_name_en",
+  "phone","position_number","position_title",
+  "employee_type","department_id","education_level",
+  "birth_date","hire_date","gender","current_address","avatar_url",
 ] as const;
+
+const STATUS_META: Record<
+  HistoryItem["status"],
+  { label: string; cls: string; icon: typeof CheckCircle2 }
+> = {
+  pending: {
+    label: "รอดำเนินการ",
+    cls: "bg-amber-50 text-amber-800 border-amber-200",
+    icon: Clock,
+  },
+  resolved: {
+    label: "ดำเนินการแล้ว",
+    cls: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "ปฏิเสธ",
+    cls: "bg-rose-50 text-rose-800 border-rose-200",
+    icon: XCircle,
+  },
+  cancelled: {
+    label: "ยกเลิก",
+    cls: "bg-slate-50 text-slate-700 border-slate-200",
+    icon: Ban,
+  },
+};
 
 export function ProfileClient({
   profile,
   educations,
   decorations,
   adminPositions,
-  departments,
-  employeeTypes,
-  educationLevels,
-  decorationCatalog,
   notificationPrefs,
+  pendingCorrectionsCount,
+  correctionHistory,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [initialFields, setInitialFields] = useState<string[]>([]);
 
   const completionPct = useMemo(() => {
     const filled = COMPLETION_FIELDS.filter(
@@ -162,12 +187,24 @@ export function ProfileClient({
     cls: "",
   };
 
+  const hasPending = pendingCorrectionsCount > 0;
+  const editDisabledReason = hasPending
+    ? "มีคำขอแก้ไขรอ HR ดำเนินการอยู่แล้ว — โปรดรอให้เสร็จก่อนส่งใหม่"
+    : undefined;
+
+  function openCorrectionDialog(sectionKey?: SectionKey) {
+    setInitialFields(sectionKey ? SECTION_FIELDS[sectionKey] ?? [] : []);
+    setCorrectionOpen(true);
+  }
+
   const tabs: Array<{ key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }> = [
     { key: "overview", label: "ภาพรวม", icon: Eye },
-    { key: "identity", label: "ข้อมูลส่วนตัว", icon: User },
-    { key: "education", label: "ประวัติการศึกษา", icon: GraduationCap, count: educations.length },
-    { key: "decorations", label: "เครื่องราชอิสริยาภรณ์", icon: Award, count: decorations.length },
-    { key: "admin", label: "ประวัติการบริหาร", icon: Briefcase, count: adminPositions.length },
+    {
+      key: "history",
+      label: "ประวัติคำขอ",
+      icon: History,
+      count: correctionHistory.length || undefined,
+    },
     { key: "notifications", label: "การแจ้งเตือน", icon: Bell },
   ];
 
@@ -176,7 +213,8 @@ export function ProfileClient({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">โปรไฟล์ของฉัน</h1>
         <p className="text-muted-foreground text-sm">
-          จัดการข้อมูลส่วนตัว ตำแหน่ง รูปภาพ และประวัติของคุณ
+          ข้อมูลที่ฝ่ายบุคคลบันทึกไว้ในระบบ — หากต้องการแก้ไข
+          กรุณาส่งคำขอให้ฝ่ายบุคคลดำเนินการ
         </p>
       </div>
 
@@ -262,39 +300,147 @@ export function ProfileClient({
       </div>
 
       {/* Content */}
-      <div className={cn(
-        "animate-fade-in",
-        activeTab === "overview"
-          ? "" // overview renders its own card sections
-          : "rounded-xl border border-border bg-card p-5 sm:p-6"
-      )}>
-        {activeTab === "overview" && (
+      {activeTab === "overview" && (
+        <div className="space-y-4 animate-fade-in">
+          {!correctionOpen && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">
+              <div>
+                <div className="font-semibold text-sm">ต้องการแก้ไขข้อมูล?</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ส่งคำขอเพื่อให้ฝ่ายบุคคลตรวจสอบและดำเนินการให้
+                  หรือคลิก &quot;ขอแก้&quot; ที่ส่วนใดส่วนหนึ่งด้านล่าง
+                </p>
+              </div>
+              <Button
+                onClick={() => openCorrectionDialog()}
+                disabled={hasPending}
+                title={editDisabledReason}
+              >
+                <Pencil className="size-4 mr-2" />
+                ขอแก้ไขข้อมูล
+              </Button>
+            </div>
+          )}
+
+          {correctionOpen && (
+            <CorrectionRequestForm
+              scope="post_approval"
+              initialFields={initialFields}
+              onCancel={() => setCorrectionOpen(false)}
+              onSubmitted={() => setCorrectionOpen(false)}
+            />
+          )}
+
           <ProfileOverview
             profile={profile}
             educations={educations}
             decorations={decorations}
             adminPositions={adminPositions}
+            onSectionEditClick={openCorrectionDialog}
+            editDisabled={hasPending || correctionOpen}
+            editDisabledReason={editDisabledReason}
           />
-        )}
-        {activeTab === "identity" && (
-          <IdentitySection
-            profile={profile}
-            departments={departments}
-            employeeTypes={employeeTypes}
-            educationLevels={educationLevels}
-          />
-        )}
-        {activeTab === "education" && (
-          <EducationSection rows={educations} educationLevels={educationLevels} />
-        )}
-        {activeTab === "decorations" && (
-          <DecorationsSection rows={decorations} catalog={decorationCatalog} />
-        )}
-        {activeTab === "admin" && <AdminPositionsSection rows={adminPositions} />}
-        {activeTab === "notifications" && (
+        </div>
+      )}
+
+      {activeTab === "history" && (
+        <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
+          <CorrectionHistoryList items={correctionHistory} />
+        </div>
+      )}
+
+      {activeTab === "notifications" && (
+        <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
           <NotificationsSection initialPrefs={notificationPrefs} />
-        )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── History list ───────────────────────────────────────────────────
+
+const THAI_MONTHS = [
+  "ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.",
+  "ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค.",
+];
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getUTCDate()} ${THAI_MONTHS[d.getUTCMonth()]} ${(d.getUTCFullYear() + 543) % 100}`;
+}
+
+function CorrectionHistoryList({ items }: { items: HistoryItem[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="text-center py-10 text-sm text-muted-foreground italic">
+        ยังไม่มีประวัติคำขอแก้ไข
       </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold text-sm">ประวัติคำขอแก้ไขข้อมูล</h3>
+      <ul className="space-y-3">
+        {items.map((it) => {
+          const meta = STATUS_META[it.status];
+          const Icon = meta.icon;
+          return (
+            <li
+              key={it.id}
+              className="rounded-lg border border-border p-4 space-y-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border",
+                      meta.cls,
+                    )}
+                  >
+                    <Icon className="size-3" />
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {it.scope === "first_review"
+                      ? "ตรวจสอบครั้งแรก"
+                      : "แก้ไขเพิ่มเติม"}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground font-mono">
+                  ส่ง {formatDate(it.created_at)}
+                  {it.resolved_at && <> · จบ {formatDate(it.resolved_at)}</>}
+                </span>
+              </div>
+              {it.fields_flagged.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {it.fields_flagged.map((k) => (
+                    <span
+                      key={k}
+                      className="inline-flex items-center px-1.5 py-px rounded text-xs bg-muted text-muted-foreground"
+                    >
+                      {FIELD_LABELS[k] ?? k}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {it.reason_text}
+              </p>
+              {it.resolver_note && (
+                <div className="mt-2 rounded bg-muted/50 border border-border px-3 py-2 text-xs">
+                  <span className="font-medium text-muted-foreground">
+                    หมายเหตุจาก HR:
+                  </span>{" "}
+                  {it.resolver_note}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -3,23 +3,16 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import {
-  Check,
-  X,
-  Loader2,
-  AlertCircle,
-  Clock,
-  Send,
-  ArrowLeft,
-} from "lucide-react";
+import { Check, X, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { ProfileOverview } from "@/components/profile-overview";
 import {
+  CorrectionRequestForm,
+  FIELD_LABELS,
+} from "@/components/correction-request-form";
+import {
   confirmProfileAsAccurate,
-  submitFirstReviewCorrection,
   cancelMyCorrectionRequest,
 } from "@/lib/actions/welcome-actions";
 
@@ -81,60 +74,6 @@ interface Props {
   pendingCorrection: PendingCorrection | null;
 }
 
-// Field key → Thai label (for the flag-checkboxes in correction form)
-const FIELD_LABELS: Record<string, string> = {
-  title_th: "คำนำหน้า (ไทย)",
-  first_name_th: "ชื่อ (ไทย)",
-  last_name_th: "นามสกุล (ไทย)",
-  title_en: "คำนำหน้า (อังกฤษ)",
-  first_name_en: "ชื่อ (อังกฤษ)",
-  last_name_en: "นามสกุล (อังกฤษ)",
-  phone: "เบอร์โทรศัพท์",
-  gender: "เพศ",
-  birth_date: "วันเดือนปีเกิด",
-  current_address: "ที่อยู่ปัจจุบัน",
-  position_title: "ตำแหน่ง",
-  position_number: "เลขที่ตำแหน่ง",
-  employee_type: "ประเภทบุคลากร",
-  department_id: "สังกัดหน่วยงาน",
-  hire_date: "วันที่เริ่มทำงาน",
-  educations: "ประวัติการศึกษา",
-  decorations: "เครื่องราชอิสริยาภรณ์",
-  admin_positions: "ประวัติการดำรงตำแหน่งบริหาร",
-};
-
-const FIELD_GROUPS: Array<{ title: string; keys: string[] }> = [
-  {
-    title: "ข้อมูลส่วนตัว",
-    keys: [
-      "title_th",
-      "first_name_th",
-      "last_name_th",
-      "title_en",
-      "first_name_en",
-      "last_name_en",
-      "phone",
-      "gender",
-      "birth_date",
-      "current_address",
-    ],
-  },
-  {
-    title: "ข้อมูลตำแหน่ง",
-    keys: [
-      "position_title",
-      "position_number",
-      "employee_type",
-      "department_id",
-      "hire_date",
-    ],
-  },
-  {
-    title: "ข้อมูลอื่นๆ",
-    keys: ["educations", "decorations", "admin_positions"],
-  },
-];
-
 type Mode = "review" | "correction-form" | "awaiting";
 
 export function WelcomeClient({
@@ -151,19 +90,6 @@ export function WelcomeClient({
   const [mode, setMode] = useState<Mode>(initialMode);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // correction form state
-  const [flaggedFields, setFlaggedFields] = useState<Set<string>>(new Set());
-  const [reason, setReason] = useState("");
-
-  function toggleField(key: string) {
-    setFlaggedFields((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
   function handleAccurate() {
     startTransition(async () => {
       try {
@@ -173,29 +99,6 @@ export function WelcomeClient({
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "ยืนยันไม่สำเร็จ");
-      }
-    });
-  }
-
-  function handleSubmitCorrection() {
-    if (reason.trim().length < 10) {
-      toast.error("กรุณาระบุรายละเอียดที่ต้องการแก้ไข (อย่างน้อย 10 ตัวอักษร)");
-      return;
-    }
-    startTransition(async () => {
-      try {
-        await submitFirstReviewCorrection({
-          fields_flagged: Array.from(flaggedFields),
-          reason_text: reason,
-        });
-        toast.success(
-          "ส่งคำขอแก้ไขแล้ว — เริ่มใช้งานระบบได้เลย ฝ่ายบุคคลจะดำเนินการให้",
-          { duration: 5000 },
-        );
-        router.push("/dashboard");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "ส่งคำขอไม่สำเร็จ");
       }
     });
   }
@@ -230,7 +133,8 @@ export function WelcomeClient({
           </p>
         </header>
 
-        {/* Awaiting correction banner */}
+        {/* Awaiting correction banner — legacy path; rarely shown after the
+            UX change that immediately marks users approved on submit. */}
         {mode === "awaiting" && pendingCorrection && (
           <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
             <div className="flex items-start gap-3">
@@ -241,25 +145,18 @@ export function WelcomeClient({
                 </div>
                 <p className="text-sm text-amber-800 mt-1">
                   คุณได้ส่งคำขอแก้ไขข้อมูลแล้วเมื่อ{" "}
-                  {formatThaiDateTime(pendingCorrection.created_at)}{" "}
-                  — กรุณารอการดำเนินการจากฝ่ายบุคคล
-                  หลังจาก HR แก้ไขเรียบร้อยแล้ว คุณจะกลับมายืนยันได้อีกครั้ง
+                  {formatThaiDateTime(pendingCorrection.created_at)}
                 </p>
                 {pendingCorrection.fields_flagged.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-xs font-medium text-amber-900 mb-1.5">
-                      หัวข้อที่แจ้ง:
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {pendingCorrection.fields_flagged.map((k) => (
-                        <span
-                          key={k}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-900 border border-amber-200"
-                        >
-                          {FIELD_LABELS[k] ?? k}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {pendingCorrection.fields_flagged.map((k) => (
+                      <span
+                        key={k}
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-900 border border-amber-200"
+                      >
+                        {FIELD_LABELS[k] ?? k}
+                      </span>
+                    ))}
                   </div>
                 )}
                 <div className="mt-3 rounded-lg bg-white border border-amber-200 p-3">
@@ -328,104 +225,12 @@ export function WelcomeClient({
 
         {/* Correction form mode */}
         {mode === "correction-form" && (
-          <div className="mt-8 space-y-5">
-            <div className="rounded-xl border-2 border-amber-200 bg-amber-50/50 p-5">
-              <div className="flex items-start gap-3 mb-4">
-                <AlertCircle className="size-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-semibold">แจ้งข้อมูลที่ต้องแก้ไขให้ฝ่ายบุคคล</div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    กรุณาเลือกหัวข้อที่ต้องแก้ไข
-                    และระบุรายละเอียดเพื่อให้ฝ่ายบุคคลดำเนินการได้ถูกต้อง
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-semibold mb-2 block">
-                    หัวข้อที่ต้องแก้ไข
-                  </Label>
-                  <div className="space-y-3">
-                    {FIELD_GROUPS.map((g) => (
-                      <div key={g.title}>
-                        <div className="text-xs font-medium text-muted-foreground mb-1.5">
-                          {g.title}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {g.keys.map((k) => (
-                            <label
-                              key={k}
-                              className={cn(
-                                "flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition",
-                                flaggedFields.has(k)
-                                  ? "border-primary bg-primary/5"
-                                  : "border-border hover:bg-muted/50",
-                              )}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={flaggedFields.has(k)}
-                                onChange={() => toggleField(k)}
-                                disabled={isPending}
-                                className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/30"
-                              />
-                              <span className="text-sm">{FIELD_LABELS[k]}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label
-                    htmlFor="reason"
-                    className="text-sm font-semibold mb-2 block"
-                  >
-                    รายละเอียด <span className="text-destructive">*</span>
-                  </Label>
-                  <textarea
-                    id="reason"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="โปรดระบุรายละเอียดข้อมูลที่ต้องการแก้ไข เช่น 'นามสกุลสะกดผิด ที่ถูกต้องคือ ...' หรือ 'เบอร์โทรเปลี่ยนเป็น 089-xxx-xxxx'"
-                    rows={6}
-                    disabled={isPending}
-                    maxLength={2000}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  />
-                  <div className="text-xs text-muted-foreground mt-1 text-right">
-                    {reason.length} / 2000
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setMode("review")}
-                disabled={isPending}
-              >
-                <ArrowLeft className="size-4 mr-2" />
-                ย้อนกลับ
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSubmitCorrection}
-                disabled={isPending || reason.trim().length < 10}
-              >
-                {isPending ? (
-                  <Loader2 className="size-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="size-4 mr-2" />
-                )}
-                ส่งคำขอให้ฝ่ายบุคคล
-              </Button>
-            </div>
+          <div className="mt-8">
+            <CorrectionRequestForm
+              scope="first_review"
+              onCancel={() => setMode("review")}
+              onSubmitted={() => router.push("/dashboard")}
+            />
           </div>
         )}
 
@@ -444,11 +249,6 @@ export function WelcomeClient({
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-/**
- * Deterministic Thai datetime formatter (UTC-based) — used only by the
- * "awaiting" banner; all body data formatting is handled inside
- * <ProfileOverview>.
- */
 const THAI_MONTHS_FULL = [
   "มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
   "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม",
