@@ -117,13 +117,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pre_registered: { label: "ยังไม่เข้าระบบ", cls: "bg-slate-50 text-slate-700 border-slate-200" },
 };
 
-const COMPLETION_FIELDS = [
-  "title_th","first_name_th","last_name_th",
-  "title_en","first_name_en","last_name_en",
-  "phone","position_number","position_title",
-  "employee_type","department_id","education_level",
-  "birth_date","hire_date","gender","current_address","avatar_url",
-] as const;
+import { completionPct as calcCompletionPct } from "@/lib/profile-completion";
 
 const STATUS_META: Record<
   HistoryItem["status"],
@@ -164,12 +158,10 @@ export function ProfileClient({
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [initialFields, setInitialFields] = useState<string[]>([]);
 
-  const completionPct = useMemo(() => {
-    const filled = COMPLETION_FIELDS.filter(
-      (f) => profile[f] && String(profile[f]).trim().length > 0,
-    ).length;
-    return Math.round((filled / COMPLETION_FIELDS.length) * 100);
-  }, [profile]);
+  const completionPct = useMemo(
+    () => calcCompletionPct(profile as Record<string, unknown>),
+    [profile],
+  );
 
   const initials = useMemo(() => {
     const name = profile.full_name ?? profile.email;

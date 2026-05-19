@@ -4,6 +4,11 @@ import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { bulkImportEmployees, type ImportRow, type ImportResult } from "@/lib/actions/user-actions";
+import {
+  validateRow,
+  REQUIRED_FIELDS,
+  REQUIRED_FIELD_LABELS,
+} from "@/lib/import-validation";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -49,6 +54,7 @@ const EXPECTED_HEADERS = [
   "role",
 ] as const;
 
+
 export function ImportClient() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +64,8 @@ export function ImportClient() {
   const [fileName, setFileName] = useState<string>("");
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
+  /** Map row index → list of validation errors */
+  const [rowErrors, setRowErrors] = useState<Record<number, string[]>>({});
   const [result, setResult] = useState<ImportResult | null>(null);
 
   function reset() {
@@ -65,6 +73,7 @@ export function ImportClient() {
     setFileName("");
     setRows([]);
     setParseErrors([]);
+    setRowErrors({});
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -112,7 +121,17 @@ export function ImportClient() {
           errs.push(`มี ${parsed.length} แถว — เกินขีดจำกัด 500 แถวต่อครั้ง`);
         }
 
+        // Per-row validation pass — required fields, email format,
+        // duplicates within batch, date format, role allowlist.
+        const rowErrMap: Record<number, string[]> = {};
+        const seenEmails = new Map<string, number>();
+        parsed.forEach((row, idx) => {
+          const rowErrs = validateRow(row, idx, seenEmails);
+          if (rowErrs.length > 0) rowErrMap[idx] = rowErrs;
+        });
+
         setParseErrors(errs);
+        setRowErrors(rowErrMap);
         setRows(parsed);
         setStep("preview");
       },
@@ -130,6 +149,12 @@ export function ImportClient() {
     }
     if (parseErrors.length > 0) {
       toast.error("กรุณาแก้ไขปัญหาในไฟล์ก่อน");
+      return;
+    }
+    if (Object.keys(rowErrors).length > 0) {
+      toast.error(
+        `มี ${Object.keys(rowErrors).length} แถวที่ข้อมูลไม่ครบหรือไม่ถูกต้อง — แก้ไขในไฟล์แล้วอัปโหลดใหม่`,
+      );
       return;
     }
 
@@ -213,8 +238,24 @@ export function ImportClient() {
 
   // ─── Preview step ───────────────────────────────────────────────────
   if (step === "preview") {
-    const preview = rows.slice(0, 10);
-    const canConfirm = parseErrors.length === 0 && rows.length > 0;
+    const invalidRowCount = Object.keys(rowErrors).length;
+    const validRowCount = rows.length - invalidRowCount;
+
+    // When there are invalid rows, prioritise showing those so HR can
+    // pinpoint what to fix. Otherwise show the first 10 valid rows.
+    const invalidIndices = Object.keys(rowErrors)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const preview =
+      invalidRowCount > 0
+        ? invalidIndices.slice(0, 10).map((i) => ({ row: rows[i], index: i }))
+        : rows.slice(0, 10).map((row, index) => ({ row, index }));
+
+    const canConfirm =
+      parseErrors.length === 0 &&
+      rows.length > 0 &&
+      invalidRowCount === 0;
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -223,6 +264,16 @@ export function ImportClient() {
               <FileSpreadsheet className="h-4 w-4 inline mr-1" />
               <span className="font-mono text-xs">{fileName}</span> ·{" "}
               <span className="font-semibold">{rows.length} แถว</span>
+              {invalidRowCount > 0 && (
+                <span className="text-destructive ml-2">
+                  · มีปัญหา {invalidRowCount} แถว
+                </span>
+              )}
+              {invalidRowCount === 0 && rows.length > 0 && (
+                <span className="text-emerald-700 ml-2">
+                  · ตรวจสอบผ่าน {validRowCount} แถว
+                </span>
+              )}
             </div>
           </div>
           <Button variant="outline" onClick={reset} disabled={isPending}>
@@ -235,7 +286,7 @@ export function ImportClient() {
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-destructive">
               <AlertCircle className="h-4 w-4" />
-              พบปัญหา {parseErrors.length} รายการ
+              ปัญหาระดับไฟล์ {parseErrors.length} รายการ
             </div>
             <ul className="text-xs text-destructive/80 list-disc pl-5">
               {parseErrors.map((e, i) => (
@@ -245,9 +296,24 @@ export function ImportClient() {
           </div>
         )}
 
+        {invalidRowCount > 0 && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-1">
+            <div className="flex items-center gap-2 text-sm font-medium text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              {invalidRowCount} แถวข้อมูลไม่ครบหรือไม่ถูกต้อง — แก้ไขในไฟล์แล้วอัปโหลดใหม่
+            </div>
+            <p className="text-xs text-destructive/80">
+              ฟิลด์ที่บังคับ:{" "}
+              {REQUIRED_FIELDS.map((f) => REQUIRED_FIELD_LABELS[f]).join(" · ")}
+            </p>
+          </div>
+        )}
+
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border text-sm font-medium">
-            ตัวอย่าง 10 แถวแรก
+            {invalidRowCount > 0
+              ? `แถวที่มีปัญหา (แสดง ${preview.length} จาก ${invalidRowCount})`
+              : `ตัวอย่าง 10 แถวแรก`}
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -259,33 +325,61 @@ export function ImportClient() {
                   <TableHead className="text-xs">ตำแหน่ง</TableHead>
                   <TableHead className="text-xs">แผนก</TableHead>
                   <TableHead className="text-xs">role</TableHead>
+                  <TableHead className="text-xs">ข้อผิดพลาด</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {preview.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-xs font-mono text-muted-foreground">
-                      {i + 1}
-                    </TableCell>
-                    <TableCell className="text-xs font-mono">{r.email}</TableCell>
-                    <TableCell className="text-xs">
-                      {[r.title_th, r.first_name_th, r.last_name_th]
-                        .filter(Boolean)
-                        .join(" ") || "—"}
-                    </TableCell>
-                    <TableCell className="text-xs">{r.position_title || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.department_name || "—"}</TableCell>
-                    <TableCell className="text-xs font-mono">
-                      {r.role || "employee"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {preview.map(({ row: r, index }) => {
+                  const errs = rowErrors[index] ?? [];
+                  const hasErr = errs.length > 0;
+                  return (
+                    <TableRow
+                      key={index}
+                      className={cn(hasErr && "bg-destructive/5")}
+                    >
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">{r.email}</TableCell>
+                      <TableCell className="text-xs">
+                        {[r.title_th, r.first_name_th, r.last_name_th]
+                          .filter(Boolean)
+                          .join(" ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.position_title || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.department_name || "—"}</TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {r.role || "employee"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {hasErr ? (
+                          <div className="space-y-0.5">
+                            {errs.map((e, i) => (
+                              <div
+                                key={i}
+                                className="inline-flex items-center gap-1 text-destructive"
+                              >
+                                <XCircle className="size-3 shrink-0" />
+                                {e}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <CheckCircle2 className="size-3" />
+                            OK
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
-          {rows.length > 10 && (
+          {invalidRowCount === 0 && rows.length > 10 && (
             <div className="px-4 py-2 text-xs text-muted-foreground border-t border-border">
-              ... และอีก {rows.length - 10} แถว
+              ... และอีก {rows.length - 10} แถว (ทั้งหมดผ่านการตรวจสอบ)
             </div>
           )}
         </div>
@@ -300,7 +394,7 @@ export function ImportClient() {
             ) : (
               <CheckCircle2 className="h-4 w-4 mr-2" />
             )}
-            ยืนยันการนำเข้า ({rows.length} แถว)
+            ยืนยันการนำเข้า ({validRowCount} แถว)
           </Button>
         </div>
       </div>

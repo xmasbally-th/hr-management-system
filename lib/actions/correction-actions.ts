@@ -382,3 +382,35 @@ export async function getPendingCorrectionCount(): Promise<number> {
   }
   return countByStatus(supabase, "pending");
 }
+
+/**
+ * Pending-correction counts grouped by target_user_id — used by the
+ * HR users table to show a badge next to each row.
+ */
+export async function getPendingCorrectionCountsByUser(): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  try {
+    await checkHrAdmin(supabase);
+  } catch {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("profile_correction_requests")
+    .select("target_user_id")
+    .eq("status", "pending");
+
+  if (error) {
+    console.error(
+      "[correction-actions] getPendingCorrectionCountsByUser failed:",
+      error,
+    );
+    return {};
+  }
+
+  const map: Record<string, number> = {};
+  for (const row of data ?? []) {
+    map[row.target_user_id] = (map[row.target_user_id] ?? 0) + 1;
+  }
+  return map;
+}
