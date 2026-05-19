@@ -370,6 +370,210 @@ export async function rejectCorrectionRequest(
   revalidatePath("/dashboard");
 }
 
+export interface BulkActionResult {
+  /** Number of requests successfully transitioned to resolved/rejected. */
+  successCount: number;
+  /** IDs that were skipped along with the reason — e.g. already resolved
+   *  by another HR before this batch landed. */
+  failed: Array<{ id: string; reason: string }>;
+}
+
+/**
+ * Bulk-resolve a set of pending correction requests. Skips rows whose
+ * status changed between fetch and action (e.g. another HR already
+ * handled them). Returns a summary so the UI can show per-row outcome.
+ */
+export async function bulkResolveCorrectionRequests(
+  ids: string[],
+  note?: string,
+): Promise<BulkActionResult> {
+  const supabase = await createClient();
+  const actorId = await checkHrAdmin(supabase);
+  checkRateLimit(actorId);
+
+  const cleaned = Array.from(new Set(ids.filter((id) => typeof id === "string" && id)));
+  if (cleaned.length === 0) {
+    throw new Error("กรุณาเลือกอย่างน้อย 1 รายการ");
+  }
+  if (cleaned.length > 50) {
+    throw new Error("เลือกได้ครั้งละไม่เกิน 50 รายการ");
+  }
+
+  const trimmedNote = note?.trim() ? note.trim() : null;
+  const failed: BulkActionResult["failed"] = [];
+  let successCount = 0;
+
+  // Look up all rows first to filter ones that are still pending
+  const { data: rows } = await supabase
+    .from("profile_correction_requests")
+    .select("id, target_user_id, status")
+    .in("id", cleaned);
+
+  const stillPending = (rows ?? []).filter((r) => r.status === "pending");
+  const stalledIds = cleaned.filter(
+    (id) => !stillPending.some((r) => r.id === id),
+  );
+  for (const id of stalledIds) {
+    failed.push({ id, reason: "ดำเนินการโดยผู้อื่นแล้วหรือไม่พบ" });
+  }
+
+  // Process in parallel — resolveCorrectionRequest per row gives us
+  // notify + audit for free.
+  const now = new Date().toISOString();
+  await Promise.all(
+    stillPending.map(async (row) => {
+      try {
+        const { error } = await supabase
+          .from("profile_correction_requests")
+          .update({
+            status: "resolved",
+            resolver_note: trimmedNote,
+            resolved_by: actorId,
+            resolved_at: now,
+          })
+          .eq("id", row.id)
+          .eq("status", "pending"); // race guard
+
+        if (error) {
+          failed.push({ id: row.id, reason: error.message });
+          return;
+        }
+
+        await logAudit(
+          supabase,
+          actorId,
+          "resolve_correction_request",
+          "profile_correction_requests",
+          row.id,
+          { target: row.target_user_id, has_note: !!trimmedNote, bulk: true },
+        );
+
+        try {
+          await createNotificationInternal(
+            supabase,
+            row.target_user_id,
+            "correction_resolved",
+            "ฝ่ายบุคคลดำเนินการแก้ไขข้อมูลตามคำขอของคุณเรียบร้อยแล้ว",
+          );
+        } catch {
+          // ignore notification failures — request is resolved either way
+        }
+
+        successCount++;
+      } catch (err) {
+        failed.push({
+          id: row.id,
+          reason: err instanceof Error ? err.message : "unknown",
+        });
+      }
+    }),
+  );
+
+  revalidatePath("/dashboard/hr/profile-corrections");
+  revalidatePath("/dashboard");
+  return { successCount, failed };
+}
+
+/**
+ * Bulk-reject a set of pending correction requests. Reason is required
+ * (≥5 chars) and is sent to every target user. Same skip-stalled behavior
+ * as bulkResolveCorrectionRequests.
+ */
+export async function bulkRejectCorrectionRequests(
+  ids: string[],
+  note: string,
+): Promise<BulkActionResult> {
+  const supabase = await createClient();
+  const actorId = await checkHrAdmin(supabase);
+  checkRateLimit(actorId);
+
+  const trimmed = note?.trim() ?? "";
+  if (trimmed.length < 5) {
+    throw new Error("กรุณาระบุเหตุผลในการปฏิเสธอย่างน้อย 5 ตัวอักษร");
+  }
+  if (trimmed.length > 2000) {
+    throw new Error("เหตุผลยาวเกินกำหนด (สูงสุด 2000 ตัวอักษร)");
+  }
+
+  const cleaned = Array.from(new Set(ids.filter((id) => typeof id === "string" && id)));
+  if (cleaned.length === 0) {
+    throw new Error("กรุณาเลือกอย่างน้อย 1 รายการ");
+  }
+  if (cleaned.length > 50) {
+    throw new Error("เลือกได้ครั้งละไม่เกิน 50 รายการ");
+  }
+
+  const failed: BulkActionResult["failed"] = [];
+  let successCount = 0;
+
+  const { data: rows } = await supabase
+    .from("profile_correction_requests")
+    .select("id, target_user_id, status")
+    .in("id", cleaned);
+
+  const stillPending = (rows ?? []).filter((r) => r.status === "pending");
+  const stalledIds = cleaned.filter(
+    (id) => !stillPending.some((r) => r.id === id),
+  );
+  for (const id of stalledIds) {
+    failed.push({ id, reason: "ดำเนินการโดยผู้อื่นแล้วหรือไม่พบ" });
+  }
+
+  const now = new Date().toISOString();
+  await Promise.all(
+    stillPending.map(async (row) => {
+      try {
+        const { error } = await supabase
+          .from("profile_correction_requests")
+          .update({
+            status: "rejected",
+            resolver_note: trimmed,
+            resolved_by: actorId,
+            resolved_at: now,
+          })
+          .eq("id", row.id)
+          .eq("status", "pending");
+
+        if (error) {
+          failed.push({ id: row.id, reason: error.message });
+          return;
+        }
+
+        await logAudit(
+          supabase,
+          actorId,
+          "reject_correction_request",
+          "profile_correction_requests",
+          row.id,
+          { target: row.target_user_id, bulk: true },
+        );
+
+        try {
+          await createNotificationInternal(
+            supabase,
+            row.target_user_id,
+            "correction_rejected",
+            `คำขอแก้ไขข้อมูลของคุณไม่ได้รับการอนุมัติ — เหตุผล: ${trimmed}`,
+          );
+        } catch {
+          // ignore
+        }
+
+        successCount++;
+      } catch (err) {
+        failed.push({
+          id: row.id,
+          reason: err instanceof Error ? err.message : "unknown",
+        });
+      }
+    }),
+  );
+
+  revalidatePath("/dashboard/hr/profile-corrections");
+  revalidatePath("/dashboard");
+  return { successCount, failed };
+}
+
 /**
  * Light-weight pending count for nav badges / dashboard tiles.
  */

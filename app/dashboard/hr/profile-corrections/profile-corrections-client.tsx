@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import {
   resolveCorrectionRequest,
   rejectCorrectionRequest,
+  bulkResolveCorrectionRequests,
+  bulkRejectCorrectionRequests,
   type CorrectionListRow,
   type ListResult,
 } from "@/lib/actions/correction-actions";
@@ -93,6 +95,85 @@ export function ProfileCorrectionsClient({
   const [rejectOpen, setRejectOpen] = useState<CorrectionListRow | null>(null);
   const [resolveNote, setResolveNote] = useState("");
   const [rejectNote, setRejectNote] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** Bulk dialog kind — null = closed, 'resolve' or 'reject' = open with intent */
+  const [bulkOpen, setBulkOpen] = useState<null | "resolve" | "reject">(null);
+  const [bulkNote, setBulkNote] = useState("");
+
+  // Only pending rows are selectable for bulk action
+  const pendingIdsOnPage = result.data
+    .filter((r) => r.status === "pending")
+    .map((r) => r.id);
+  const allOnPageSelected =
+    pendingIdsOnPage.length > 0 &&
+    pendingIdsOnPage.every((id) => selectedIds.has(id));
+  const someOnPageSelected =
+    pendingIdsOnPage.some((id) => selectedIds.has(id)) && !allOnPageSelected;
+  const showBulkUI = currentStatus === "pending" && pendingIdsOnPage.length > 0;
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        for (const id of pendingIdsOnPage) next.delete(id);
+      } else {
+        for (const id of pendingIdsOnPage) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function handleBulk() {
+    if (!bulkOpen) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.error("ยังไม่ได้เลือกรายการ");
+      return;
+    }
+    if (bulkOpen === "reject" && bulkNote.trim().length < 5) {
+      toast.error("กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const res =
+          bulkOpen === "resolve"
+            ? await bulkResolveCorrectionRequests(ids, bulkNote.trim() || undefined)
+            : await bulkRejectCorrectionRequests(ids, bulkNote);
+
+        if (res.successCount > 0) {
+          toast.success(
+            `${bulkOpen === "resolve" ? "ทำเครื่องหมายเสร็จสิ้น" : "ปฏิเสธ"} ${res.successCount} รายการ`,
+          );
+        }
+        if (res.failed.length > 0) {
+          toast.error(
+            `ข้ามไป ${res.failed.length} รายการ (ดำเนินการโดยผู้อื่นแล้ว)`,
+          );
+        }
+        setBulkOpen(null);
+        setBulkNote("");
+        clearSelection();
+        window.dispatchEvent(new CustomEvent("corrections-updated"));
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
+      }
+    });
+  }
 
   function navigate(updates: Record<string, string>) {
     const params = new URLSearchParams();
@@ -244,6 +325,52 @@ export function ProfileCorrectionsClient({
         </form>
       </div>
 
+      {/* Bulk action bar — shown when at least one row is selected */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-2 z-10 rounded-xl border-2 border-primary bg-primary/5 px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Check className="size-4 text-primary" />
+            เลือก {selectedIds.size} รายการ
+          </div>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+            onClick={() => {
+              setBulkOpen("resolve");
+              setBulkNote("");
+            }}
+            disabled={isPending}
+          >
+            <Check className="size-3 mr-1" />
+            เสร็จสิ้นทั้งหมด ({selectedIds.size})
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/5"
+            onClick={() => {
+              setBulkOpen("reject");
+              setBulkNote("");
+            }}
+            disabled={isPending}
+          >
+            <X className="size-3 mr-1" />
+            ปฏิเสธทั้งหมด
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs"
+            onClick={clearSelection}
+            disabled={isPending}
+          >
+            ยกเลิกการเลือก
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {result.data.length === 0 ? (
@@ -258,6 +385,22 @@ export function ProfileCorrectionsClient({
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b border-border">
                 <tr>
+                  {showBulkUI && (
+                    <th className="w-10 px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someOnPageSelected;
+                        }}
+                        onChange={toggleAllOnPage}
+                        disabled={isPending}
+                        title="เลือกทั้งหมดในหน้า"
+                        aria-label="เลือกทั้งหมดในหน้า"
+                        className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/30"
+                      />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3 font-medium">ผู้ใช้</th>
                   <th className="text-left px-4 py-3 font-medium">ฟิลด์ที่แจ้ง</th>
                   <th className="text-left px-4 py-3 font-medium">สถานะ</th>
@@ -269,8 +412,31 @@ export function ProfileCorrectionsClient({
                 {result.data.map((r) => {
                   const meta = STATUS_META[r.status];
                   const Icon = meta.icon;
+                  const checked = selectedIds.has(r.id);
                   return (
-                    <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        "border-b border-border last:border-0 hover:bg-muted/20",
+                        checked && "bg-primary/5",
+                      )}
+                    >
+                      {showBulkUI && (
+                        <td className="px-3 py-3 align-top">
+                          {r.status === "pending" ? (
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleRow(r.id)}
+                              disabled={isPending}
+                              aria-label={`เลือก ${r.target_user_name ?? r.id}`}
+                              className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/30 mt-0.5"
+                            />
+                          ) : (
+                            <span className="inline-block size-4" />
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 align-top">
                         <div className="font-medium">{r.target_user_name ?? "—"}</div>
                         <div className="text-xs text-muted-foreground font-mono">
@@ -501,6 +667,85 @@ export function ProfileCorrectionsClient({
               disabled={isPending}
             >
               {isPending ? "กำลังบันทึก..." : "ปฏิเสธ"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk action dialog — resolve OR reject many at once */}
+      <AlertDialog
+        open={bulkOpen !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkOpen(null);
+            setBulkNote("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkOpen === "resolve"
+                ? `ทำเครื่องหมายเสร็จสิ้น ${selectedIds.size} รายการ`
+                : `ปฏิเสธคำขอ ${selectedIds.size} รายการ`}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              คุณกำลังจะ
+              {bulkOpen === "resolve"
+                ? " ดำเนินการเสร็จสิ้นและแจ้งผู้ใช้ทั้งหมดในรายการที่เลือก"
+                : " ปฏิเสธคำขอและแจ้งผู้ใช้ทั้งหมดในรายการที่เลือก"}
+            </p>
+            <div>
+              <Label className="text-xs">
+                {bulkOpen === "resolve"
+                  ? "หมายเหตุ (ถ้ามี — ส่งให้ผู้ใช้ทุกคน)"
+                  : (
+                      <>
+                        เหตุผล <span className="text-destructive">*</span>{" "}
+                        (ส่งให้ผู้ใช้ทุกคน · อย่างน้อย 5 ตัวอักษร)
+                      </>
+                    )}
+              </Label>
+              <textarea
+                value={bulkNote}
+                onChange={(e) => setBulkNote(e.target.value)}
+                placeholder={
+                  bulkOpen === "resolve"
+                    ? "เช่น 'แก้ไขข้อมูลตามคำขอเรียบร้อย'"
+                    : "เช่น 'ข้อมูลเดิมถูกต้องแล้ว — กรุณาตรวจสอบที่บัตรประชาชน'"
+                }
+                rows={4}
+                maxLength={2000}
+                disabled={isPending}
+                className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {bulkOpen === "reject" && (
+                <div className="text-xs text-muted-foreground mt-1 text-right">
+                  {bulkNote.length} / 2000
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              หมายเหตุ: รายการที่คนอื่นเพิ่งดำเนินการจะถูกข้ามอัตโนมัติ
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              variant={bulkOpen === "reject" ? "destructive" : "default"}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBulk();
+              }}
+              disabled={isPending}
+            >
+              {isPending
+                ? "กำลังบันทึก..."
+                : bulkOpen === "resolve"
+                  ? "ยืนยันเสร็จสิ้น"
+                  : "ยืนยันปฏิเสธ"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
