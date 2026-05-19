@@ -18,12 +18,14 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, UserCheck, UserX, Shield, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal, UserCheck, UserX, Shield, Loader2, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
 
 export function UserActionsMenu({ profile }: { profile: { id: string; status: ProfileStatus; role: UserRole; full_name?: string } }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmAction, setConfirmAction] = useState<{
     type: "status" | "role";
@@ -72,6 +74,16 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>จัดการผู้ใช้</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onClick={() => router.push(`/dashboard/hr/users/${profile.id}/edit`)}
+          className="cursor-pointer"
+        >
+          <Pencil className="mr-2 h-4 w-4 text-primary" />
+          แก้ไขโปรไฟล์
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         {/* Status Actions */}

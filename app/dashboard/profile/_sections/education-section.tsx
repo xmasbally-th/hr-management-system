@@ -8,6 +8,11 @@ import {
   deleteEducation,
   type EducationInput,
 } from "@/lib/actions/profile-actions";
+import {
+  addEducationAsHr,
+  updateEducationAsHr,
+  deleteEducationAsHr,
+} from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +50,8 @@ interface Props {
   rows: EducationRow[];
   /** From education_levels catalog. Falls back to a small built-in list if empty. */
   educationLevels: string[];
+  /** When provided, mutations call HR actions targeting this user. */
+  targetUserId?: string;
 }
 
 const FALLBACK_LEVELS = [
@@ -66,7 +73,7 @@ const BLANK: EducationInput = {
   major_field: "",
 };
 
-export function EducationSection({ rows, educationLevels }: Props) {
+export function EducationSection({ rows, educationLevels, targetUserId }: Props) {
   const levelOptions = educationLevels.length > 0 ? educationLevels : FALLBACK_LEVELS;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -103,10 +110,18 @@ export function EducationSection({ rows, educationLevels }: Props) {
     startTransition(async () => {
       try {
         if (editingId) {
-          await updateEducation(editingId, form);
+          if (targetUserId) {
+            await updateEducationAsHr(targetUserId, editingId, form);
+          } else {
+            await updateEducation(editingId, form);
+          }
           toast.success("บันทึกการแก้ไขแล้ว");
         } else {
-          await addEducation(form);
+          if (targetUserId) {
+            await addEducationAsHr(targetUserId, form);
+          } else {
+            await addEducation(form);
+          }
           toast.success("เพิ่มประวัติการศึกษาแล้ว");
         }
         cancel();
@@ -123,7 +138,11 @@ export function EducationSection({ rows, educationLevels }: Props) {
     setDeleteId(null);
     startTransition(async () => {
       try {
-        await deleteEducation(id);
+        if (targetUserId) {
+          await deleteEducationAsHr(targetUserId, id);
+        } else {
+          await deleteEducation(id);
+        }
         toast.success("ลบรายการแล้ว");
         router.refresh();
       } catch (err) {

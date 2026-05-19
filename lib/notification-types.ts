@@ -16,6 +16,7 @@ export const ALLOWED_NOTIFICATION_TYPES = [
   "account_approved",
   "account_rejected",
   "account_pending",
+  "profile_edited_by_hr",
 ] as const;
 
 export type NotificationType = (typeof ALLOWED_NOTIFICATION_TYPES)[number];
@@ -28,7 +29,7 @@ export interface NotificationTypeMeta {
   type: NotificationType;
   label: string;
   description: string;
-  group: "leave" | "travel" | "account";
+  group: "leave" | "travel" | "account" | "profile";
 }
 
 /**
@@ -45,4 +46,5 @@ export const NOTIFICATION_TYPE_META: NotificationTypeMeta[] = [
   { type: "account_approved", label: "บัญชีของฉันได้รับการอนุมัติ", description: "แจ้งเมื่อ HR อนุมัติบัญชีของคุณ", group: "account" },
   { type: "account_rejected", label: "บัญชีของฉันถูกระงับ", description: "แจ้งเมื่อบัญชีของคุณถูกระงับการใช้งาน", group: "account" },
   { type: "account_pending", label: "บัญชีของฉันกลับเป็นรออนุมัติ", description: "แจ้งเมื่อสถานะบัญชีของคุณเปลี่ยนกลับเป็น pending", group: "account" },
+  { type: "profile_edited_by_hr", label: "ฝ่ายบุคคลแก้ไขข้อมูลโปรไฟล์ของฉัน", description: "แจ้งเมื่อ HR/Admin มีการแก้ไขข้อมูลในโปรไฟล์ของคุณ", group: "profile" },
 ];

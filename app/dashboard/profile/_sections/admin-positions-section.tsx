@@ -8,6 +8,11 @@ import {
   deleteAdminPosition,
   type AdminPositionInput,
 } from "@/lib/actions/profile-actions";
+import {
+  addAdminPositionAsHr,
+  updateAdminPositionAsHr,
+  deleteAdminPositionAsHr,
+} from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +39,8 @@ interface AdminPositionRow {
 
 interface Props {
   rows: AdminPositionRow[];
+  /** When provided, mutations call HR actions targeting this user. */
+  targetUserId?: string;
 }
 
 const BLANK: AdminPositionInput = {
@@ -44,7 +51,7 @@ const BLANK: AdminPositionInput = {
   end_date: "",
 };
 
-export function AdminPositionsSection({ rows }: Props) {
+export function AdminPositionsSection({ rows, targetUserId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -78,10 +85,18 @@ export function AdminPositionsSection({ rows }: Props) {
     startTransition(async () => {
       try {
         if (editingId) {
-          await updateAdminPosition(editingId, form);
+          if (targetUserId) {
+            await updateAdminPositionAsHr(targetUserId, editingId, form);
+          } else {
+            await updateAdminPosition(editingId, form);
+          }
           toast.success("บันทึกการแก้ไขแล้ว");
         } else {
-          await addAdminPosition(form);
+          if (targetUserId) {
+            await addAdminPositionAsHr(targetUserId, form);
+          } else {
+            await addAdminPosition(form);
+          }
           toast.success("เพิ่มประวัติการบริหารแล้ว");
         }
         cancel();
@@ -98,7 +113,11 @@ export function AdminPositionsSection({ rows }: Props) {
     setDeleteId(null);
     startTransition(async () => {
       try {
-        await deleteAdminPosition(id);
+        if (targetUserId) {
+          await deleteAdminPositionAsHr(targetUserId, id);
+        } else {
+          await deleteAdminPosition(id);
+        }
         toast.success("ลบรายการแล้ว");
         router.refresh();
       } catch (err) {

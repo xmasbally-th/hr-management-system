@@ -6,6 +6,7 @@ import {
   updateMyProfile,
   type UpdateMyProfileInput,
 } from "@/lib/actions/profile-actions";
+import { updateProfileAsHr } from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,12 @@ interface Props {
    * history with degree + major is managed in the "ประวัติการศึกษา" tab.
    */
   educationLevels?: string[];
+  /**
+   * When provided, the section saves via the HR action that targets this
+   * user. Used by /dashboard/hr/users/[id]/edit. When omitted, the
+   * section saves to the current authenticated user.
+   */
+  targetUserId?: string;
 }
 
 const TITLE_TH = ["นาย", "นาง", "นางสาว", "ผศ.", "รศ.", "ศ.", "ดร.", "ผศ.ดร.", "รศ.ดร.", "ศ.ดร."];
@@ -65,6 +72,7 @@ export function IdentitySection({
   profile,
   departments,
   employeeTypes,
+  targetUserId,
 }: Props) {
   const employeeTypeOptions =
     employeeTypes.length > 0 ? employeeTypes : FALLBACK_EMPLOYEE_TYPES;
@@ -98,7 +106,11 @@ export function IdentitySection({
     e.preventDefault();
     startTransition(async () => {
       try {
-        await updateMyProfile(form);
+        if (targetUserId) {
+          await updateProfileAsHr(targetUserId, form);
+        } else {
+          await updateMyProfile(form);
+        }
         toast.success("บันทึกข้อมูลแล้ว");
         router.refresh();
       } catch (err) {

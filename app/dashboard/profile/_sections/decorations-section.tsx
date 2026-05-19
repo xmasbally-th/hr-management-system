@@ -8,6 +8,11 @@ import {
   deleteDecoration,
   type DecorationInput,
 } from "@/lib/actions/profile-actions";
+import {
+  addDecorationAsHr,
+  updateDecorationAsHr,
+  deleteDecorationAsHr,
+} from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +46,8 @@ interface Props {
   rows: DecorationRow[];
   /** From master-data catalog — used as datalist autocomplete. */
   catalog?: CatalogEntry[];
+  /** When provided, mutations call HR actions targeting this user. */
+  targetUserId?: string;
 }
 
 const BLANK: DecorationInput = {
@@ -51,7 +58,7 @@ const BLANK: DecorationInput = {
   position_at_grant: "",
 };
 
-export function DecorationsSection({ rows, catalog = [] }: Props) {
+export function DecorationsSection({ rows, catalog = [], targetUserId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
@@ -85,10 +92,18 @@ export function DecorationsSection({ rows, catalog = [] }: Props) {
     startTransition(async () => {
       try {
         if (editingId) {
-          await updateDecoration(editingId, form);
+          if (targetUserId) {
+            await updateDecorationAsHr(targetUserId, editingId, form);
+          } else {
+            await updateDecoration(editingId, form);
+          }
           toast.success("บันทึกการแก้ไขแล้ว");
         } else {
-          await addDecoration(form);
+          if (targetUserId) {
+            await addDecorationAsHr(targetUserId, form);
+          } else {
+            await addDecoration(form);
+          }
           toast.success("เพิ่มเครื่องราชอิสริยาภรณ์แล้ว");
         }
         cancel();
@@ -105,7 +120,11 @@ export function DecorationsSection({ rows, catalog = [] }: Props) {
     setDeleteId(null);
     startTransition(async () => {
       try {
-        await deleteDecoration(id);
+        if (targetUserId) {
+          await deleteDecorationAsHr(targetUserId, id);
+        } else {
+          await deleteDecoration(id);
+        }
         toast.success("ลบรายการแล้ว");
         router.refresh();
       } catch (err) {
