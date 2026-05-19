@@ -19,6 +19,8 @@ export const ALLOWED_NOTIFICATION_TYPES = [
   "profile_edited_by_hr",
   "correction_resolved",
   "correction_rejected",
+  "user_profile_confirmed",
+  "new_correction_request",
 ] as const;
 
 export type NotificationType = (typeof ALLOWED_NOTIFICATION_TYPES)[number];
@@ -31,7 +33,7 @@ export interface NotificationTypeMeta {
   type: NotificationType;
   label: string;
   description: string;
-  group: "leave" | "travel" | "account" | "profile";
+  group: "leave" | "travel" | "account" | "profile" | "hr_inbox";
 }
 
 /**
@@ -51,4 +53,6 @@ export const NOTIFICATION_TYPE_META: NotificationTypeMeta[] = [
   { type: "profile_edited_by_hr", label: "ฝ่ายบุคคลแก้ไขข้อมูลโปรไฟล์ของฉัน", description: "แจ้งเมื่อ HR/Admin มีการแก้ไขข้อมูลในโปรไฟล์ของคุณ", group: "profile" },
   { type: "correction_resolved", label: "คำขอแก้ไขของฉันได้รับการดำเนินการ", description: "แจ้งเมื่อ HR ดำเนินการคำขอแก้ไขข้อมูลของคุณเสร็จสิ้น", group: "profile" },
   { type: "correction_rejected", label: "คำขอแก้ไขของฉันถูกปฏิเสธ", description: "แจ้งเมื่อ HR ปฏิเสธคำขอแก้ไขข้อมูลของคุณ", group: "profile" },
+  { type: "user_profile_confirmed", label: "มีผู้ใช้ยืนยันโปรไฟล์ใหม่", description: "[HR/Admin] แจ้งเมื่อผู้ใช้ยืนยันข้อมูลโปรไฟล์ครั้งแรกหลังเข้าสู่ระบบ", group: "hr_inbox" },
+  { type: "new_correction_request", label: "มีคำขอแก้ไขข้อมูลใหม่", description: "[HR/Admin] แจ้งเมื่อผู้ใช้ส่งคำขอแก้ไขข้อมูลโปรไฟล์", group: "hr_inbox" },
 ];

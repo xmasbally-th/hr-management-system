@@ -222,3 +222,46 @@ export async function createNotificationInternal(
     console.error("[notification-actions] Failed to create notification:", error.message);
   }
 }
+
+/**
+ * Broadcast a notification to every active HR + Admin user.
+ *
+ * Uses the service-role client to read the profile list across RLS, then
+ * delegates to createNotificationInternal for each recipient (which honors
+ * per-user opt-out preferences).
+ *
+ * Fire-and-forget — callers should not let notification failures break
+ * their main flow.
+ */
+export async function notifyAllHrAdmins(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  type: string,
+  message: string,
+): Promise<void> {
+  if (!VALID_NOTIFICATION_TYPE_SET.has(type)) {
+    console.error("[notification-actions] notifyAllHrAdmins: invalid type", type);
+    return;
+  }
+
+  // Need service-role to bypass RLS — regular employees can't read other
+  // users' profile rows, so neither can the caller's supabase client.
+  const admin = getAdminClient();
+  const { data: recipients, error } = await admin
+    .from("profiles")
+    .select("id")
+    .in("role", ["hr", "admin"])
+    .eq("status", "approved");
+
+  if (error || !recipients) {
+    console.error("[notification-actions] notifyAllHrAdmins: lookup failed", error);
+    return;
+  }
+
+  await Promise.all(
+    recipients.map((r) =>
+      createNotificationInternal(supabase, r.id, type, message).catch((e) => {
+        console.error("[notification-actions] notifyAllHrAdmins: send failed", e);
+      }),
+    ),
+  );
+}

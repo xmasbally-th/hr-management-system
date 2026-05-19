@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
+import { notifyAllHrAdmins } from "./notification-actions";
 
 /**
  * Server actions for the /welcome onboarding gate (Phase P-Onboard).
@@ -66,6 +67,17 @@ export async function confirmProfileAsAccurate(): Promise<void> {
   }
 
   await logAudit(supabase, user.id, "confirm_profile_accurate", "profile", user.id, {});
+
+  // Tell HR/Admin that a new user has finished onboarding — useful for
+  // them to spot-check the imported data is still being kept current.
+  const userLabel = user.user_metadata?.full_name ?? user.email ?? "ผู้ใช้";
+  await notifyAllHrAdmins(
+    supabase,
+    "user_profile_confirmed",
+    `${userLabel} ยืนยันข้อมูลโปรไฟล์เรียบร้อยและเริ่มใช้งานระบบ`,
+  ).catch(() => {
+    // fire-and-forget
+  });
 
   revalidatePath("/welcome");
   revalidatePath("/dashboard");
@@ -199,6 +211,18 @@ export async function submitCorrectionRequest(
     inserted.id,
     { fields_flagged: fields, reason_length: reason.length },
   );
+
+  // Notify all HR/Admin so they can pick up the new pending request.
+  const userLabel = user.user_metadata?.full_name ?? user.email ?? "ผู้ใช้";
+  const fieldsLabel =
+    fields.length > 0 ? ` (${fields.length} ฟิลด์)` : "";
+  await notifyAllHrAdmins(
+    supabase,
+    "new_correction_request",
+    `${userLabel} ส่งคำขอแก้ไขข้อมูลโปรไฟล์${fieldsLabel}`,
+  ).catch(() => {
+    // fire-and-forget
+  });
 
   revalidatePath("/welcome");
   revalidatePath("/dashboard");
