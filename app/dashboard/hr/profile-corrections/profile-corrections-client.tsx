@@ -12,6 +12,8 @@ import {
   type CorrectionListRow,
   type ListResult,
 } from "@/lib/actions/correction-actions";
+import { exportProfileCorrections } from "@/lib/actions/export-actions";
+import { downloadCsv } from "@/lib/export-utils";
 import { getAgingInfo } from "@/lib/correction-aging";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -36,6 +38,7 @@ import {
   X,
   Loader2,
   Inbox,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -237,13 +240,82 @@ export function ProfileCorrectionsClient({
 
   const totalPages = Math.max(1, Math.ceil(result.totalCount / result.pageSize));
 
+  function handleExport() {
+    startTransition(async () => {
+      try {
+        const data = await exportProfileCorrections({
+          status: currentStatus as
+            | "all"
+            | "pending"
+            | "resolved"
+            | "rejected"
+            | "cancelled",
+          scope: currentScope as "all" | "first_review" | "post_approval",
+        });
+        if (data.length === 0) {
+          toast.info("ไม่มีข้อมูลให้ส่งออก");
+          return;
+        }
+        const filename = `profile-corrections-${currentStatus}-${new Date()
+          .toISOString()
+          .slice(0, 10)}.csv`;
+        downloadCsv(
+          filename,
+          [
+            "ID",
+            "ชื่อผู้ใช้",
+            "อีเมล",
+            "แผนก",
+            "ประเภทคำขอ",
+            "สถานะ",
+            "ฟิลด์ที่แจ้ง",
+            "รายละเอียด",
+            "หมายเหตุจาก HR",
+            "ผู้ดำเนินการ",
+            "วันที่ส่ง",
+            "วันที่จบ",
+          ],
+          data.map((r) => [
+            r.id,
+            r.userName,
+            r.userEmail,
+            r.department,
+            r.scope,
+            r.status,
+            r.fieldsFlagged,
+            r.reason,
+            r.resolverNote,
+            r.resolverName,
+            r.createdAt,
+            r.resolvedAt,
+          ]),
+        );
+        toast.success(`ส่งออก ${data.length} รายการแล้ว`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "ส่งออกไม่สำเร็จ");
+      }
+    });
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">อนุมัติคำขอแก้ไขข้อมูล</h1>
-        <p className="text-muted-foreground text-sm">
-          จัดการคำขอแก้ไขข้อมูลโปรไฟล์จากผู้ใช้
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">อนุมัติคำขอแก้ไขข้อมูล</h1>
+          <p className="text-muted-foreground text-sm">
+            จัดการคำขอแก้ไขข้อมูลโปรไฟล์จากผู้ใช้
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={isPending}
+        >
+          <Download className="size-4 mr-1.5" />
+          ส่งออก CSV
+        </Button>
       </div>
 
       {/* Stat strip */}

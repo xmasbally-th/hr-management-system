@@ -110,3 +110,71 @@ export async function exportTravelRequests() {
     };
   });
 }
+
+/**
+ * Export profile correction requests filtered by status + optional scope.
+ * Caller passes the same filter they're viewing in the queue UI so the
+ * downloaded file matches what they see on screen.
+ */
+export async function exportProfileCorrections(filters: {
+  status?: "all" | "pending" | "resolved" | "rejected" | "cancelled";
+  scope?: "all" | "first_review" | "post_approval";
+} = {}) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  let query = supabase
+    .from("profile_correction_requests")
+    .select(
+      `id, reason_text, fields_flagged, scope, status, resolver_note,
+       resolved_at, created_at,
+       target:profiles!profile_correction_requests_target_user_id_fkey(
+         full_name, email, department:departments(name)
+       ),
+       resolver:profiles!profile_correction_requests_resolved_by_fkey(
+         full_name
+       )`,
+    )
+    .order("created_at", { ascending: false });
+
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  }
+  if (filters.scope && filters.scope !== "all") {
+    query = query.eq("scope", filters.scope);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[export-actions] exportProfileCorrections failed:", error);
+    throw new Error("ไม่สามารถดึงข้อมูลคำขอแก้ไขได้");
+  }
+
+  type Target = { full_name?: string | null; email?: string | null; department?: { name?: string } | { name?: string }[] | null };
+  type Resolver = { full_name?: string | null };
+
+  return (data ?? []).map((r) => {
+    const t = (Array.isArray(r.target) ? r.target[0] : r.target) as Target | null;
+    const dept = t && (Array.isArray(t.department) ? t.department[0] : t.department);
+    const resolver = (Array.isArray(r.resolver) ? r.resolver[0] : r.resolver) as
+      | Resolver
+      | null;
+    return {
+      id: r.id,
+      userName: t?.full_name ?? "",
+      userEmail: t?.email ?? "",
+      department: dept?.name ?? "",
+      scope: r.scope === "first_review" ? "ตรวจสอบครั้งแรก" : "แก้ไขเพิ่มเติม",
+      status: r.status,
+      fieldsFlagged: Array.isArray(r.fields_flagged)
+        ? (r.fields_flagged as string[]).join("; ")
+        : "",
+      reason: r.reason_text ?? "",
+      resolverNote: r.resolver_note ?? "",
+      resolverName: resolver?.full_name ?? "",
+      createdAt: r.created_at,
+      resolvedAt: r.resolved_at ?? "",
+    };
+  });
+}
