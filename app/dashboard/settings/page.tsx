@@ -4,6 +4,7 @@ import {
   getAutoApproveNewUsers,
   getAllSystemSettings,
 } from "@/lib/system-settings";
+import { getAllNotificationTypeSettings } from "@/lib/actions/notification-settings-actions";
 import { SettingsClient } from "./settings-client";
 
 export const metadata = { title: "ตั้งค่าระบบ" };
@@ -14,14 +15,17 @@ interface PageProps {
 
 export default async function SettingsPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const [systemStats, domains, autoApprove, allSettings] = await Promise.all([
-    getSystemStats(),
-    getAllowedDomains(),
-    getAutoApproveNewUsers(),
-    getAllSystemSettings().catch(
-      () => ({}) as Record<string, { value: unknown; updated_at: string }>,
-    ),
-  ]);
+  const [systemStats, domains, autoApprove, allSettings, notificationSettings] =
+    await Promise.all([
+      getSystemStats(),
+      getAllowedDomains(),
+      getAutoApproveNewUsers(),
+      getAllSystemSettings().catch(
+        () => ({}) as Record<string, { value: unknown; updated_at: string }>,
+      ),
+      // Admin-only — non-admins get [] and the tab won't render rows
+      getAllNotificationTypeSettings().catch(() => []),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -46,6 +50,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
             null,
         }}
         initialTab={params.tab}
+        notificationSettings={notificationSettings}
       />
     </div>
   );

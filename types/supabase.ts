@@ -224,6 +224,37 @@ export interface Database {
         ];
       };
 
+      notification_type_settings: {
+        Row: {
+          type: string;
+          enabled: boolean;
+          realtime_enabled: boolean;
+          cooldown_seconds: number;
+          recipient_roles: Record<string, boolean>;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          type: string;
+          enabled?: boolean;
+          realtime_enabled?: boolean;
+          cooldown_seconds?: number;
+          recipient_roles?: Record<string, boolean>;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          type?: string;
+          enabled?: boolean;
+          realtime_enabled?: boolean;
+          cooldown_seconds?: number;
+          recipient_roles?: Record<string, boolean>;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+
       notification_preferences: {
         Row: {
           user_id: string;

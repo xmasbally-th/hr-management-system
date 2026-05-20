@@ -16,6 +16,7 @@ import {
   markAllAsRead,
   deleteNotification,
 } from "@/lib/actions/notification-actions";
+import { getRealtimeEnabledTypes } from "@/lib/actions/notification-settings-actions";
 import { NOTIFICATION_TYPE_META } from "@/lib/notification-types";
 
 interface NotificationItem {
@@ -55,11 +56,23 @@ export function NotificationBell({ role, userId }: Props) {
   const originalTitleRef = useRef<string>("");
   const flickerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Which types should surface as realtime toast/flicker (admin-controlled).
+  // Stored in a ref so the realtime callback always sees the latest value.
+  const realtimeTypesRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     loadNotifications();
     if (typeof document !== "undefined") {
       originalTitleRef.current = document.title;
     }
+    // Load admin-configured realtime-enabled types (best-effort)
+    getRealtimeEnabledTypes()
+      .then((types) => {
+        realtimeTypesRef.current = new Set(types);
+      })
+      .catch(() => {
+        // keep empty — falls back to "no toast/flicker" which is safe
+      });
   }, []);
 
   function loadNotifications() {
@@ -94,11 +107,18 @@ export function NotificationBell({ role, userId }: Props) {
           const newNotif = payload.new as NotificationItem;
           if (!newNotif?.id) return;
 
-          // Prepend to state (avoid duplicates if optimistic race)
+          // Prepend to state (avoid duplicates if optimistic race) —
+          // the bell badge always updates regardless of realtime setting.
           setNotifications((prev) => {
             if (prev.some((n) => n.id === newNotif.id)) return prev;
             return [newNotif, ...prev];
           });
+
+          // Respect the admin-controlled realtime toggle: if this type
+          // has realtime delivery disabled, just update the badge (above)
+          // without a toast or title flicker.
+          const realtimeOn = realtimeTypesRef.current.has(newNotif.type);
+          if (!realtimeOn) return;
 
           // Toast popup for HR-inbox group only — leave personal alerts
           // to be discovered via the bell dropdown to avoid spam.

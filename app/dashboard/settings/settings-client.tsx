@@ -16,11 +16,14 @@ import {
   Palette,
   ShieldCheck,
   ClipboardList,
+  Bell,
 } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { DensitySwitcher } from "@/components/density-switcher";
 import { SecuritySection } from "./_sections/security-section";
 import { AuditLogSection } from "./_sections/audit-log-section";
+import { NotificationsSettingsSection } from "./_sections/notifications-settings-section";
+import type { TypeSettingRow } from "@/lib/actions/notification-settings-actions";
 
 interface SettingsProps {
   systemStats: {
@@ -36,11 +39,12 @@ interface SettingsProps {
     auto_approve_new_users: string | null;
   };
   initialTab?: string;
+  notificationSettings: TypeSettingRow[];
 }
 
-type Tab = "general" | "appearance" | "security" | "audit" | "export";
+type Tab = "general" | "appearance" | "security" | "notifications" | "audit" | "export";
 
-const VALID_TABS: Tab[] = ["general", "appearance", "security", "audit", "export"];
+const VALID_TABS: Tab[] = ["general", "appearance", "security", "notifications", "audit", "export"];
 
 export function SettingsClient({
   systemStats,
@@ -48,6 +52,7 @@ export function SettingsClient({
   autoApprove,
   lastUpdated,
   initialTab,
+  notificationSettings,
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<Tab>(
     VALID_TABS.includes(initialTab as Tab) ? (initialTab as Tab) : "general",
@@ -58,6 +63,7 @@ export function SettingsClient({
     { key: "general", label: "สถิติระบบ", icon: <Settings className="h-4 w-4" /> },
     { key: "appearance", label: "หน้าตาและธีม", icon: <Palette className="h-4 w-4" /> },
     { key: "security", label: "ความปลอดภัย", icon: <ShieldCheck className="h-4 w-4" /> },
+    { key: "notifications", label: "การแจ้งเตือน", icon: <Bell className="h-4 w-4" /> },
     { key: "audit", label: "Audit Log", icon: <ClipboardList className="h-4 w-4" /> },
     { key: "export", label: "ส่งออกข้อมูล", icon: <FileSpreadsheet className="h-4 w-4" /> },
   ];
@@ -175,6 +181,10 @@ export function SettingsClient({
             initialAutoApprove={autoApprove}
             lastUpdated={lastUpdated}
           />
+        )}
+
+        {activeTab === "notifications" && (
+          <NotificationsSettingsSection initial={notificationSettings} />
         )}
 
         {activeTab === "audit" && <AuditLogSection />}

@@ -10,6 +10,7 @@ import {
   VALID_NOTIFICATION_TYPE_SET,
   type NotificationType,
 } from "@/lib/notification-types";
+import { getEffectiveTypeSetting } from "./notification-settings-actions";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -96,88 +97,59 @@ export async function deleteNotification(notificationId: string) {
   revalidatePath("/dashboard");
 }
 
-// =============================================================================
-// Per-user notification preferences (Phase S6)
-// =============================================================================
 
 /**
- * Returns the calling user's notification preferences as a complete map,
- * defaulting any missing key to `true` (opt-out model).
- */
-export async function getMyNotificationPrefs(): Promise<Record<NotificationType, boolean>> {
-  const supabase = await createClient();
-  const user = await getAuthUser(supabase);
-
-  const { data } = await supabase
-    .from("notification_preferences")
-    .select("preferences")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const stored = (data?.preferences ?? {}) as Record<string, boolean>;
-  const out = {} as Record<NotificationType, boolean>;
-  for (const t of ALLOWED_NOTIFICATION_TYPES) {
-    out[t] = stored[t] === false ? false : true; // default true
-  }
-  return out;
-}
-
-/**
- * Replaces the calling user's preferences. Missing keys are treated as
- * "enabled" (the opt-out default).
- */
-export async function updateMyNotificationPrefs(
-  prefs: Partial<Record<NotificationType, boolean>>,
-): Promise<void> {
-  const supabase = await createClient();
-  const user = await getAuthUser(supabase);
-
-  // Sanitize — only store known types, and only when explicitly false
-  // (true is the default, so we don't bloat the JSON with all keys).
-  const toStore: Record<string, boolean> = {};
-  for (const t of ALLOWED_NOTIFICATION_TYPES) {
-    if (prefs[t] === false) toStore[t] = false;
-  }
-
-  const { error } = await supabase
-    .from("notification_preferences")
-    .upsert(
-      {
-        user_id: user.id,
-        preferences: toStore,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-
-  if (error) {
-    console.error("[notification-actions] updateMyNotificationPrefs failed:", error);
-    throw new Error("บันทึกการตั้งค่าการแจ้งเตือนไม่สำเร็จ");
-  }
-
-  revalidatePath("/dashboard/profile");
-}
-
-/**
- * Service-role lookup — used by createNotificationInternal() to honor the
- * target user's opt-out preferences. Returns `true` (send) on any failure
- * so notifications are never silently dropped when the prefs system itself
- * has a problem.
+ * System-wide gate (Phase S11) — replaces per-user opt-out. Returns true
+ * if the type should be delivered to this recipient, considering:
+ *   1. type enabled?
+ *   2. recipient's role allowed for this type?
+ *   3. cooldown elapsed since last same-type notification to this user?
+ *
+ * Returns true (send) on any unexpected failure so a settings glitch
+ * never silently drops notifications.
  */
 async function shouldSendNotification(
   targetUserId: string,
   type: string,
 ): Promise<boolean> {
   try {
+    const setting = await getEffectiveTypeSetting(type);
+    if (!setting) return true; // unknown type — default to send
+
+    if (!setting.enabled) return false;
+
     const admin = getAdminClient();
-    const { data, error } = await admin
-      .from("notification_preferences")
-      .select("preferences")
-      .eq("user_id", targetUserId)
+
+    // Role gate
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", targetUserId)
       .maybeSingle();
-    if (error) return true; // err-on-the-side-of-sending
-    const prefs = (data?.preferences ?? {}) as Record<string, boolean>;
-    return prefs[type] !== false; // explicit false = opted out
+    const role = profile?.role as keyof typeof setting.recipient_roles | undefined;
+    if (role && setting.recipient_roles[role] === false) {
+      return false;
+    }
+
+    // Cooldown gate
+    if (setting.cooldown_seconds > 0) {
+      const { data: last } = await admin
+        .from("notifications")
+        .select("created_at")
+        .eq("user_id", targetUserId)
+        .eq("type", type)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (last?.created_at) {
+        const elapsedMs = Date.now() - new Date(last.created_at).getTime();
+        if (elapsedMs < setting.cooldown_seconds * 1000) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   } catch {
     return true;
   }

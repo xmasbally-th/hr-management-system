@@ -56,3 +56,41 @@ export const NOTIFICATION_TYPE_META: NotificationTypeMeta[] = [
   { type: "user_profile_confirmed", label: "มีผู้ใช้ยืนยันโปรไฟล์ใหม่", description: "[HR/Admin] แจ้งเมื่อผู้ใช้ยืนยันข้อมูลโปรไฟล์ครั้งแรกหลังเข้าสู่ระบบ", group: "hr_inbox" },
   { type: "new_correction_request", label: "มีคำขอแก้ไขข้อมูลใหม่", description: "[HR/Admin] แจ้งเมื่อผู้ใช้ส่งคำขอแก้ไขข้อมูลโปรไฟล์", group: "hr_inbox" },
 ];
+
+/**
+ * System-wide settings per notification type (Phase S11). Mirrors the
+ * notification_type_settings table. Used as a fallback when the table is
+ * empty / not yet migrated, and as the seed/reference for the admin UI.
+ */
+export interface NotificationTypeSetting {
+  type: NotificationType;
+  enabled: boolean;
+  realtime_enabled: boolean;
+  cooldown_seconds: number;
+  recipient_roles: Record<"admin" | "hr" | "manager" | "employee", boolean>;
+}
+
+const ALL_ROLES = { admin: true, hr: true, manager: true, employee: true };
+const HR_ONLY = { admin: true, hr: true, manager: false, employee: false };
+const HR_MANAGER = { admin: false, hr: true, manager: true, employee: false };
+
+/**
+ * Default settings — kept in sync with the seed in
+ * supabase/migrations/20260525_notification_type_settings.sql.
+ */
+export const DEFAULT_TYPE_SETTINGS: Record<NotificationType, NotificationTypeSetting> = {
+  new_leave_request:      { type: "new_leave_request",      enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: HR_MANAGER },
+  new_travel_request:     { type: "new_travel_request",     enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: HR_MANAGER },
+  leave_approved:         { type: "leave_approved",         enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  leave_rejected:         { type: "leave_rejected",         enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  travel_approved:        { type: "travel_approved",        enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  travel_rejected:        { type: "travel_rejected",        enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  account_approved:       { type: "account_approved",       enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  account_rejected:       { type: "account_rejected",       enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  account_pending:        { type: "account_pending",        enabled: true, realtime_enabled: false, cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  profile_edited_by_hr:   { type: "profile_edited_by_hr",   enabled: true, realtime_enabled: false, cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  correction_resolved:    { type: "correction_resolved",    enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  correction_rejected:    { type: "correction_rejected",    enabled: true, realtime_enabled: true,  cooldown_seconds: 0,  recipient_roles: ALL_ROLES },
+  user_profile_confirmed: { type: "user_profile_confirmed", enabled: true, realtime_enabled: true,  cooldown_seconds: 10, recipient_roles: HR_ONLY },
+  new_correction_request: { type: "new_correction_request", enabled: true, realtime_enabled: true,  cooldown_seconds: 5,  recipient_roles: HR_ONLY },
+};

@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Eye,
-  Bell,
   Pencil,
   History,
   CheckCircle2,
@@ -24,10 +23,8 @@ import {
   FIELD_LABELS,
   SECTION_FIELDS,
 } from "@/components/correction-request-form";
-import { NotificationsSection } from "./_sections/notifications-section";
-import type { NotificationType } from "@/lib/notification-types";
 
-type TabKey = "overview" | "history" | "notifications";
+type TabKey = "overview" | "history";
 
 interface Profile {
   id: string;
@@ -95,7 +92,6 @@ interface Props {
     start_date: string;
     end_date: string | null;
   }>;
-  notificationPrefs: Record<NotificationType, boolean>;
   /** Pending correction-request count — drives disable state of "ขอแก้" buttons */
   pendingCorrectionsCount: number;
   /** Most-recent correction requests (any status) — for the "ประวัติคำขอ" tab */
@@ -150,7 +146,6 @@ export function ProfileClient({
   educations,
   decorations,
   adminPositions,
-  notificationPrefs,
   pendingCorrectionsCount,
   correctionHistory,
 }: Props) {
@@ -197,7 +192,6 @@ export function ProfileClient({
       icon: History,
       count: correctionHistory.length || undefined,
     },
-    { key: "notifications", label: "การแจ้งเตือน", icon: Bell },
   ];
 
   return (
@@ -338,12 +332,6 @@ export function ProfileClient({
       {activeTab === "history" && (
         <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
           <CorrectionHistoryList items={correctionHistory} />
-        </div>
-      )}
-
-      {activeTab === "notifications" && (
-        <div className="rounded-xl border border-border bg-card p-5 sm:p-6 animate-fade-in">
-          <NotificationsSection initialPrefs={notificationPrefs} />
         </div>
       )}
     </div>
