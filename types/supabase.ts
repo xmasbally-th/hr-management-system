@@ -999,6 +999,7 @@ export interface Database {
           type: string;
           message: string;
           is_read: boolean;
+          realtime: boolean;
           created_at: string;
         };
         Insert: {
@@ -1007,6 +1008,7 @@ export interface Database {
           type?: string;
           message: string;
           is_read?: boolean;
+          realtime?: boolean;
           created_at?: string;
         };
         Update: {
@@ -1015,6 +1017,7 @@ export interface Database {
           type?: string;
           message?: string;
           is_read?: boolean;
+          realtime?: boolean;
           created_at?: string;
         };
         Relationships: [

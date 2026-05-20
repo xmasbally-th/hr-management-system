@@ -151,6 +151,9 @@ describe("createNotificationInternal", () => {
         type: "leave_approved",
         message: "Your leave was approved",
         is_read: false,
+        // S12: row carries the realtime flag (defaults true when settings
+        // can't be resolved in the test env).
+        realtime: true,
       }),
     );
   });

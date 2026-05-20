@@ -98,25 +98,38 @@ export async function deleteNotification(notificationId: string) {
 }
 
 
+interface DeliveryDecision {
+  /** Whether to insert the notification at all. */
+  send: boolean;
+  /** Value for the notifications.realtime column — controls whether the
+   *  Supabase publication row-filter (Phase S12) broadcasts the row. */
+  realtime: boolean;
+}
+
 /**
- * System-wide gate (Phase S11) — replaces per-user opt-out. Returns true
- * if the type should be delivered to this recipient, considering:
+ * System-wide gate (Phase S11/S12) — replaces per-user opt-out. Resolves
+ * the type's settings ONCE and returns both the send decision and the
+ * realtime flag, so createNotificationInternal doesn't fetch twice.
+ *
+ * Send decision considers:
  *   1. type enabled?
  *   2. recipient's role allowed for this type?
  *   3. cooldown elapsed since last same-type notification to this user?
  *
- * Returns true (send) on any unexpected failure so a settings glitch
- * never silently drops notifications.
+ * Fails open (send=true, realtime=true) on any unexpected error so a
+ * settings glitch never silently drops notifications.
  */
-async function shouldSendNotification(
+async function resolveDelivery(
   targetUserId: string,
   type: string,
-): Promise<boolean> {
+): Promise<DeliveryDecision> {
   try {
     const setting = await getEffectiveTypeSetting(type);
-    if (!setting) return true; // unknown type — default to send
+    if (!setting) return { send: true, realtime: true }; // unknown type
 
-    if (!setting.enabled) return false;
+    const realtime = setting.realtime_enabled;
+
+    if (!setting.enabled) return { send: false, realtime };
 
     const admin = getAdminClient();
 
@@ -128,7 +141,7 @@ async function shouldSendNotification(
       .maybeSingle();
     const role = profile?.role as keyof typeof setting.recipient_roles | undefined;
     if (role && setting.recipient_roles[role] === false) {
-      return false;
+      return { send: false, realtime };
     }
 
     // Cooldown gate
@@ -144,14 +157,14 @@ async function shouldSendNotification(
       if (last?.created_at) {
         const elapsedMs = Date.now() - new Date(last.created_at).getTime();
         if (elapsedMs < setting.cooldown_seconds * 1000) {
-          return false;
+          return { send: false, realtime };
         }
       }
     }
 
-    return true;
+    return { send: true, realtime };
   } catch {
-    return true;
+    return { send: true, realtime: true };
   }
 }
 
@@ -171,16 +184,18 @@ export async function createNotificationInternal(
     return;
   }
 
-  // Per-user opt-out check (service-role read — caller's RLS would block
-  // reading another user's prefs row).
-  if (!(await shouldSendNotification(targetUserId, type))) {
-    return;
-  }
+  // System-wide gate (enabled / recipient role / cooldown) + realtime
+  // flag — resolved in a single settings fetch.
+  const { send, realtime } = await resolveDelivery(targetUserId, type);
+  if (!send) return;
 
   if (message.length > 500) {
     message = message.slice(0, 500);
   }
 
+  // realtime tags the row so the supabase_realtime publication row-filter
+  // (Phase S12) only broadcasts realtime=true rows — stopping silent-type
+  // messages at the source rather than just on the client.
   const { error } = await supabase
     .from("notifications")
     .insert({
@@ -188,6 +203,7 @@ export async function createNotificationInternal(
       type,
       message,
       is_read: false,
+      realtime,
     });
 
   if (error) {
