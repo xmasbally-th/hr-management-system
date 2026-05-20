@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   getAuditLogs,
   getAuditActionTypes,
+  getAuditTargetTypes,
   exportAuditLogs,
   type AuditLogRow,
   type AuditLogFilters,
@@ -63,6 +64,7 @@ const TONE_BG: Record<string, string> = {
 export function AuditLogSection() {
   const [isPending, startTransition] = useTransition();
   const [actionTypes, setActionTypes] = useState<string[]>([]);
+  const [targetTypes, setTargetTypes] = useState<string[]>([]);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -70,6 +72,8 @@ export function AuditLogSection() {
 
   // Filters
   const [actionFilter, setActionFilter] = useState<string>("all");
+  const [targetTypeFilter, setTargetTypeFilter] = useState<string>("all");
+  const [targetIdFilter, setTargetIdFilter] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -79,10 +83,23 @@ export function AuditLogSection() {
   function buildFilters(): AuditLogFilters {
     return {
       action: actionFilter,
+      targetType: targetTypeFilter,
+      targetId: targetIdFilter.trim() || undefined,
       userSearch: userSearch.trim() || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     };
+  }
+
+  /** Apply a quick date preset (e.g. last 7 days). End = today (local). */
+  function applyDatePreset(days: number) {
+    const now = new Date();
+    const end = now.toISOString().slice(0, 10);
+    const startMs = now.getTime() - (days - 1) * 24 * 60 * 60 * 1000;
+    const start = new Date(startMs).toISOString().slice(0, 10);
+    setStartDate(start);
+    setEndDate(end);
+    setTimeout(() => load(1), 0);
   }
 
   async function load(p: number = page) {
@@ -105,8 +122,12 @@ export function AuditLogSection() {
   useEffect(() => {
     (async () => {
       try {
-        const types = await getAuditActionTypes();
-        setActionTypes(types);
+        const [actions, targets] = await Promise.all([
+          getAuditActionTypes(),
+          getAuditTargetTypes(),
+        ]);
+        setActionTypes(actions);
+        setTargetTypes(targets);
       } catch {
         // ignore
       }
@@ -121,6 +142,8 @@ export function AuditLogSection() {
 
   function resetFilters() {
     setActionFilter("all");
+    setTargetTypeFilter("all");
+    setTargetIdFilter("");
     setUserSearch("");
     setStartDate("");
     setEndDate("");
@@ -151,7 +174,7 @@ export function AuditLogSection() {
     <div className="space-y-4">
       {/* Filters */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">ประเภท Action</Label>
             <Select
@@ -174,12 +197,44 @@ export function AuditLogSection() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">ค้นหาชื่อผู้ใช้</Label>
+            <Label className="text-xs">ประเภท Resource (target)</Label>
+            <Select
+              value={targetTypeFilter}
+              onValueChange={(v) => setTargetTypeFilter(v ?? "all")}
+              disabled={isPending}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="ทั้งหมด" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทั้งหมด</SelectItem>
+                {targetTypes.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">ค้นหาชื่อผู้ใช้ (actor)</Label>
             <Input
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}
               placeholder="ชื่อ-สกุล..."
               disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">ค้นหา target ID</Label>
+            <Input
+              value={targetIdFilter}
+              onChange={(e) => setTargetIdFilter(e.target.value)}
+              placeholder="UUID ของ resource เป้าหมาย"
+              disabled={isPending}
+              className="font-mono text-xs"
             />
           </div>
 
@@ -202,6 +257,29 @@ export function AuditLogSection() {
               disabled={isPending}
             />
           </div>
+        </div>
+
+        {/* Quick date presets */}
+        <div className="flex flex-wrap gap-1 pt-1">
+          <span className="text-xs text-muted-foreground mr-1 py-1">เลือกช่วงเร็ว:</span>
+          {[
+            { label: "วันนี้", days: 1 },
+            { label: "7 วัน", days: 7 },
+            { label: "30 วัน", days: 30 },
+            { label: "90 วัน", days: 90 },
+          ].map((preset) => (
+            <Button
+              key={preset.days}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => applyDatePreset(preset.days)}
+              disabled={isPending}
+            >
+              {preset.label}
+            </Button>
+          ))}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">

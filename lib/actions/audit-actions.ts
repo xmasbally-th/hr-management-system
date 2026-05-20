@@ -35,9 +35,18 @@ async function checkAdmin(
 
 export interface AuditLogFilters {
   action?: string;
-  userSearch?: string; // matches against the user's full_name
-  startDate?: string; // YYYY-MM-DD inclusive
-  endDate?: string; // YYYY-MM-DD inclusive
+  /** Substring (case-insensitive) match against actor's full_name. */
+  userSearch?: string;
+  /** Exact match on target_type column (e.g. "profile",
+   *  "leave_requests", "profile_correction_requests"). */
+  targetType?: string;
+  /** Exact UUID match on target_id — useful for "show all activity on
+   *  this specific resource" lookups. */
+  targetId?: string;
+  /** YYYY-MM-DD inclusive */
+  startDate?: string;
+  /** YYYY-MM-DD inclusive */
+  endDate?: string;
 }
 
 export interface AuditLogRow {
@@ -93,6 +102,12 @@ export async function getAuditLogs(
 
   if (params.action && params.action !== "all") {
     q = q.eq("action", params.action);
+  }
+  if (params.targetType && params.targetType !== "all") {
+    q = q.eq("target_type", params.targetType);
+  }
+  if (params.targetId && params.targetId.trim()) {
+    q = q.eq("target_id", params.targetId.trim());
   }
   if (params.startDate) {
     q = q.gte("created_at", `${params.startDate}T00:00:00`);
@@ -186,6 +201,32 @@ export async function getAuditActionTypes(): Promise<string[]> {
 }
 
 /**
+ * Returns the distinct list of target_type strings currently in audit_logs
+ * (e.g. "profile", "leave_requests", "profile_correction_requests").
+ * Used to populate the target-type filter dropdown.
+ */
+export async function getAuditTargetTypes(): Promise<string[]> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkAdmin(supabase, user.id);
+
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("target_type")
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    console.error("[audit-actions] getAuditTargetTypes failed:", error);
+    return [];
+  }
+
+  const set = new Set<string>();
+  for (const r of data ?? []) set.add(r.target_type);
+  return [...set].sort();
+}
+
+/**
  * Export the (already-filtered) audit log to a CSV string.
  * Used by the section's "Export CSV" button.
  */
@@ -203,6 +244,12 @@ export async function exportAuditLogs(
 
   if (filters.action && filters.action !== "all") {
     q = q.eq("action", filters.action);
+  }
+  if (filters.targetType && filters.targetType !== "all") {
+    q = q.eq("target_type", filters.targetType);
+  }
+  if (filters.targetId && filters.targetId.trim()) {
+    q = q.eq("target_id", filters.targetId.trim());
   }
   if (filters.startDate) {
     q = q.gte("created_at", `${filters.startDate}T00:00:00`);
