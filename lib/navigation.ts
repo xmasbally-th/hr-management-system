@@ -126,6 +126,12 @@ export const navigationGroups: NavGroup[] = [
         icon: "FolderSearch",
         roles: ["admin", "hr"],
       },
+      {
+        title: "จัดการวันลา",
+        href: "/dashboard/hr/leave-balances",
+        icon: "CalendarCog",
+        roles: ["admin", "hr"],
+      },
     ],
   },
   {

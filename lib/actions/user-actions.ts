@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit-log";
 import { env } from "@/lib/env";
 import { isEmailAllowed } from "@/lib/system-settings";
 import { createNotificationInternal } from "./notification-actions";
+import { initializeLeaveBalances, initializeAllEmployeesBalances } from "./leave-actions";
 
 /**
  * Validates that the current authenticated user has 'hr' or 'admin' role.
@@ -320,6 +321,15 @@ export async function createUserByAdmin(data: {
   }
 
   await logAudit(supabase, actorId, "create_user", "profile", authData.user.id, { email, role: data.role });
+
+  // Auto-initialize leave balances for the new employee (non-blocking —
+  // failure here must not roll back the successful user creation)
+  try {
+    await initializeLeaveBalances(authData.user.id);
+  } catch (e) {
+    console.error("[user-actions] auto-init leave balances failed:", e);
+  }
+
   revalidatePath("/dashboard/hr/users");
 
   return { success: true };
@@ -558,6 +568,16 @@ export async function bulkImportEmployees(
     failed: result.failed.length,
     skipped: result.skipped.length,
   });
+
+  // Auto-initialize leave balances for newly imported employees (one batch
+  // pass, idempotent — non-blocking so import result is preserved on failure)
+  if (result.success.length > 0) {
+    try {
+      await initializeAllEmployeesBalances();
+    } catch (e) {
+      console.error("[user-actions] bulk auto-init leave balances failed:", e);
+    }
+  }
 
   revalidatePath("/dashboard/hr/users");
 

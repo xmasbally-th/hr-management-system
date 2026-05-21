@@ -787,3 +787,318 @@ export async function initializeLeaveBalances(
   });
   revalidatePath("/dashboard/hr/master-data");
 }
+
+export interface InitBalancesResult {
+  employeesProcessed: number;
+  rowsCreated: number;
+  rowsSkipped: number;
+}
+
+/**
+ * HR/Admin: initialize leave_balances for ALL active employees in one pass.
+ *
+ * Idempotent — skips (employee, leave_type) pairs that already have a row for
+ * the FY (won't overwrite imported opening balances).
+ * For VACATION, carries over previous-FY remaining capped by employee_type.
+ *
+ * Efficient: a handful of queries + chunked insert (not N per-employee calls).
+ */
+export async function initializeAllEmployeesBalances(
+  fiscalYear?: number,
+): Promise<InitBalancesResult> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+
+  const fy = fiscalYear ?? currentFiscalYear();
+
+  // Active employees (exclude rejected) + leave types — fetched once
+  const [{ data: employees }, { data: leaveTypes }] = await Promise.all([
+    supabase.from("profiles").select("id, employee_type").neq("status", "rejected"),
+    supabase.from("leave_types").select("id, code, max_days_per_year"),
+  ]);
+
+  if (!employees || employees.length === 0 || !leaveTypes || leaveTypes.length === 0) {
+    return { employeesProcessed: 0, rowsCreated: 0, rowsSkipped: 0 };
+  }
+
+  // Existing balances for this FY → skip set (don't overwrite)
+  const { data: existing } = await supabase
+    .from("leave_balances")
+    .select("employee_id, leave_type_id")
+    .eq("fiscal_year", fy);
+  const existsSet = new Set(
+    (existing ?? []).map((b) => `${b.employee_id}:${b.leave_type_id}`),
+  );
+
+  // Previous-FY vacation remaining (for accumulation)
+  const vacationType = leaveTypes.find((lt) => lt.code === "VACATION");
+  const prevVacByEmployee = new Map<string, number>();
+  if (vacationType) {
+    const { data: prev } = await supabase
+      .from("leave_balances")
+      .select("employee_id, remaining_days")
+      .eq("fiscal_year", fy - 1)
+      .eq("leave_type_id", vacationType.id);
+    for (const p of prev ?? []) {
+      prevVacByEmployee.set(p.employee_id, p.remaining_days ?? 0);
+    }
+  }
+
+  const toInsert: Database["public"]["Tables"]["leave_balances"]["Insert"][] = [];
+  let skipped = 0;
+
+  for (const emp of employees) {
+    for (const lt of leaveTypes) {
+      if (existsSet.has(`${emp.id}:${lt.id}`)) {
+        skipped++;
+        continue;
+      }
+      let accumulated = 0;
+      if (lt.code === "VACATION") {
+        const cap = getVacationAccumulationCap(emp.employee_type ?? null);
+        accumulated = cap > 0 ? Math.min(prevVacByEmployee.get(emp.id) ?? 0, cap) : 0;
+      }
+      const annual = lt.max_days_per_year;
+      toInsert.push({
+        employee_id: emp.id,
+        leave_type_id: lt.id,
+        fiscal_year: fy,
+        total_days: annual + accumulated,
+        used_days: 0,
+        remaining_days: annual + accumulated,
+        accumulated_days: accumulated,
+      });
+    }
+  }
+
+  let created = 0;
+  const CHUNK = 500;
+  for (let i = 0; i < toInsert.length; i += CHUNK) {
+    const chunk = toInsert.slice(i, i + CHUNK);
+    const { error } = await supabase.from("leave_balances").insert(chunk);
+    if (error) {
+      console.error("[leave-actions] initializeAllEmployeesBalances insert failed:", error);
+      throw new Error("ไม่สามารถสร้างยอดวันลาบางส่วนได้");
+    }
+    created += chunk.length;
+  }
+
+  await logAudit(supabase, user.id, "initialize_all_leave_balances", "leave_balance", "batch", {
+    fiscal_year: fy,
+    created,
+    skipped,
+  });
+  revalidatePath("/dashboard/hr/master-data");
+
+  return { employeesProcessed: employees.length, rowsCreated: created, rowsSkipped: skipped };
+}
+
+// ─── CSV opening-balance import (launch-time backfill) ─────
+
+export interface BalanceImportRow {
+  email: string;
+  sick_remaining?: string;
+  personal_remaining?: string;
+  vacation_remaining?: string;
+  vacation_accumulated?: string;
+}
+
+export interface BalanceImportResult {
+  success: Array<{ row: number; email: string }>;
+  failed: Array<{ row: number; email: string; error: string }>;
+  warnings: Array<{ row: number; email: string; warning: string }>;
+}
+
+/** Parse a remaining/accumulated cell → number ≥ 0, or null when blank. */
+function parseBalanceCell(v: string | undefined): number | null | "invalid" {
+  if (v === undefined || v === null || String(v).trim() === "") return null;
+  const n = Number(String(v).trim());
+  if (!Number.isFinite(n) || n < 0) return "invalid";
+  return n;
+}
+
+/**
+ * HR/Admin: import opening leave balances from CSV (wide format, remaining-based).
+ *
+ * For each employee (matched by email) sets SICK/PERSONAL/VACATION balances for
+ * the FY: total = max_days_per_year (+ vacation accumulated, capped by
+ * employee_type); used = total − remaining (remaining blank ⇒ full).
+ * Upserts (insert new / update existing) — safe to re-run.
+ * Maternity is event-based and intentionally not imported.
+ */
+export async function importLeaveBalances(
+  rows: BalanceImportRow[],
+  fiscalYear?: number,
+): Promise<BalanceImportResult> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("ไม่มีข้อมูลที่จะนำเข้า");
+  }
+  if (rows.length > 1000) {
+    throw new Error("จำนวนแถวเกิน 1000 รายการ");
+  }
+
+  const fy = fiscalYear ?? currentFiscalYear();
+  const result: BalanceImportResult = { success: [], failed: [], warnings: [] };
+
+  // Reference data — fetched once
+  const [{ data: leaveTypes }, { data: profiles }] = await Promise.all([
+    supabase.from("leave_types").select("id, code, max_days_per_year"),
+    supabase.from("profiles").select("id, email, employee_type").neq("status", "rejected"),
+  ]);
+
+  const ltByCode = new Map((leaveTypes ?? []).map((lt) => [lt.code, lt]));
+  const profByEmail = new Map(
+    (profiles ?? []).map((p) => [p.email.toLowerCase(), p]),
+  );
+
+  // Existing balances for FY → key `${empId}:${ltId}` → balance id
+  const { data: existing } = await supabase
+    .from("leave_balances")
+    .select("id, employee_id, leave_type_id")
+    .eq("fiscal_year", fy);
+  const existingId = new Map(
+    (existing ?? []).map((b) => [`${b.employee_id}:${b.leave_type_id}`, b.id]),
+  );
+
+  type BalRow = Database["public"]["Tables"]["leave_balances"]["Insert"];
+  const inserts: BalRow[] = [];
+  const updates: Array<{ id: string; data: Partial<BalRow> }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = i + 1;
+    const email = (rows[i].email ?? "").trim().toLowerCase();
+    if (!email) {
+      result.failed.push({ row: rowNum, email: "", error: "ไม่มีอีเมล" });
+      continue;
+    }
+    const prof = profByEmail.get(email);
+    if (!prof) {
+      result.failed.push({ row: rowNum, email, error: "ไม่พบพนักงานอีเมลนี้ในระบบ" });
+      continue;
+    }
+
+    // Parse cells
+    const sickRem = parseBalanceCell(rows[i].sick_remaining);
+    const persRem = parseBalanceCell(rows[i].personal_remaining);
+    const vacRem = parseBalanceCell(rows[i].vacation_remaining);
+    const vacAcc = parseBalanceCell(rows[i].vacation_accumulated);
+    if ([sickRem, persRem, vacRem, vacAcc].includes("invalid")) {
+      result.failed.push({ row: rowNum, email, error: "ตัวเลขไม่ถูกต้อง (ต้องเป็นจำนวน ≥ 0)" });
+      continue;
+    }
+
+    // Build per-type balance rows
+    const plan: Array<{ code: string; remaining: number | null; accumulatedInput: number | null }> = [
+      { code: "SICK", remaining: sickRem as number | null, accumulatedInput: null },
+      { code: "PERSONAL", remaining: persRem as number | null, accumulatedInput: null },
+      { code: "VACATION", remaining: vacRem as number | null, accumulatedInput: vacAcc as number | null },
+    ];
+
+    let rowError: string | null = null;
+    const rowBalances: BalRow[] = [];
+
+    for (const p of plan) {
+      const lt = ltByCode.get(p.code);
+      if (!lt) continue; // leave type not configured — skip silently
+
+      let accumulated = 0;
+      if (p.code === "VACATION") {
+        const cap = getVacationAccumulationCap(prof.employee_type ?? null);
+        const requested = p.accumulatedInput ?? 0;
+        accumulated = cap > 0 ? Math.min(requested, cap) : 0;
+        if (requested > accumulated) {
+          result.warnings.push({
+            row: rowNum,
+            email,
+            warning: `วันสะสมพักผ่อน ${requested} เกินเพดาน ${cap} — ปรับเป็น ${accumulated}`,
+          });
+        }
+      }
+
+      const total = lt.max_days_per_year + accumulated;
+      const remaining = p.remaining ?? total; // blank ⇒ full entitlement
+      if (remaining > total) {
+        rowError = `วันคงเหลือ ${p.code} (${remaining}) เกินสิทธิ์รวม (${total})`;
+        break;
+      }
+      const used = Math.max(0, total - remaining);
+
+      rowBalances.push({
+        employee_id: prof.id,
+        leave_type_id: lt.id,
+        fiscal_year: fy,
+        total_days: total,
+        used_days: used,
+        remaining_days: remaining,
+        accumulated_days: accumulated,
+      });
+    }
+
+    if (rowError) {
+      result.failed.push({ row: rowNum, email, error: rowError });
+      continue;
+    }
+
+    for (const bal of rowBalances) {
+      const key = `${bal.employee_id}:${bal.leave_type_id}`;
+      const exId = existingId.get(key);
+      if (exId) {
+        updates.push({
+          id: exId,
+          data: {
+            total_days: bal.total_days,
+            used_days: bal.used_days,
+            remaining_days: bal.remaining_days,
+            accumulated_days: bal.accumulated_days,
+            updated_at: new Date().toISOString(),
+          },
+        });
+      } else {
+        inserts.push(bal);
+      }
+    }
+    result.success.push({ row: rowNum, email });
+  }
+
+  // Execute — batch insert new, then update existing
+  const CHUNK = 500;
+  for (let i = 0; i < inserts.length; i += CHUNK) {
+    const chunk = inserts.slice(i, i + CHUNK);
+    const { error } = await supabase.from("leave_balances").insert(chunk);
+    if (error) {
+      console.error("[leave-actions] importLeaveBalances insert failed:", error);
+      throw new Error("บันทึกยอดวันลาบางส่วนไม่สำเร็จ");
+    }
+  }
+  for (const u of updates) {
+    const { error } = await supabase.from("leave_balances").update(u.data).eq("id", u.id);
+    if (error) {
+      console.error("[leave-actions] importLeaveBalances update failed:", error);
+      throw new Error("ปรับปรุงยอดวันลาบางส่วนไม่สำเร็จ");
+    }
+  }
+
+  await logAudit(supabase, user.id, "import_leave_balances", "leave_balance", "batch", {
+    fiscal_year: fy,
+    success: result.success.length,
+    failed: result.failed.length,
+    inserted: inserts.length,
+    updated: updates.length,
+  });
+  revalidatePath("/dashboard/hr/leave-balances");
+  revalidatePath("/dashboard/leaves");
+
+  return result;
+}
