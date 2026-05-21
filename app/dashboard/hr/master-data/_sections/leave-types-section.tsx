@@ -19,14 +19,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, Plus, Loader2, Check, X, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface LeaveTypeRow {
   id: string;
   name: string;
+  code?: string | null;
   max_days_per_year: number;
 }
+
+const CODE_COLORS: Record<string, string> = {
+  SICK: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  PERSONAL: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  VACATION: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  MATERNITY: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
+};
 
 export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
   const router = useRouter();
@@ -169,6 +178,7 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>ประเภทการลา</TableHead>
+                <TableHead className="w-[100px]">รหัส</TableHead>
                 <TableHead className="text-center w-[140px]">วันสูงสุด/ปี</TableHead>
                 <TableHead className="w-[140px] text-right">จัดการ</TableHead>
               </TableRow>
@@ -176,7 +186,7 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground text-sm">
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground text-sm">
                     {search ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประเภทการลา"}
                   </TableCell>
                 </TableRow>
@@ -194,6 +204,18 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
                           />
                         ) : (
                           <span className="font-medium">{row.name}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.code ? (
+                          <Badge
+                            variant="secondary"
+                            className={CODE_COLORS[row.code] ?? ""}
+                          >
+                            {row.code}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">
