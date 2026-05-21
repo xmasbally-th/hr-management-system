@@ -6,7 +6,7 @@ import { approveLeaveRequest, rejectLeaveRequest } from "@/lib/actions/leave-act
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, XCircle, Loader2, Eye } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Eye, FileCheck, FileX } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "sonner";
 
@@ -16,9 +16,11 @@ interface LeaveRequestRow {
   start_date: string;
   end_date: string;
   total_days: number;
+  working_days: number | null;
   reason: string | null;
   status: string;
   submission_channel: string | null;
+  medical_cert_url: string | null;
   created_at: string;
   leave_type: { name: string } | null;
   employee: { full_name: string; email: string; department_id: string | null } | null;
@@ -78,6 +80,7 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
               <TableHead>ประเภท</TableHead>
               <TableHead>วันที่</TableHead>
               <TableHead>จำนวน</TableHead>
+              <TableHead>ใบรับรอง</TableHead>
               <TableHead>ช่องทาง</TableHead>
               <TableHead>สถานะ</TableHead>
               <TableHead>จัดการ</TableHead>
@@ -99,7 +102,25 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
                   <TableCell className="text-sm">
                     {req.start_date} ~ {req.end_date}
                   </TableCell>
-                  <TableCell>{req.total_days} วัน</TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <span className="font-mono">{req.total_days}</span> วัน
+                      {req.working_days != null && req.working_days !== req.total_days && (
+                        <div className="text-xs text-muted-foreground">
+                          ({req.working_days} วันทำการ)
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span title={req.medical_cert_url ? "มีใบรับรองแพทย์" : "ไม่มีใบรับรองแพทย์"}>
+                      {req.medical_cert_url ? (
+                        <FileCheck className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <FileX className="h-4 w-4 text-muted-foreground/40" />
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {req.submission_channel === "paper" ? "กระดาษ" : "ออนไลน์"}
@@ -144,7 +165,7 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
             })}
             {requests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   ไม่มีคำขอลาในหมวดนี้
                 </TableCell>
               </TableRow>

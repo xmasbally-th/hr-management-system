@@ -11,8 +11,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const mockCreateLeaveRequest = vi.fn();
+const mockPreviewWorkingDays = vi.fn().mockResolvedValue({ workingDays: 5, calendarDays: 7 });
 vi.mock("@/lib/actions/leave-actions", () => ({
   createLeaveRequest: (...args: unknown[]) => mockCreateLeaveRequest(...args),
+  previewWorkingDays: (...args: unknown[]) => mockPreviewWorkingDays(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -50,10 +52,10 @@ vi.mock("@/components/ui/select", () => ({
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
 const LEAVE_TYPES = [
-  { id: "lt-vac", name: "ลาพักผ่อน", max_days_per_year: 10, is_accumulative: true, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-sick", name: "ลาป่วย", max_days_per_year: 30, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-per", name: "ลากิจ", max_days_per_year: 10, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
-  { id: "lt-mat", name: "ลาคลอด", max_days_per_year: 90, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-vac", name: "ลาพักผ่อน", code: "VACATION", max_days_per_year: 10, is_accumulative: true, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-sick", name: "ลาป่วย", code: "SICK", max_days_per_year: 30, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-per", name: "ลากิจ", code: "PERSONAL", max_days_per_year: 10, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
+  { id: "lt-mat", name: "ลาคลอด", code: "MATERNITY", max_days_per_year: 90, is_accumulative: false, conditions: null, created_at: "2024-01-01" },
 ];
 
 const EMPLOYEES = [
@@ -67,8 +69,17 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function renderForm() {
-  return render(<LeaveRequestForm leaveTypes={LEAVE_TYPES} employees={EMPLOYEES} />);
+function renderForm(overrides?: Partial<React.ComponentProps<typeof LeaveRequestForm>>) {
+  return render(
+    <LeaveRequestForm
+      leaveTypes={LEAVE_TYPES}
+      employees={EMPLOYEES}
+      leaveOnlineEnabled={true}
+      gender="female"
+      employeeType="ข้าราชการ"
+      {...overrides}
+    />
+  );
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────

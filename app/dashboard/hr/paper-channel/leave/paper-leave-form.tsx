@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createLeaveRequestByHr } from "@/lib/actions/leave-actions";
+import {
+  createLeaveRequestByHr,
+  previewWorkingDays,
+} from "@/lib/actions/leave-actions";
 import { createDocumentTracking } from "@/lib/actions/document-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload } from "@/components/file-upload";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { LeaveType } from "@/types/supabase";
 
@@ -40,6 +43,10 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
   const [substitute3Id, setSubstitute3Id] = useState("");
   const [branchHeadOpinion, setBranchHeadOpinion] = useState("");
 
+  // Working days preview
+  const [workingDays, setWorkingDays] = useState<number | null>(null);
+  const [wdLoading, setWdLoading] = useState(false);
+
   const selectedType = leaveTypes.find((t) => t.id === leaveTypeId);
   const typeName = selectedType?.name?.toLowerCase() ?? "";
   const isMaternity = typeName.includes("คลอด") || typeName.includes("maternity");
@@ -53,6 +60,31 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
     const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return Math.max(diff, 0);
   }
+
+  // Fetch working days preview when dates change
+  const fetchWorkingDays = useCallback(
+    async (s: string, e: string) => {
+      if (!s || !e) { setWorkingDays(null); return; }
+      setWdLoading(true);
+      try {
+        const result = await previewWorkingDays(s, e);
+        setWorkingDays(result.workingDays);
+      } catch {
+        setWorkingDays(null);
+      } finally {
+        setWdLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchWorkingDays(startDate, endDate);
+    } else {
+      setWorkingDays(null);
+    }
+  }, [startDate, endDate, fetchWorkingDays]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -197,9 +229,24 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
       </div>
 
       {startDate && endDate && (
-        <p className="text-sm text-muted-foreground">
-          จำนวนวันลา: <span className="font-semibold">{calculateDays()}</span> วัน
-        </p>
+        <div className="rounded-lg bg-muted/50 p-3 text-sm">
+          <span>
+            จำนวนวันลา:{" "}
+            <span className="font-bold">{calculateDays()} วันปฏิทิน</span>
+            {workingDays !== null && (
+              <span className="text-muted-foreground ml-1.5">
+                ({wdLoading ? (
+                  <Loader2 className="inline h-3 w-3 animate-spin" />
+                ) : (
+                  <span className="font-semibold text-foreground">{workingDays} วันทำการ</span>
+                )})
+              </span>
+            )}
+            {wdLoading && workingDays === null && (
+              <Loader2 className="inline h-3 w-3 animate-spin ml-2" />
+            )}
+          </span>
+        </div>
       )}
 
       {/* Maternity-specific */}
@@ -295,13 +342,19 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
         </div>
       )}
 
-      {/* Medical cert upload (Sick leave) */}
-      {isSick && (
+      {/* Medical cert upload (Sick leave or maternity) */}
+      {(isSick || isMaternity) && (
         <div className="p-4 border rounded-lg bg-amber-50/50 space-y-2">
+          {isSick && workingDays !== null && workingDays > 2 && (
+            <p className="text-xs text-amber-800 flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5" />
+              ลาป่วยเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์
+            </p>
+          )}
           <FileUpload
             pathPrefix={`leaves/${employeeId || "unknown"}`}
             onUploaded={setMedicalCertPath}
-            label="แนบใบรับรองแพทย์ (ถ้ามี)"
+            label={isSick ? "แนบใบรับรองแพทย์ (บังคับถ้าเกิน 2 วันทำการ)" : "แนบใบรับรองแพทย์"}
             disabled={isPending}
           />
         </div>

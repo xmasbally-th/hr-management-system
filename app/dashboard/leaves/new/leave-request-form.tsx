@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   createLeaveRequest,
+  previewWorkingDays,
   type CreateLeaveRequestInput,
 } from "@/lib/actions/leave-actions";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ import {
   Send,
   AlertCircle,
   X,
+  Info,
+  WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -43,6 +46,9 @@ interface Props {
   leaveTypes: LeaveType[];
   employees: { id: string; full_name: string; email: string }[];
   balances?: Balance[];
+  leaveOnlineEnabled: boolean;
+  gender: string | null;
+  employeeType: string | null;
 }
 
 const KIND_META: Record<
@@ -132,10 +138,35 @@ const STORAGE_KEY = "hr-leave-form-kind";
  * - Maternity auto-fills date range from EDD (start = EDD - 30, end = +89)
  * - Sick requires medical cert when total_days > 3 (handled via FileUpload)
  */
-export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props) {
+/** Vacation accumulation cap per employee type */
+function getVacationCapLabel(employeeType: string | null): { cap: number; label: string } {
+  switch (employeeType) {
+    case "ข้าราชการ":
+      return { cap: 30, label: "ข้าราชการ — สะสมสูงสุด 30 วัน" };
+    case "พนักงานมหาวิทยาลัย":
+      return { cap: 20, label: "พนักงานมหาวิทยาลัย — สะสมสูงสุด 20 วัน" };
+    case "พนักงานราชการ":
+      return { cap: 15, label: "พนักงานราชการ — สะสมสูงสุด 15 วัน" };
+    default:
+      return { cap: 0, label: "ประเภทของคุณไม่มีสิทธิ์สะสมวันลาข้ามปี" };
+  }
+}
+
+export function LeaveRequestForm({
+  leaveTypes,
+  employees,
+  balances = [],
+  leaveOnlineEnabled,
+  gender,
+  employeeType,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // Working days preview (fetched from server)
+  const [workingDays, setWorkingDays] = useState<number | null>(null);
+  const [wdLoading, setWdLoading] = useState(false);
 
   // Active leave kind — persisted in localStorage
   const [kind, setKind] = useState<Kind>("vacation");
@@ -192,9 +223,10 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
   const [substitute3Id, setSubstitute3Id] = useState("");
   const [branchHeadOpinion, setBranchHeadOpinion] = useState("");
 
-  // Maternity: auto-fill date range from EDD (start = EDD - 30, end = +89 → 90 days total)
+  // Maternity (female): auto-fill date range from EDD (start = EDD - 30, end = +89 → 90 days total)
+  // Maternity (male): manual date selection — no auto-fill
   useEffect(() => {
-    if (kind !== "maternity" || !expectedDeliveryDate) return;
+    if (kind !== "maternity" || gender !== "female" || !expectedDeliveryDate) return;
     const edd = new Date(expectedDeliveryDate);
     const start = new Date(edd);
     start.setDate(start.getDate() - 30);
@@ -202,7 +234,32 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
     end.setDate(end.getDate() + 89);
     setStartDate(start.toISOString().slice(0, 10));
     setEndDate(end.toISOString().slice(0, 10));
-  }, [kind, expectedDeliveryDate]);
+  }, [kind, gender, expectedDeliveryDate]);
+
+  // Fetch working days preview when dates change
+  const fetchWorkingDays = useCallback(
+    async (s: string, e: string) => {
+      if (!s || !e) { setWorkingDays(null); return; }
+      setWdLoading(true);
+      try {
+        const result = await previewWorkingDays(s, e);
+        setWorkingDays(result.workingDays);
+      } catch {
+        setWorkingDays(null);
+      } finally {
+        setWdLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      fetchWorkingDays(startDate, endDate);
+    } else {
+      setWorkingDays(null);
+    }
+  }, [startDate, endDate, fetchWorkingDays]);
 
   function calcDays(): number {
     if (!startDate || !endDate) return 0;
@@ -218,8 +275,14 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
     return balances.find((b) => KIND_META[kind].match.test(b.typeName));
   }, [balances, kind]);
 
-  // Sick cert required when > 3 days
-  const requiresMedicalCert = (kind === "sick" && totalDays > 3) || kind === "maternity";
+  // Maternity visible only when gender is set
+  const showMaternity = gender === "female" || gender === "male";
+  // For female maternity, always require cert; for male, no cert required
+  const isFemaleMaternity = kind === "maternity" && gender === "female";
+  // Sick cert required when > 2 working days (use workingDays if available, fallback to totalDays)
+  const effectiveWorkingDays = workingDays ?? totalDays;
+  const requiresMedicalCert =
+    (kind === "sick" && effectiveWorkingDays > 2) || isFemaleMaternity;
   const meta = KIND_META[kind];
 
   function validate(): string | null {
@@ -230,8 +293,8 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
 
     if (kind === "sick") {
       if (!symptoms.trim()) return "กรุณาระบุอาการเจ็บป่วย";
-      if (totalDays > 3 && !medicalCertPath)
-        return "ลาป่วยเกิน 3 วัน ต้องแนบใบรับรองแพทย์";
+      if (effectiveWorkingDays > 2 && !medicalCertPath)
+        return "ลาป่วยเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์";
     }
     if (kind === "personal") {
       if (!reason.trim() || reason.trim().length < 10)
@@ -246,10 +309,16 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
       }
     }
     if (kind === "maternity") {
-      if (!expectedDeliveryDate) return "กรุณาระบุวันกำหนดคลอด";
-      if (!emergencyContact.trim()) return "กรุณาระบุเบอร์ติดต่อฉุกเฉิน";
-      if (totalDays !== 90) return "ลาคลอดต้องเป็น 90 วัน";
-      if (!medicalCertPath) return "กรุณาแนบใบรับรองแพทย์";
+      if (gender === "female") {
+        if (!expectedDeliveryDate) return "กรุณาระบุวันกำหนดคลอด";
+        if (!emergencyContact.trim()) return "กรุณาระบุเบอร์ติดต่อฉุกเฉิน";
+        if (totalDays !== 90) return "ลาคลอดต้องเป็น 90 วัน";
+        if (!medicalCertPath) return "กรุณาแนบใบรับรองแพทย์";
+      } else if (gender === "male") {
+        if (!emergencyContact.trim()) return "กรุณาระบุเบอร์ติดต่อฉุกเฉิน";
+        if (effectiveWorkingDays > 15)
+          return "ลาดูแลภรรยาคลอดไม่เกิน 15 วันทำการ";
+      }
     }
     if (kind === "vacation") {
       if (!substitute1Id) return "กรุณาเลือกผู้ปฏิบัติหน้าที่แทนคนที่ 1";
@@ -287,7 +356,7 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
       submission_channel: "digital",
     };
 
-    if (kind === "maternity") {
+    if (kind === "maternity" && expectedDeliveryDate) {
       input.expected_delivery_date = expectedDeliveryDate;
     }
     if (medicalCertPath) {
@@ -320,6 +389,20 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Offline banner — leave online submission disabled */}
+      {!leaveOnlineEnabled && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 flex items-start gap-3 text-amber-900">
+          <WifiOff className="h-5 w-5 mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <p className="font-semibold text-sm">ระบบยื่นลาออนไลน์ปิดอยู่</p>
+            <p className="text-xs leading-relaxed">
+              ขณะนี้ไม่สามารถยื่นคำขอลาผ่านระบบออนไลน์ได้ กรุณาติดต่อ HR
+              เพื่อยื่นคำขอลาผ่านช่องทางกระดาษ
+            </p>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">ยื่นคำขอลา</h1>
         <p className="text-muted-foreground text-sm">
@@ -327,14 +410,28 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
         </p>
       </div>
 
-      {/* Balance strip — 4 tiles */}
+      {/* Balance strip — 4 tiles (hide maternity if gender unknown) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {(Object.keys(KIND_META) as Kind[]).map((k) => {
+          // Hide maternity tile if gender is not set
+          if (k === "maternity" && !showMaternity) return null;
+
           const m = KIND_META[k];
           const bal = balances.find((b) => m.match.test(b.typeName));
           const remaining = bal ? bal.totalDays - bal.usedDays : null;
           const isActive = kind === k;
           const Icon = m.icon;
+
+          // Override label for male maternity
+          const displayLabel =
+            k === "maternity" && gender === "male"
+              ? "ลาดูแลภรรยาคลอด"
+              : m.label;
+          const displaySub =
+            k === "maternity" && gender === "male"
+              ? "Paternity"
+              : m.sub;
+
           return (
             <button
               key={k}
@@ -361,8 +458,8 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
                   )}
                 />
               </div>
-              <div className="mt-2 text-sm font-semibold">{m.label}</div>
-              <div className="text-xs text-muted-foreground">{m.sub}</div>
+              <div className="mt-2 text-sm font-semibold">{displayLabel}</div>
+              <div className="text-xs text-muted-foreground">{displaySub}</div>
               {bal ? (
                 <div className="mt-3">
                   <div className="text-2xl font-bold font-mono">
@@ -382,12 +479,30 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
         })}
       </div>
 
+      {/* Alert: maternity hidden because gender not set */}
+      {!showMaternity && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs flex items-start gap-2 text-rose-800">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            ประเภท &quot;ลาคลอด&quot; ยังไม่แสดง เนื่องจากยังไม่ได้ระบุเพศในโปรไฟล์ —{" "}
+            <a href="/dashboard/profile" className="underline font-medium">
+              อัปเดตโปรไฟล์
+            </a>
+          </span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Tab pills */}
         <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-muted">
           {(Object.keys(KIND_META) as Kind[]).map((k) => {
+            if (k === "maternity" && !showMaternity) return null;
             const m = KIND_META[k];
             const active = kind === k;
+            const tabLabel =
+              k === "maternity" && gender === "male"
+                ? "ลาดูแลภรรยาคลอด"
+                : m.label;
             return (
               <button
                 key={k}
@@ -400,7 +515,7 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {m.label}
+                {tabLabel}
               </button>
             );
           })}
@@ -418,11 +533,13 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
             {kind === "vacation" &&
               "ลาพักผ่อน — เลือกผู้ปฏิบัติแทนคนที่ 1 บังคับ (สูงสุด 3 คน) และระบุความเห็นหัวหน้าสาขา (ถ้ามี)"}
             {kind === "sick" &&
-              "ลาป่วย — ลาเกิน 3 วัน ต้องแนบใบรับรองแพทย์ · อนุญาตให้ลงวันที่ย้อนหลัง"}
+              "ลาป่วย — ลาเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์ · สูงสุด 30 วันทำการ/ปีงบประมาณ"}
             {kind === "personal" &&
-              "ลากิจ — แบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน · เหตุผลต้องมีอย่างน้อย 10 ตัวอักษร"}
-            {kind === "maternity" &&
+              "ลากิจ — แบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน · เหตุผลต้องมีอย่างน้อย 10 ตัวอักษร · สูงสุด 10 วันทำการ/ปีงบประมาณ"}
+            {kind === "maternity" && gender === "female" &&
               "ลาคลอด — ระบบจะคำนวณช่วงวันลา 90 วันจากวันกำหนดคลอดอัตโนมัติ · ต้องแนบใบรับรองแพทย์"}
+            {kind === "maternity" && gender === "male" &&
+              "ลาดูแลภรรยาคลอด — สูงสุด 15 วันทำการ · เลือกช่วงเวลาที่ต้องการได้เอง"}
           </div>
         </div>
 
@@ -435,8 +552,8 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
 
         {/* Form card */}
         <div className="rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
-          {/* Maternity: pregnancy info box at top (special pink card) */}
-          {kind === "maternity" && (
+          {/* Maternity (female): pregnancy info box */}
+          {kind === "maternity" && gender === "female" && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 space-y-4">
               <div className="text-sm font-semibold text-rose-900">
                 ข้อมูลการตั้งครรภ์
@@ -475,6 +592,38 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
             </div>
           )}
 
+          {/* Maternity (male): paternity leave info box */}
+          {kind === "maternity" && gender === "male" && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 space-y-4">
+              <div className="text-sm font-semibold text-rose-900">
+                ลาดูแลภรรยาคลอด
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">เบอร์ฉุกเฉิน *</Label>
+                  <Input
+                    value={emergencyContact}
+                    onChange={(e) => setEmergencyContact(e.target.value)}
+                    placeholder="ภรรยา / ครอบครัว"
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">วันกำหนดคลอด (ถ้าทราบ)</Label>
+                  <Input
+                    type="date"
+                    value={expectedDeliveryDate}
+                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-rose-700">
+                สูงสุด 15 วันทำการ · เลือกช่วงวันที่เริ่มต้น-สิ้นสุดด้านล่าง
+              </p>
+            </div>
+          )}
+
           {/* Personal: planning vs urgent segmented */}
           {kind === "personal" && (
             <div className="space-y-2">
@@ -506,7 +655,7 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
             </div>
           )}
 
-          {/* Date range */}
+          {/* Date range — locked for female maternity (auto-calculated from EDD) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>วันที่เริ่ม *</Label>
@@ -514,7 +663,7 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                disabled={isPending || kind === "maternity"}
+                disabled={isPending || isFemaleMaternity}
                 required
               />
             </div>
@@ -524,34 +673,48 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                disabled={isPending || kind === "maternity"}
+                disabled={isPending || isFemaleMaternity}
                 required
               />
             </div>
           </div>
 
-          {/* Days summary + progress */}
+          {/* Days summary + working days + progress */}
           {totalDays > 0 && (
-            <div className="rounded-lg bg-muted/50 p-3 flex items-center justify-between gap-4 text-sm">
-              <span>
-                จำนวนวันลา:{" "}
-                <span className="font-bold text-base">{totalDays} วัน</span>
-              </span>
-              {activeBalance && (
-                <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xs">
-                  <div className="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full", TONE_BG[meta.tone])}
-                      style={{
-                        width: `${Math.min(((activeBalance.usedDays + totalDays) / activeBalance.totalDays) * 100, 100)}%`,
-                      }}
-                    />
+            <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span>
+                  จำนวนวันลา:{" "}
+                  <span className="font-bold text-base">{totalDays} วันปฏิทิน</span>
+                  {workingDays !== null && (
+                    <span className="text-muted-foreground ml-1.5">
+                      ({wdLoading ? (
+                        <Loader2 className="inline h-3 w-3 animate-spin" />
+                      ) : (
+                        <span className="font-semibold text-foreground">{workingDays} วันทำการ</span>
+                      )})
+                    </span>
+                  )}
+                  {wdLoading && workingDays === null && (
+                    <Loader2 className="inline h-3 w-3 animate-spin ml-2" />
+                  )}
+                </span>
+                {activeBalance && (
+                  <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xs">
+                    <div className="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full", TONE_BG[meta.tone])}
+                        style={{
+                          width: `${Math.min(((activeBalance.usedDays + totalDays) / activeBalance.totalDays) * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      เหลือ {activeBalance.totalDays - activeBalance.usedDays - totalDays} วัน
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    เหลือ {activeBalance.totalDays - activeBalance.usedDays - totalDays} วัน
-                  </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
@@ -603,8 +766,8 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
             </>
           )}
 
-          {/* Maternity: hospital + doctor */}
-          {kind === "maternity" && (
+          {/* Maternity (female): hospital + doctor */}
+          {kind === "maternity" && gender === "female" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>โรงพยาบาลที่คลอด</Label>
@@ -642,13 +805,13 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
             </div>
           )}
 
-          {/* Medical cert upload (sick > 3 days, or maternity) */}
+          {/* Medical cert upload (sick > 2 working days, or female maternity) */}
           {requiresMedicalCert && (
             <div className="space-y-1.5">
               <Label>
                 ใบรับรองแพทย์{" "}
                 <span className="text-rose-600 font-semibold">
-                  {kind === "maternity" || (kind === "sick" && totalDays > 3)
+                  {isFemaleMaternity || (kind === "sick" && effectiveWorkingDays > 2)
                     ? "(บังคับ)"
                     : "(ถ้ามี)"}
                 </span>
@@ -664,6 +827,19 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
           {/* Vacation-specific */}
           {kind === "vacation" && (
             <div className="space-y-5 border-t border-border pt-5">
+              {/* Vacation accumulation cap info */}
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs flex items-start gap-2 text-sky-900">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-semibold">สิทธิ์ลาพักผ่อน:</span>{" "}
+                  10 วันทำการ/ปี
+                  {getVacationCapLabel(employeeType).cap > 0 ? (
+                    <> + สะสมจากปีก่อนสูงสุด {getVacationCapLabel(employeeType).cap} วัน ({getVacationCapLabel(employeeType).label})</>
+                  ) : (
+                    <> · {getVacationCapLabel(employeeType).label}</>
+                  )}
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>วันสะสมจากปีก่อน</Label>
@@ -757,7 +933,7 @@ export function LeaveRequestForm({ leaveTypes, employees, balances = [] }: Props
           </Button>
           <Button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || !leaveOnlineEnabled}
             className={cn("text-white", TONE_BG[meta.tone], TONE_HOVER_BG[meta.tone])}
           >
             {isPending ? (
