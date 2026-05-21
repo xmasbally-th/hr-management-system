@@ -175,11 +175,17 @@ export async function enforceLeaveTypeRules(
     case "MATERNITY": {
       const gender = emp?.gender ?? null;
 
-      if (!gender) {
+      // gender เก็บเป็นภาษาไทย: "ชาย" / "หญิง" / "ไม่ระบุ"
+      // (คง "female"/"male" ไว้รองรับข้อมูลเก่า backward-compat)
+      const isFemale = gender === "หญิง" || gender === "female";
+      const isMale = gender === "ชาย" || gender === "male";
+
+      if (!isFemale && !isMale) {
+        // ครอบคลุม null, "ไม่ระบุ", และค่าอื่น ๆ ที่ไม่รู้จัก
         throw new Error("กรุณาอัปเดตข้อมูลเพศในโปรไฟล์ก่อนยื่นลาคลอด");
       }
 
-      if (gender === "หญิง" || gender === "female") {
+      if (isFemale) {
         // เพศหญิง: ≤ 90 วันปฏิทิน (นับรวมวันหยุด — ตามกฎหมายลาคลอด)
         const calendarDays = calculateCalendarDays(startDate, endDate);
         if (calendarDays > 90) {

@@ -226,7 +226,7 @@ export function LeaveRequestForm({
   // Maternity (female): auto-fill date range from EDD (start = EDD - 30, end = +89 → 90 days total)
   // Maternity (male): manual date selection — no auto-fill
   useEffect(() => {
-    if (kind !== "maternity" || gender !== "female" || !expectedDeliveryDate) return;
+    if (kind !== "maternity" || gender !== "หญิง" || !expectedDeliveryDate) return;
     const edd = new Date(expectedDeliveryDate);
     const start = new Date(edd);
     start.setDate(start.getDate() - 30);
@@ -276,9 +276,9 @@ export function LeaveRequestForm({
   }, [balances, kind]);
 
   // Maternity visible only when gender is set
-  const showMaternity = gender === "female" || gender === "male";
+  const showMaternity = gender === "หญิง" || gender === "ชาย";
   // For female maternity, always require cert; for male, no cert required
-  const isFemaleMaternity = kind === "maternity" && gender === "female";
+  const isFemaleMaternity = kind === "maternity" && gender === "หญิง";
   // Sick cert required when > 2 working days (use workingDays if available, fallback to totalDays)
   const effectiveWorkingDays = workingDays ?? totalDays;
   const requiresMedicalCert =
@@ -309,12 +309,12 @@ export function LeaveRequestForm({
       }
     }
     if (kind === "maternity") {
-      if (gender === "female") {
+      if (gender === "หญิง") {
         if (!expectedDeliveryDate) return "กรุณาระบุวันกำหนดคลอด";
         if (!emergencyContact.trim()) return "กรุณาระบุเบอร์ติดต่อฉุกเฉิน";
         if (totalDays !== 90) return "ลาคลอดต้องเป็น 90 วัน";
         if (!medicalCertPath) return "กรุณาแนบใบรับรองแพทย์";
-      } else if (gender === "male") {
+      } else if (gender === "ชาย") {
         if (!emergencyContact.trim()) return "กรุณาระบุเบอร์ติดต่อฉุกเฉิน";
         if (effectiveWorkingDays > 15)
           return "ลาดูแลภรรยาคลอดไม่เกิน 15 วันทำการ";
@@ -424,11 +424,11 @@ export function LeaveRequestForm({
 
           // Override label for male maternity
           const displayLabel =
-            k === "maternity" && gender === "male"
+            k === "maternity" && gender === "ชาย"
               ? "ลาดูแลภรรยาคลอด"
               : m.label;
           const displaySub =
-            k === "maternity" && gender === "male"
+            k === "maternity" && gender === "ชาย"
               ? "Paternity"
               : m.sub;
 
@@ -500,7 +500,7 @@ export function LeaveRequestForm({
             const m = KIND_META[k];
             const active = kind === k;
             const tabLabel =
-              k === "maternity" && gender === "male"
+              k === "maternity" && gender === "ชาย"
                 ? "ลาดูแลภรรยาคลอด"
                 : m.label;
             return (
@@ -536,9 +536,9 @@ export function LeaveRequestForm({
               "ลาป่วย — ลาเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์ · สูงสุด 30 วันทำการ/ปีงบประมาณ"}
             {kind === "personal" &&
               "ลากิจ — แบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน · เหตุผลต้องมีอย่างน้อย 10 ตัวอักษร · สูงสุด 10 วันทำการ/ปีงบประมาณ"}
-            {kind === "maternity" && gender === "female" &&
+            {kind === "maternity" && gender === "หญิง" &&
               "ลาคลอด — ระบบจะคำนวณช่วงวันลา 90 วันจากวันกำหนดคลอดอัตโนมัติ · ต้องแนบใบรับรองแพทย์"}
-            {kind === "maternity" && gender === "male" &&
+            {kind === "maternity" && gender === "ชาย" &&
               "ลาดูแลภรรยาคลอด — สูงสุด 15 วันทำการ · เลือกช่วงเวลาที่ต้องการได้เอง"}
           </div>
         </div>
@@ -553,7 +553,7 @@ export function LeaveRequestForm({
         {/* Form card */}
         <div className="rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
           {/* Maternity (female): pregnancy info box */}
-          {kind === "maternity" && gender === "female" && (
+          {kind === "maternity" && gender === "หญิง" && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 space-y-4">
               <div className="text-sm font-semibold text-rose-900">
                 ข้อมูลการตั้งครรภ์
@@ -593,7 +593,7 @@ export function LeaveRequestForm({
           )}
 
           {/* Maternity (male): paternity leave info box */}
-          {kind === "maternity" && gender === "male" && (
+          {kind === "maternity" && gender === "ชาย" && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 space-y-4">
               <div className="text-sm font-semibold text-rose-900">
                 ลาดูแลภรรยาคลอด
@@ -767,7 +767,7 @@ export function LeaveRequestForm({
           )}
 
           {/* Maternity (female): hospital + doctor */}
-          {kind === "maternity" && gender === "female" && (
+          {kind === "maternity" && gender === "หญิง" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>โรงพยาบาลที่คลอด</Label>

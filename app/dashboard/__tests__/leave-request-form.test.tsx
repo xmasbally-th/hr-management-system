@@ -75,7 +75,7 @@ function renderForm(overrides?: Partial<React.ComponentProps<typeof LeaveRequest
       leaveTypes={LEAVE_TYPES}
       employees={EMPLOYEES}
       leaveOnlineEnabled={true}
-      gender="female"
+      gender="หญิง"
       employeeType="ข้าราชการ"
       {...overrides}
     />
