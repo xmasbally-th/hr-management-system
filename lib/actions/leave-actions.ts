@@ -376,7 +376,7 @@ export async function createLeaveRequestByHr(
   await validateEmployeeExists(supabase, employeeId);
 
   // ── Enforce business rules (no toggle check — paper channel) ──
-  const { workingDays } = await enforceLeaveTypeRules(
+  const { workingDays, leaveTypeName, employeeName } = await enforceLeaveTypeRules(
     supabase, input.leave_type_id, employeeId,
     input.start_date, input.end_date, input.total_days,
     input.medical_cert_url, input.expected_delivery_date,
@@ -422,6 +422,19 @@ export async function createLeaveRequestByHr(
 
     if (vacError) {
       console.error("[leave-actions] HR vacation details insert failed:", vacError);
+    }
+  }
+
+  // ── Notify HR/Admin (exclude the HR who submitted) ──
+  const notifMsg = `มีคำขอ${leaveTypeName}ใหม่จาก ${employeeName} (${workingDays} วัน · กระดาษ) รอการอนุมัติ`;
+  const { data: hrUsers } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("role", ["hr", "admin"])
+    .neq("id", user.id);
+  if (hrUsers) {
+    for (const hr of hrUsers) {
+      await createNotificationInternal(supabase, hr.id, "new_leave_request", notifMsg);
     }
   }
 
@@ -551,8 +564,12 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
     .from("leave_types").select("name").eq("id", updated.leave_type_id).single();
   const ltName = ltInfo?.name ?? "ลา";
 
+  const rejectMsg = reason
+    ? `คำขอ${ltName}ของคุณไม่ได้รับการอนุมัติ เหตุผล: ${reason}`
+    : `คำขอ${ltName}ของคุณไม่ได้รับการอนุมัติ`;
+
   await logAudit(supabase, user.id, "reject_leave", "leave_request", requestId);
-  await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", `คำขอ${ltName}ของคุณไม่ได้รับการอนุมัติ`);
+  await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", rejectMsg);
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
@@ -626,6 +643,33 @@ export async function cancelLeaveRequest(requestId: string) {
   await logAudit(supabase, user.id, "cancel_leave", "leave_request", requestId, {
     was_approved: wasPreviouslyApproved,
   });
+
+  // ── Notify HR/Admin about cancellation ──
+  try {
+    const [{ data: empProfile }, { data: ltInfo }] = await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", req.employee_id).single(),
+      supabase.from("leave_types").select("name").eq("id", req.leave_type_id).single(),
+    ]);
+    const empName = empProfile?.full_name ?? "พนักงาน";
+    const ltName = ltInfo?.name ?? "ลา";
+    const daysLabel = req.working_days ?? req.total_days;
+    const cancelMsg = wasPreviouslyApproved
+      ? `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) ที่อนุมัติแล้ว — วันลาถูกคืนกลับ`
+      : `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน)`;
+
+    const { data: hrUsers } = await supabase
+      .from("profiles")
+      .select("id")
+      .in("role", ["hr", "admin"]);
+    if (hrUsers) {
+      for (const hr of hrUsers) {
+        await createNotificationInternal(supabase, hr.id, "new_leave_request", cancelMsg);
+      }
+    }
+  } catch {
+    // Non-blocking: notification failure shouldn't fail cancellation
+    console.error("[leave-actions] Failed to send cancel notification");
+  }
 
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
