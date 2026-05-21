@@ -600,10 +600,46 @@ export interface Database {
         ];
       };
 
+      holidays: {
+        Row: {
+          id: string;
+          date: string;
+          name: string;
+          fiscal_year: number;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          date: string;
+          name: string;
+          fiscal_year: number;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          name?: string;
+          fiscal_year?: number;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "holidays_created_by_fkey";
+            columns: ["created_by"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       leave_types: {
         Row: {
           id: string;
           name: string;
+          code: string | null;
           max_days_per_year: number;
           is_accumulative: boolean;
           conditions: string | null;
@@ -612,6 +648,7 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          code?: string | null;
           max_days_per_year: number;
           is_accumulative?: boolean;
           conditions?: string | null;
@@ -620,6 +657,7 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          code?: string | null;
           max_days_per_year?: number;
           is_accumulative?: boolean;
           conditions?: string | null;
@@ -689,6 +727,7 @@ export interface Database {
           start_date: string;
           end_date: string;
           total_days: number;
+          working_days: number | null;
           reason: string | null;
           contact_number: string | null;
           medical_cert_url: string | null;
@@ -706,6 +745,7 @@ export interface Database {
           start_date: string;
           end_date: string;
           total_days: number;
+          working_days?: number | null;
           reason?: string | null;
           contact_number?: string | null;
           medical_cert_url?: string | null;
@@ -723,6 +763,7 @@ export interface Database {
           start_date?: string;
           end_date?: string;
           total_days?: number;
+          working_days?: number | null;
           reason?: string | null;
           contact_number?: string | null;
           medical_cert_url?: string | null;
@@ -1078,6 +1119,7 @@ export type UpdateDto<T extends keyof Database["public"]["Tables"]> =
 export type Department = Tables<"departments">;
 export type Position = Tables<"positions">;
 export type Profile = Tables<"profiles">;
+export type Holiday = Tables<"holidays">;
 export type LeaveType = Tables<"leave_types">;
 export type LeaveBalance = Tables<"leave_balances">;
 export type LeaveRequest = Tables<"leave_requests">;
