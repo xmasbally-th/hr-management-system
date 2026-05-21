@@ -167,6 +167,59 @@ export async function countRequestsByLeaveType(id: string): Promise<number> {
 }
 
 // =============================================================================
+// Leave Online Submission Toggle
+// =============================================================================
+
+/**
+ * Read whether online leave submission is enabled.
+ * Any authenticated user can read (needed by the leave form).
+ */
+export async function getLeaveOnlineEnabled(): Promise<boolean> {
+  const supabase = await createClient();
+  await getAuthUser(supabase);
+
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "leave_online_submission_enabled")
+    .maybeSingle();
+
+  if (!data) return true; // default: enabled
+  const val = data.value as { enabled?: boolean } | null;
+  return val?.enabled !== false;
+}
+
+/**
+ * HR/Admin: update the leave online submission toggle.
+ */
+export async function updateLeaveOnlineEnabled(enabled: boolean): Promise<void> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const { error } = await supabase
+    .from("system_settings")
+    .upsert(
+      {
+        key: "leave_online_submission_enabled",
+        value: { enabled } as unknown as import("@/types/supabase").Database["public"]["Tables"]["system_settings"]["Insert"]["value"],
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      },
+      { onConflict: "key" },
+    );
+
+  if (error) throw new Error("บันทึกค่าระบบไม่สำเร็จ");
+
+  await logAudit(supabase, user.id, "update_leave_online_toggle", "system_setting", "leave_online_submission_enabled", {
+    enabled,
+  });
+
+  revalidatePath("/dashboard/hr/master-data");
+  revalidatePath("/dashboard/leaves/new");
+}
+
+// =============================================================================
 // Departments / System stats — relaxed RBAC where appropriate
 // =============================================================================
 
