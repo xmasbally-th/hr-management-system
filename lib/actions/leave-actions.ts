@@ -1,7 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { env } from "@/lib/env";
 import { createNotificationInternal } from "./notification-actions";
 import { UUID_RE, validateRequestDates, validateEmployeeExists, validateTextField } from "./validators";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -11,6 +13,108 @@ import { calculateWorkingDays, calculateCalendarDays } from "@/lib/working-days"
 import { enforceLeaveTypeRules, getVacationAccumulationCap } from "@/lib/leave-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
+
+// ─── Service-role admin client ─────────────────────────────
+// Leave balances + document_tracking are SYSTEM-managed (RLS restricts
+// writes to hr/admin). When an employee submits/cancels their own request
+// we still need to reserve/release balance and create tracking rows, so
+// those mutations go through the service-role client. Only ever called
+// from authenticated server actions after auth/role checks.
+function getAdminClient(): SupabaseClient<Database> {
+  return createSupabaseClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
+// ─── Balance reserve / release (W0 reserve-on-submit) ──────
+
+/** Reserve `days` against an employee's leave balance for the FY (used += days).
+ *  Auto-creates the balance row from leave_type entitlement if missing. */
+async function reserveLeaveBalance(
+  admin: SupabaseClient<Database>,
+  employeeId: string,
+  leaveTypeId: string,
+  days: number,
+  fy: number,
+): Promise<void> {
+  const { data: bal } = await admin
+    .from("leave_balances")
+    .select("id, total_days, used_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("fiscal_year", fy)
+    .maybeSingle();
+
+  if (bal) {
+    const newUsed = (bal.used_days ?? 0) + days;
+    await admin
+      .from("leave_balances")
+      .update({
+        used_days: newUsed,
+        remaining_days: Math.max(0, bal.total_days - newUsed),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", bal.id);
+  } else {
+    const { data: lt } = await admin
+      .from("leave_types")
+      .select("max_days_per_year")
+      .eq("id", leaveTypeId)
+      .single();
+    const total = lt?.max_days_per_year ?? 0;
+    await admin.from("leave_balances").insert({
+      employee_id: employeeId,
+      leave_type_id: leaveTypeId,
+      fiscal_year: fy,
+      total_days: total,
+      used_days: days,
+      remaining_days: Math.max(0, total - days),
+      accumulated_days: 0,
+    });
+  }
+}
+
+/** Release `days` back to an employee's balance (used -= days, floored at 0). */
+async function releaseLeaveBalance(
+  admin: SupabaseClient<Database>,
+  employeeId: string,
+  leaveTypeId: string,
+  days: number,
+  fy: number,
+): Promise<void> {
+  const { data: bal } = await admin
+    .from("leave_balances")
+    .select("id, total_days, used_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("fiscal_year", fy)
+    .maybeSingle();
+  if (!bal) return;
+  const newUsed = Math.max(0, (bal.used_days ?? 0) - days);
+  await admin
+    .from("leave_balances")
+    .update({
+      used_days: newUsed,
+      remaining_days: Math.max(0, bal.total_days - newUsed),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", bal.id);
+}
+
+/** Create the document_tracking row that drives the signature workflow. */
+async function createLeaveDocumentTracking(
+  admin: SupabaseClient<Database>,
+  requestId: string,
+): Promise<void> {
+  const { error } = await admin
+    .from("document_tracking")
+    .insert({ reference_id: requestId, document_type: "leave" });
+  if (error) {
+    console.error("[leave-actions] create document_tracking failed:", error.message);
+  }
+}
 
 // ─── Auth helpers ──────────────────────────────────────────
 
@@ -333,6 +437,11 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     }
   }
 
+  // ── Reserve balance on submit (W0) + create document_tracking (CW7) ──
+  const admin = getAdminClient();
+  await reserveLeaveBalance(admin, user.id, input.leave_type_id, workingDays, currentFiscalYear());
+  await createLeaveDocumentTracking(admin, request.id);
+
   // ── Notify HR/Manager (reuse data from enforceLeaveTypeRules) ──
   const notifMsg = `มีคำขอ${leaveTypeName}ใหม่จาก ${employeeName} (${workingDays} วัน) รอการอนุมัติ`;
 
@@ -425,6 +534,11 @@ export async function createLeaveRequestByHr(
     }
   }
 
+  // ── Reserve balance on submit (W0) + create document_tracking (CW7) ──
+  const admin = getAdminClient();
+  await reserveLeaveBalance(admin, employeeId, input.leave_type_id, workingDays, currentFiscalYear());
+  await createLeaveDocumentTracking(admin, request.id);
+
   // ── Notify HR/Admin (exclude the HR who submitted) ──
   const notifMsg = `มีคำขอ${leaveTypeName}ใหม่จาก ${employeeName} (${workingDays} วัน · กระดาษ) รอการอนุมัติ`;
   const { data: hrUsers } = await supabase
@@ -473,52 +587,9 @@ export async function approveLeaveRequest(requestId: string) {
 
   if (error || !updated) throw new Error("ไม่สามารถอนุมัติคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
 
-  // ── Update leave_balances: add used_days ──
+  // Balance was already reserved at submission (W0 reserve-on-submit) —
+  // approval only advances status, it must NOT add days again.
   const daysToAdd = updated.working_days ?? updated.total_days;
-  const fy = currentFiscalYear();
-
-  try {
-    const { data: balance } = await supabase
-      .from("leave_balances")
-      .select("id, used_days, total_days")
-      .eq("employee_id", updated.employee_id)
-      .eq("leave_type_id", updated.leave_type_id)
-      .eq("fiscal_year", fy)
-      .maybeSingle();
-
-    if (balance) {
-      const newUsed = (balance.used_days ?? 0) + daysToAdd;
-      await supabase
-        .from("leave_balances")
-        .update({
-          used_days: newUsed,
-          remaining_days: Math.max(0, balance.total_days - newUsed),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", balance.id);
-    } else {
-      // Auto-create balance row — use leave_type max_days as default
-      const { data: lt } = await supabase
-        .from("leave_types")
-        .select("max_days_per_year")
-        .eq("id", updated.leave_type_id)
-        .single();
-      const totalEntitlement = lt?.max_days_per_year ?? 0;
-
-      await supabase.from("leave_balances").insert({
-        employee_id: updated.employee_id,
-        leave_type_id: updated.leave_type_id,
-        fiscal_year: fy,
-        total_days: totalEntitlement,
-        used_days: daysToAdd,
-        remaining_days: Math.max(0, totalEntitlement - daysToAdd),
-        accumulated_days: 0,
-      });
-    }
-  } catch (balanceErr) {
-    // Non-blocking: log but don't fail the approval
-    console.error("[leave-actions] Failed to update leave_balances:", balanceErr);
-  }
 
   // ── Notification with leave type name ──
   const { data: ltInfo } = await supabase
@@ -555,10 +626,19 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
     })
     .eq("id", requestId)
     .eq("status", "pending")
-    .select("employee_id, leave_type_id")
+    .select("employee_id, leave_type_id, working_days, total_days")
     .single();
 
   if (error || !updated) throw new Error("ไม่สามารถปฏิเสธคำขอลาได้ (อาจถูกดำเนินการแล้ว)");
+
+  // Release the balance reserved at submission (W0)
+  await releaseLeaveBalance(
+    getAdminClient(),
+    updated.employee_id,
+    updated.leave_type_id,
+    updated.working_days ?? updated.total_days,
+    currentFiscalYear(),
+  );
 
   const { data: ltInfo } = await supabase
     .from("leave_types").select("name").eq("id", updated.leave_type_id).single();
@@ -590,11 +670,12 @@ export async function cancelLeaveRequest(requestId: string) {
     .single();
 
   if (!req) throw new Error("ไม่พบคำขอลานี้");
-  if (req.status !== "pending" && req.status !== "approved") {
-    throw new Error("ยกเลิกได้เฉพาะคำขอที่อยู่ในสถานะรออนุมัติหรืออนุมัติแล้วเท่านั้น");
+  // Cancellable while committed but not yet archived. `completed`
+  // (sent to university) is terminal and cannot be cancelled here.
+  const CANCELLABLE = ["pending", "awaiting_director", "awaiting_dean", "approved"];
+  if (!CANCELLABLE.includes(req.status)) {
+    throw new Error("ยกเลิกได้เฉพาะคำขอที่ยังไม่ถูกส่งหน่วยงาน (รออนุมัติ/ระหว่างเซ็น/อนุมัติแล้ว)");
   }
-
-  const wasPreviouslyApproved = req.status === "approved";
 
   // Atomic: only cancel if status hasn't changed since our read
   const { data: cancelled, error } = await supabase
@@ -610,38 +691,17 @@ export async function cancelLeaveRequest(requestId: string) {
     throw new Error("ไม่สามารถยกเลิกคำขอลาได้ (สถานะอาจเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า)");
   }
 
-  // ── Restore leave_balances if the request was approved ──
-  if (wasPreviouslyApproved) {
-    const daysToRestore = req.working_days ?? req.total_days;
-    const fy = currentFiscalYear();
-
-    try {
-      const { data: balance } = await supabase
-        .from("leave_balances")
-        .select("id, used_days, total_days")
-        .eq("employee_id", req.employee_id)
-        .eq("leave_type_id", req.leave_type_id)
-        .eq("fiscal_year", fy)
-        .maybeSingle();
-
-      if (balance) {
-        const newUsed = Math.max(0, (balance.used_days ?? 0) - daysToRestore);
-        await supabase
-          .from("leave_balances")
-          .update({
-            used_days: newUsed,
-            remaining_days: Math.max(0, balance.total_days - newUsed),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", balance.id);
-      }
-    } catch (balanceErr) {
-      console.error("[leave-actions] Failed to restore leave_balances:", balanceErr);
-    }
-  }
+  // ── Release the reserved balance (W0 — all committed statuses reserve) ──
+  await releaseLeaveBalance(
+    getAdminClient(),
+    req.employee_id,
+    req.leave_type_id,
+    req.working_days ?? req.total_days,
+    currentFiscalYear(),
+  );
 
   await logAudit(supabase, user.id, "cancel_leave", "leave_request", requestId, {
-    was_approved: wasPreviouslyApproved,
+    prev_status: req.status,
   });
 
   // ── Notify HR/Admin about cancellation ──
@@ -653,9 +713,7 @@ export async function cancelLeaveRequest(requestId: string) {
     const empName = empProfile?.full_name ?? "พนักงาน";
     const ltName = ltInfo?.name ?? "ลา";
     const daysLabel = req.working_days ?? req.total_days;
-    const cancelMsg = wasPreviouslyApproved
-      ? `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) ที่อนุมัติแล้ว — วันลาถูกคืนกลับ`
-      : `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน)`;
+    const cancelMsg = `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) — วันลาถูกคืนกลับ`;
 
     const { data: hrUsers } = await supabase
       .from("profiles")
@@ -674,6 +732,243 @@ export async function cancelLeaveRequest(requestId: string) {
   revalidatePath("/dashboard/leaves");
   revalidatePath("/dashboard/hr/leaves");
   revalidatePath("/dashboard/approvals/leaves");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Signature workflow (ผอ. → คณบดี → สแกน → ส่งมหาวิทยาลัย)
+//  HR/Admin only (managers are read-only — CW5). Balance is NOT
+//  touched here (reserved at submit, W0); these only advance status,
+//  stamp document_tracking dates, audit, and notify the employee.
+// ═══════════════════════════════════════════════════════════
+
+async function requireHrAdmin(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string> {
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+  return user.id;
+}
+
+type ReqStatus = Database["public"]["Tables"]["leave_requests"]["Row"]["status"];
+
+interface StageConfig {
+  from: ReqStatus[];
+  to?: ReqStatus;
+  trackingDates?: string[];
+  trackingExtra?: Record<string, unknown>;
+  audit: string;
+  notifyType?: string;
+  notifyMsg?: (ltName: string) => string;
+}
+
+/** Shared HR/Admin workflow step: guard status, advance, stamp tracking,
+ *  audit, notify employee, revalidate all leave/document surfaces. */
+async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void> {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+  const supabase = await createClient();
+  const actorId = await requireHrAdmin(supabase);
+
+  let row: { employee_id: string; leave_type_id: string };
+  if (cfg.to) {
+    const { data, error } = await supabase
+      .from("leave_requests")
+      .update({ status: cfg.to })
+      .eq("id", requestId)
+      .in("status", cfg.from)
+      .select("employee_id, leave_type_id")
+      .single();
+    if (error || !data) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว กรุณารีเฟรช)");
+    row = data;
+  } else {
+    const { data, error } = await supabase
+      .from("leave_requests")
+      .select("employee_id, leave_type_id, status")
+      .eq("id", requestId)
+      .single();
+    if (error || !data || !cfg.from.includes(data.status)) {
+      throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง)");
+    }
+    row = data;
+  }
+
+  if (cfg.trackingDates?.length || cfg.trackingExtra) {
+    const now = new Date().toISOString();
+    const tpatch: Record<string, unknown> = { ...(cfg.trackingExtra ?? {}) };
+    for (const c of cfg.trackingDates ?? []) tpatch[c] = now;
+    const { error: terr } = await supabase
+      .from("document_tracking")
+      .update(tpatch as Database["public"]["Tables"]["document_tracking"]["Update"])
+      .eq("reference_id", requestId);
+    if (terr) console.error("[leave-actions] tracking update failed:", terr.message);
+  }
+
+  await logAudit(supabase, actorId, cfg.audit, "leave_request", requestId);
+
+  if (cfg.notifyType && cfg.notifyMsg) {
+    const { data: lt } = await supabase
+      .from("leave_types").select("name").eq("id", row.leave_type_id).single();
+    await createNotificationInternal(
+      supabase, row.employee_id, cfg.notifyType, cfg.notifyMsg(lt?.name ?? "ลา"),
+    );
+  }
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath(`/dashboard/leaves/${requestId}`);
+  revalidatePath("/dashboard/documents");
+  revalidatePath("/dashboard/hr/leaves");
+  revalidatePath("/dashboard/hr/documents");
+  revalidatePath("/dashboard/approvals/leaves");
+  revalidatePath("/dashboard/approvals/documents");
+}
+
+/** Step 1: HR ส่งใบลาให้ผู้อำนวยการลงนาม */
+export async function routeToDirector(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["pending"],
+    to: "awaiting_director",
+    trackingDates: ["sent_to_director_date"],
+    audit: "route_to_director",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ผู้อำนวยการลงนามแล้ว`,
+  });
+}
+
+/** Step 2: ผู้อำนวยการลงนาม (status คงที่ awaiting_director จนกว่าจะส่งคณบดี) */
+export async function markDirectorSigned(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["awaiting_director"],
+    trackingDates: ["director_signed_date"],
+    audit: "director_signed",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอ${lt}ของคุณแล้ว`,
+  });
+}
+
+/** Step 3: HR ส่งใบลาให้คณบดีลงนาม */
+export async function routeToDean(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["awaiting_director"],
+    to: "awaiting_dean",
+    trackingDates: ["sent_to_dean_date"],
+    audit: "route_to_dean",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้คณบดีลงนามแล้ว`,
+  });
+}
+
+/** Step 4: คณบดีลงนาม → อนุมัติ (balance ถูกจองตั้งแต่ยื่นแล้ว ไม่แตะซ้ำ) */
+export async function markDeanSigned(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["awaiting_dean"],
+    to: "approved",
+    trackingDates: ["dean_signed_date"],
+    audit: "dean_signed",
+    notifyType: "leave_approved",
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณได้รับการอนุมัติแล้ว (คณบดีลงนามครบ)`,
+  });
+}
+
+/** Step 5: HR สแกนใบลาที่เซ็นแล้ว อัปโหลดเก็บแฟ้ม */
+export async function markLeaveScanned(requestId: string, scannedUrl: string) {
+  const url = validateTextField(scannedUrl, "ไฟล์สแกน", 500);
+  return runLeaveStage(requestId, {
+    from: ["approved"],
+    trackingDates: ["scanned_upload_date"],
+    trackingExtra: { scanned_document_url: url },
+    audit: "leave_scanned",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ใบลา${lt}ของคุณถูกสแกนเก็บเข้าแฟ้มแล้ว`,
+  });
+}
+
+/** Step 6: HR ส่งใบลาให้ HR มหาวิทยาลัย → จบกระบวนการ */
+export async function markLeaveSentToUniversity(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["approved"],
+    to: "completed",
+    trackingDates: ["sent_to_agency_date"],
+    audit: "leave_sent_to_university",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ใบลา${lt}ของคุณส่งหน่วยงานมหาวิทยาลัยเรียบร้อย — เสร็จสิ้นกระบวนการ`,
+  });
+}
+
+/** Reject at any stage (HR validation / ผอ. / คณบดี). Releases reserved balance. */
+export async function rejectLeaveAtStage(
+  requestId: string,
+  level: "hr" | "director" | "dean",
+  reason: string,
+) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+  const sanitizedReason = validateTextField(reason, "เหตุผล", 500);
+  if (!["hr", "director", "dean"].includes(level)) {
+    throw new Error("ระดับการปฏิเสธไม่ถูกต้อง");
+  }
+
+  const supabase = await createClient();
+  const actorId = await requireHrAdmin(supabase);
+
+  const { data: updated, error } = await supabase
+    .from("leave_requests")
+    .update({
+      status: "rejected" as const,
+      approver_id: actorId,
+      ...(sanitizedReason ? { reason: sanitizedReason } : {}),
+    })
+    .eq("id", requestId)
+    .in("status", ["pending", "awaiting_director", "awaiting_dean", "approved"])
+    .select("employee_id, leave_type_id, working_days, total_days")
+    .single();
+
+  if (error || !updated) {
+    throw new Error("ไม่สามารถปฏิเสธคำขอลาได้ (สถานะอาจเปลี่ยนไปแล้ว)");
+  }
+
+  // Release the balance reserved at submission (W0)
+  await releaseLeaveBalance(
+    getAdminClient(),
+    updated.employee_id,
+    updated.leave_type_id,
+    updated.working_days ?? updated.total_days,
+    currentFiscalYear(),
+  );
+
+  // Record the rejection on the document tracking row
+  await supabase
+    .from("document_tracking")
+    .update({
+      rejected_at: new Date().toISOString(),
+      rejected_by: actorId,
+      reject_reason: sanitizedReason,
+      reject_level: level,
+    })
+    .eq("reference_id", requestId);
+
+  const { data: lt } = await supabase
+    .from("leave_types").select("name").eq("id", updated.leave_type_id).single();
+  const ltName = lt?.name ?? "ลา";
+  const levelLabel = level === "director" ? "ผู้อำนวยการ" : level === "dean" ? "คณบดี" : "HR";
+  const msg = sanitizedReason
+    ? `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel}) เหตุผล: ${sanitizedReason}`
+    : `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel})`;
+
+  await logAudit(supabase, actorId, "reject_leave_at_stage", "leave_request", requestId, {
+    level,
+    reason: sanitizedReason,
+  });
+  await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", msg);
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath(`/dashboard/leaves/${requestId}`);
+  revalidatePath("/dashboard/documents");
+  revalidatePath("/dashboard/hr/leaves");
+  revalidatePath("/dashboard/hr/documents");
+  revalidatePath("/dashboard/approvals/leaves");
+  revalidatePath("/dashboard/approvals/documents");
 }
 
 // ═══════════════════════════════════════════════════════════

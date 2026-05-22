@@ -11,8 +11,51 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { currentFiscalYear, fiscalYearRange } from "@/lib/date-ranges";
+import { currentFiscalYear } from "@/lib/date-ranges";
 import { calculateWorkingDays, calculateCalendarDays } from "@/lib/working-days";
+
+// ─── Status contract (W0) ──────────────────────────────────
+
+/**
+ * Statuses that COUNT toward leave usage / quota (reserve-on-submit model).
+ * A request consumes balance from submission until it is rejected/cancelled.
+ * Used by getUsedLeaveDays + reports + availability checks — the single
+ * source of truth for "is this request consuming quota".
+ */
+export const COMMITTED_LEAVE_STATUSES = [
+  "pending",
+  "awaiting_director",
+  "awaiting_dean",
+  "approved",
+  "completed",
+] as const;
+
+export type LeaveStatus =
+  | (typeof COMMITTED_LEAVE_STATUSES)[number]
+  | "rejected"
+  | "cancelled";
+
+/** Display stage derived from leave_requests.status (Thai label + step index). */
+export function getLeaveStage(status: string): { label: string; step: number } {
+  switch (status) {
+    case "pending":
+      return { label: "รอตรวจสอบ", step: 0 };
+    case "awaiting_director":
+      return { label: "รอผู้อำนวยการเซ็น", step: 1 };
+    case "awaiting_dean":
+      return { label: "รอคณบดีเซ็น", step: 2 };
+    case "approved":
+      return { label: "อนุมัติแล้ว", step: 3 };
+    case "completed":
+      return { label: "ส่งมหาวิทยาลัยแล้ว", step: 4 };
+    case "rejected":
+      return { label: "ไม่อนุมัติ", step: -1 };
+    case "cancelled":
+      return { label: "ยกเลิก", step: -1 };
+    default:
+      return { label: status, step: 0 };
+  }
+}
 
 // ─── Vacation accumulation cap by employee_type ────────────
 
@@ -30,12 +73,16 @@ export function getVacationAccumulationCap(employeeType: string | null): number 
   }
 }
 
-// ─── Get used leave days for current FY (approved only) ────
+// ─── Get used leave days for current FY (committed statuses) ────
 
 /**
- * Sum working_days from approved leave_requests for a given employee,
+ * Sum working_days from committed leave_requests (reserve-on-submit: every
+ * non-rejected/cancelled request consumes quota) for a given employee,
  * leave type, and fiscal year range.  Falls back to `total_days` if
  * `working_days` is null (backward compat for old records).
+ *
+ * Pass `excludeRequestId` to omit a specific request (e.g. when validating
+ * an edit so the request doesn't count against itself).
  */
 export async function getUsedLeaveDays(
   supabase: SupabaseClient<Database>,
@@ -43,15 +90,18 @@ export async function getUsedLeaveDays(
   leaveTypeId: string,
   fyStart: string,
   fyEnd: string,
+  excludeRequestId?: string,
 ): Promise<number> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("leave_requests")
     .select("working_days, total_days")
     .eq("employee_id", employeeId)
     .eq("leave_type_id", leaveTypeId)
-    .eq("status", "approved")
+    .in("status", COMMITTED_LEAVE_STATUSES)
     .gte("start_date", fyStart)
     .lte("start_date", fyEnd);
+  if (excludeRequestId) query = query.neq("id", excludeRequestId);
+  const { data, error } = await query;
 
   if (error) {
     console.warn("[leave-rules] getUsedLeaveDays failed:", error.message);
@@ -116,12 +166,20 @@ export async function enforceLeaveTypeRules(
   // 3. Calculate working days
   const workingDays = await calculateWorkingDays(supabase, startDate, endDate);
 
-  // 4. Fiscal year range for used-days query
+  // 4. Current balance — the authoritative usage source (W0; fixes the
+  //    dual-source bug where opening-balance imports have no request rows).
+  //    balance.used_days includes imported opening balances + every reserved
+  //    request (reserve-on-submit). The request being created is not reserved
+  //    yet, so it is not double-counted here.
   const fy = currentFiscalYear();
-  const { start: fyStart, end: fyEnd } = fiscalYearRange(fy);
-
-  // 5. Get used days this FY (approved only)
-  const usedDays = await getUsedLeaveDays(supabase, employeeId, leaveTypeId, fyStart, fyEnd);
+  const { data: balance } = await supabase
+    .from("leave_balances")
+    .select("used_days, total_days, accumulated_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("fiscal_year", fy)
+    .maybeSingle();
+  const usedDays = balance?.used_days ?? 0;
 
   // 6. Validate based on leave type code
   switch (code) {
@@ -150,14 +208,7 @@ export async function enforceLeaveTypeRules(
     }
 
     case "VACATION": {
-      const { data: balance } = await supabase
-        .from("leave_balances")
-        .select("total_days, accumulated_days")
-        .eq("employee_id", employeeId)
-        .eq("leave_type_id", leaveTypeId)
-        .eq("fiscal_year", fy)
-        .maybeSingle();
-
+      // Uses the balance fetched above (single source).
       const annualDays = 10;
       const accumulated = balance?.accumulated_days ?? 0;
       const entitlement = balance?.total_days ?? annualDays;

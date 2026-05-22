@@ -6,7 +6,6 @@ import {
   createLeaveRequestByHr,
   previewWorkingDays,
 } from "@/lib/actions/leave-actions";
-import { createDocumentTracking } from "@/lib/actions/document-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,7 +98,7 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
 
     startTransition(async () => {
       try {
-        const result = await createLeaveRequestByHr(employeeId, {
+        await createLeaveRequestByHr(employeeId, {
           leave_type_id: leaveTypeId,
           start_date: startDate,
           end_date: endDate,
@@ -118,19 +117,8 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
           } : undefined,
         });
 
-        // Create document tracking record
-        if (result.id) {
-          try {
-            await createDocumentTracking({
-              reference_id: result.id,
-              document_type: "leave_request",
-              notes: `ใบลา${selectedType?.name ?? ""} - ช่องทางกระดาษ`,
-            });
-          } catch {
-            // Non-critical — don't fail the whole operation
-            console.error("[paper-leave] Document tracking creation failed");
-          }
-        }
+        // document_tracking row is created inside createLeaveRequestByHr
+        // (W2b) — no separate call here (avoids a duplicate row).
 
         toast.success("บันทึกใบลาเรียบร้อยแล้ว");
         router.push("/dashboard/hr/leaves");
