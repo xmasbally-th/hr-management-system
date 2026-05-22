@@ -733,7 +733,7 @@ export interface Database {
           medical_cert_url: string | null;
           expected_delivery_date: string | null;
           submission_channel: string | null;
-          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
+          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id: string | null;
           created_at: string;
           updated_at: string;
@@ -751,7 +751,7 @@ export interface Database {
           medical_cert_url?: string | null;
           expected_delivery_date?: string | null;
           submission_channel?: string | null;
-          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -769,7 +769,7 @@ export interface Database {
           medical_cert_url?: string | null;
           expected_delivery_date?: string | null;
           submission_channel?: string | null;
-          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -1138,6 +1138,7 @@ export interface Database {
         | "awaiting_director"
         | "awaiting_dean"
         | "approved"
+        | "awaiting_university"
         | "completed"
         | "rejected"
         | "cancelled";

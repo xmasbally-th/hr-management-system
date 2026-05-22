@@ -670,11 +670,12 @@ export async function cancelLeaveRequest(requestId: string) {
     .single();
 
   if (!req) throw new Error("ไม่พบคำขอลานี้");
-  // Cancellable while committed but not yet archived. `completed`
-  // (sent to university) is terminal and cannot be cancelled here.
-  const CANCELLABLE = ["pending", "awaiting_director", "awaiting_dean", "approved"];
+  // Cancellable while still in process (incl. sent to university awaiting
+  // return). `completed` is terminal — it requires the separate completed-
+  // cancellation flow (cancellation request routed through ผอ./คณบดี).
+  const CANCELLABLE = ["pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"];
   if (!CANCELLABLE.includes(req.status)) {
-    throw new Error("ยกเลิกได้เฉพาะคำขอที่ยังไม่ถูกส่งหน่วยงาน (รออนุมัติ/ระหว่างเซ็น/อนุมัติแล้ว)");
+    throw new Error("ยกเลิกได้เฉพาะคำขอที่ยังอยู่ในกระบวนการ — ใบที่เสร็จสิ้นแล้วต้องยื่นคำขอยกเลิกแยก");
   }
 
   // Atomic: only cancel if status hasn't changed since our read
@@ -872,33 +873,9 @@ export async function markDeanSigned(requestId: string) {
   });
 }
 
-/** Step 4.5 (optional): HR ส่งใบลาให้อธิการบดีลงนาม (หลังคณบดี — ไม่เปลี่ยน status) */
-export async function routeToPresident(requestId: string) {
-  return runLeaveStage(requestId, {
-    from: ["approved"],
-    trackingDates: ["sent_to_president_date"],
-    audit: "route_to_president",
-    notifyType: "leave_status_update",
-    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้อธิการบดีลงนามแล้ว`,
-  });
-}
-
-/** Step 4.6 (optional): อธิการบดีลงนาม + จัดเก็บเอกสารที่เซ็นกลับมา */
-export async function markPresidentSigned(requestId: string, presidentDocUrl: string) {
-  const url = validateTextField(presidentDocUrl, "ไฟล์เอกสารอธิการบดี", 500);
-  return runLeaveStage(requestId, {
-    from: ["approved"],
-    trackingDates: ["president_signed_date"],
-    trackingExtra: { president_document_url: url },
-    audit: "president_signed",
-    notifyType: "leave_status_update",
-    notifyMsg: (lt) => `อธิการบดีลงนามคำขอ${lt}ของคุณแล้ว`,
-  });
-}
-
-/** Step 5: HR สแกนใบลาที่เซ็นแล้ว อัปโหลดเก็บแฟ้ม */
-export async function markLeaveScanned(requestId: string, scannedUrl: string) {
-  const url = validateTextField(scannedUrl, "ไฟล์สแกน", 500);
+/** Step 5: HR สแกน + อัปโหลดเอกสารที่ลงนามครบระดับคณะ (faculty) — ก่อนส่ง/เก็บแฟ้ม */
+export async function markLeaveScanned(requestId: string, facultyDocUrl: string) {
+  const url = validateTextField(facultyDocUrl, "ไฟล์เอกสาร", 500);
   return runLeaveStage(requestId, {
     from: ["approved"],
     trackingDates: ["scanned_upload_date"],
@@ -909,15 +886,40 @@ export async function markLeaveScanned(requestId: string, scannedUrl: string) {
   });
 }
 
-/** Step 6: HR ส่งใบลาให้ HR มหาวิทยาลัย → จบกระบวนการ */
-export async function markLeaveSentToUniversity(requestId: string) {
+/** Step 6a (optional): HR ส่งใบลาให้มหาวิทยาลัย/อธิการบดีลงนาม → รอเอกสารกลับ */
+export async function sendLeaveToUniversity(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["approved"],
+    to: "awaiting_university",
+    trackingDates: ["sent_to_president_date"],
+    audit: "send_leave_to_university",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ใบลา${lt}ของคุณถูกส่งให้มหาวิทยาลัย/อธิการบดีลงนามแล้ว`,
+  });
+}
+
+/** Step 6b: HR รับเอกสารคืนจากมหาวิทยาลัย (อธิการบดีลงนาม) + อัปโหลดเก็บแฟ้ม → จบ */
+export async function receiveLeaveFromUniversity(requestId: string, signedDocUrl: string) {
+  const url = validateTextField(signedDocUrl, "ไฟล์เอกสารที่ลงนาม", 500);
+  return runLeaveStage(requestId, {
+    from: ["awaiting_university"],
+    to: "completed",
+    trackingDates: ["president_signed_date"],
+    trackingExtra: { president_document_url: url },
+    audit: "receive_leave_from_university",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ใบลา${lt}ของคุณรับเอกสารคืนจากมหาวิทยาลัย (ลงนามครบ) — เสร็จสิ้นกระบวนการ`,
+  });
+}
+
+/** Step 6 (faculty-only path): จบกระบวนการที่ระดับคณะ โดยไม่ส่งมหาวิทยาลัย */
+export async function completeLeaveAtFaculty(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["approved"],
     to: "completed",
-    trackingDates: ["sent_to_agency_date"],
-    audit: "leave_sent_to_university",
+    audit: "complete_leave_faculty",
     notifyType: "leave_status_update",
-    notifyMsg: (lt) => `ใบลา${lt}ของคุณส่งหน่วยงานมหาวิทยาลัยเรียบร้อย — เสร็จสิ้นกระบวนการ`,
+    notifyMsg: (lt) => `ใบลา${lt}ของคุณเสร็จสิ้นกระบวนการแล้ว`,
   });
 }
 
@@ -944,7 +946,7 @@ export async function rejectLeaveAtStage(
       ...(sanitizedReason ? { reason: sanitizedReason } : {}),
     })
     .eq("id", requestId)
-    .in("status", ["pending", "awaiting_director", "awaiting_dean", "approved"])
+    .in("status", ["pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"])
     .select("employee_id, leave_type_id, working_days, total_days")
     .single();
 

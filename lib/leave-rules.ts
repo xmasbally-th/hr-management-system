@@ -27,6 +27,7 @@ export const COMMITTED_LEAVE_STATUSES = [
   "awaiting_director",
   "awaiting_dean",
   "approved",
+  "awaiting_university",
   "completed",
 ] as const;
 
@@ -45,9 +46,11 @@ export function getLeaveStage(status: string): { label: string; step: number } {
     case "awaiting_dean":
       return { label: "รอคณบดีเซ็น", step: 2 };
     case "approved":
-      return { label: "อนุมัติแล้ว", step: 3 };
+      return { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 3 };
+    case "awaiting_university":
+      return { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 4 };
     case "completed":
-      return { label: "ส่งมหาวิทยาลัยแล้ว", step: 4 };
+      return { label: "เสร็จสิ้น", step: 5 };
     case "rejected":
       return { label: "ไม่อนุมัติ", step: -1 };
     case "cancelled":
