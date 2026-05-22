@@ -42,3 +42,9 @@ next-env.d.ts
 
 # claude code worktree artifacts (session, plans, design assets)
 .claude/
+
+# Agent skills (re-install via: npx skills add supabase/agent-skills)
+.agents/
+
+# Local-only DB introspection tool (uses SUPABASE_DB_URL)
+scripts/db.mjs

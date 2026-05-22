@@ -58,3 +58,8 @@ For users submitting physical forms[cite: 1]:
 2. **Do Not Hallucinate DB Schema:** Always refer to the schema structure outlined in this document. If a column is missing, ask the user before creating it.
 3. **Server Actions First:** Use Next.js Server Actions for data mutations instead of API routes.
 4. **RLS is Mandatory:** Ensure every Supabase table has strict Row Level Security policies matching the RBAC rules.
+5. **Read Supabase skills before ANY database work:** Before writing/reviewing SQL, migrations, RLS policies, or schema changes, read the installed Supabase agent skills first:
+   - `.claude/skills/supabase/SKILL.md` (security checklist, schema-change workflow, CLI/MCP gotchas)
+   - `.claude/skills/supabase-postgres-best-practices/SKILL.md` (perf/RLS rules + `references/` rule files)
+   - Follow their guidance (RLS on every exposed-schema table, UPDATE policies need `USING`+`WITH CHECK`, `security_invoker` views, avoid `SECURITY DEFINER` to fix perms, verify after applying).
+   - Install/refresh with: `npx skills add supabase/agent-skills` (skills live in `.agents/`, gitignored — re-install per machine).
