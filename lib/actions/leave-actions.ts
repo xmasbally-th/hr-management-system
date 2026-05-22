@@ -1427,3 +1427,312 @@ export async function importLeaveBalances(
 
   return result;
 }
+
+// ═══════════════════════════════════════════════════════════
+//  Completed-leave cancellation flow (workflow ลายเซ็นแยก)
+//  ใบลาที่ completed แล้วต้องยื่น "ใบขอยกเลิก" → ผอ. → คณบดี →
+//  ส่งอธิการบดี(รับทราบ, ไม่มีเอกสารกลับ) → คืน balance + ใบเดิม=cancelled
+// ═══════════════════════════════════════════════════════════
+
+/** พนักงาน(เจ้าของ)/HR ยื่นคำขอยกเลิกใบลาที่เสร็จสิ้นแล้ว */
+export async function createLeaveCancellationRequest(
+  leaveRequestId: string,
+  reason: string,
+) {
+  if (!UUID_RE.test(leaveRequestId)) throw new Error("รหัสคำขอลาไม่ถูกต้อง");
+  const sanitizedReason = validateTextField(reason, "เหตุผลการยกเลิก", 1000);
+  if (!sanitizedReason) throw new Error("กรุณาระบุเหตุผลการยกเลิก");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  const isHr = profile?.role === "hr" || profile?.role === "admin";
+
+  const { data: leave } = await supabase
+    .from("leave_requests")
+    .select("id, employee_id, status, leave_type_id")
+    .eq("id", leaveRequestId)
+    .single();
+  if (!leave) throw new Error("ไม่พบใบลานี้");
+  if (leave.status !== "completed") {
+    throw new Error("flow นี้ใช้ยกเลิกได้เฉพาะใบลาที่เสร็จสิ้นแล้ว (completed)");
+  }
+  if (!isHr && leave.employee_id !== user.id) {
+    throw new Error("Forbidden: ยื่นยกเลิกได้เฉพาะใบลาของตัวเอง");
+  }
+
+  // กันยื่นซ้ำ (มีคำขอยกเลิกที่ยังไม่จบและไม่ถูกปฏิเสธ)
+  const { data: existing } = await supabase
+    .from("leave_cancellation_requests")
+    .select("id")
+    .eq("leave_request_id", leaveRequestId)
+    .not("status", "in", "(rejected,cancelled)")
+    .maybeSingle();
+  if (existing) throw new Error("มีคำขอยกเลิกใบลานี้อยู่แล้ว");
+
+  const { data: created, error } = await supabase
+    .from("leave_cancellation_requests")
+    .insert({
+      leave_request_id: leaveRequestId,
+      requested_by: user.id,
+      reason: sanitizedReason,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("[leave-actions] create cancellation failed:", error?.message);
+    throw new Error("ไม่สามารถยื่นคำขอยกเลิกได้");
+  }
+
+  // document_tracking row สำหรับ routing (reuse, doc_type=leave_cancellation)
+  await getAdminClient()
+    .from("document_tracking")
+    .insert({ reference_id: created.id, document_type: "leave_cancellation" });
+
+  await logAudit(supabase, user.id, "create_leave_cancellation", "leave_cancellation_request", created.id, {
+    leave_request_id: leaveRequestId,
+  });
+
+  // แจ้ง HR/Admin
+  const [{ data: ltInfo }, { data: empInfo }] = await Promise.all([
+    supabase.from("leave_types").select("name").eq("id", leave.leave_type_id).single(),
+    supabase.from("profiles").select("full_name").eq("id", leave.employee_id).single(),
+  ]);
+  const msg = `มีคำขอยกเลิกใบ${ltInfo?.name ?? "ลา"}จาก ${empInfo?.full_name ?? "พนักงาน"} รอดำเนินการ`;
+  const { data: hrUsers } = await supabase
+    .from("profiles").select("id").in("role", ["hr", "admin"]).neq("id", user.id);
+  if (hrUsers) {
+    await Promise.all(
+      hrUsers.map((hr) => createNotificationInternal(supabase, hr.id, "new_leave_request", msg)),
+    );
+  }
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath(`/dashboard/leaves/${leaveRequestId}`);
+  revalidatePath("/dashboard/hr/leaves");
+  return { success: true, id: created.id };
+}
+
+interface CancelStageConfig {
+  from: ReqStatus[];
+  to?: ReqStatus;
+  trackingDates?: string[];
+  audit: string;
+  notifyMsg: (ltName: string) => string;
+}
+
+/** Shared HR/Admin step for the cancellation workflow. */
+async function runCancellationStage(cancellationId: string, cfg: CancelStageConfig): Promise<void> {
+  if (!UUID_RE.test(cancellationId)) throw new Error("รหัสคำขอยกเลิกไม่ถูกต้อง");
+  const supabase = await createClient();
+  const actorId = await requireHrAdmin(supabase);
+
+  let row: { leave_request_id: string };
+  if (cfg.to) {
+    const { data, error } = await supabase
+      .from("leave_cancellation_requests")
+      .update({ status: cfg.to, updated_at: new Date().toISOString() })
+      .eq("id", cancellationId)
+      .in("status", cfg.from)
+      .select("leave_request_id")
+      .single();
+    if (error || !data) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว)");
+    row = data;
+  } else {
+    const { data, error } = await supabase
+      .from("leave_cancellation_requests")
+      .select("leave_request_id, status")
+      .eq("id", cancellationId)
+      .single();
+    if (error || !data || !cfg.from.includes(data.status)) {
+      throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง)");
+    }
+    row = data;
+  }
+
+  if (cfg.trackingDates?.length) {
+    const now = new Date().toISOString();
+    const tpatch: Record<string, unknown> = {};
+    for (const c of cfg.trackingDates) tpatch[c] = now;
+    await supabase
+      .from("document_tracking")
+      .update(tpatch as Database["public"]["Tables"]["document_tracking"]["Update"])
+      .eq("reference_id", cancellationId);
+  }
+
+  await logAudit(supabase, actorId, cfg.audit, "leave_cancellation_request", cancellationId);
+
+  const { data: leave } = await supabase
+    .from("leave_requests")
+    .select("employee_id, leave_type_id")
+    .eq("id", row.leave_request_id)
+    .single();
+  if (leave) {
+    const { data: lt } = await supabase
+      .from("leave_types").select("name").eq("id", leave.leave_type_id).single();
+    await createNotificationInternal(
+      supabase, leave.employee_id, "leave_status_update", cfg.notifyMsg(lt?.name ?? "ลา"),
+    );
+  }
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath("/dashboard/hr/leaves");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+export async function routeCancellationToDirector(id: string) {
+  return runCancellationStage(id, {
+    from: ["pending"], to: "awaiting_director",
+    trackingDates: ["sent_to_director_date"],
+    audit: "cancel_route_director",
+    notifyMsg: (lt) => `คำขอยกเลิกใบ${lt}ของคุณถูกส่งให้ผู้อำนวยการลงนาม`,
+  });
+}
+export async function markCancellationDirectorSigned(id: string) {
+  return runCancellationStage(id, {
+    from: ["awaiting_director"],
+    trackingDates: ["director_signed_date"],
+    audit: "cancel_director_signed",
+    notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
+  });
+}
+export async function routeCancellationToDean(id: string) {
+  return runCancellationStage(id, {
+    from: ["awaiting_director"], to: "awaiting_dean",
+    trackingDates: ["sent_to_dean_date"],
+    audit: "cancel_route_dean",
+    notifyMsg: (lt) => `คำขอยกเลิกใบ${lt}ของคุณถูกส่งให้คณบดีลงนาม`,
+  });
+}
+export async function markCancellationDeanSigned(id: string) {
+  return runCancellationStage(id, {
+    from: ["awaiting_dean"], to: "approved",
+    trackingDates: ["dean_signed_date"],
+    audit: "cancel_dean_signed",
+    notifyMsg: (lt) => `คณบดีลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
+  });
+}
+export async function sendCancellationToPresident(id: string) {
+  return runCancellationStage(id, {
+    from: ["approved"], to: "awaiting_university",
+    trackingDates: ["sent_to_president_date"],
+    audit: "cancel_send_president",
+    notifyMsg: (lt) => `คำขอยกเลิกใบ${lt}ของคุณถูกส่งให้อธิการบดีพิจารณา`,
+  });
+}
+
+/** ขั้นสุดท้าย: อธิการบดีรับทราบ → คืน balance + ตั้งใบลาเดิม = cancelled */
+export async function completeCancellation(cancellationId: string) {
+  if (!UUID_RE.test(cancellationId)) throw new Error("รหัสคำขอยกเลิกไม่ถูกต้อง");
+  const supabase = await createClient();
+  const actorId = await requireHrAdmin(supabase);
+
+  const { data: cancel, error } = await supabase
+    .from("leave_cancellation_requests")
+    .update({ status: "completed", approver_id: actorId, updated_at: new Date().toISOString() })
+    .eq("id", cancellationId)
+    .in("status", ["awaiting_university"])
+    .select("leave_request_id")
+    .single();
+  if (error || !cancel) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว)");
+
+  const { data: leave } = await supabase
+    .from("leave_requests")
+    .select("id, employee_id, leave_type_id, working_days, total_days, start_date, status")
+    .eq("id", cancel.leave_request_id)
+    .single();
+
+  if (leave && leave.status === "completed") {
+    const fy = currentFiscalYear(new Date(leave.start_date));
+    await releaseLeaveBalance(
+      getAdminClient(),
+      leave.employee_id,
+      leave.leave_type_id,
+      leave.working_days ?? leave.total_days,
+      fy,
+    );
+    await supabase
+      .from("leave_requests")
+      .update({ status: "cancelled" })
+      .eq("id", leave.id)
+      .eq("status", "completed");
+  }
+
+  await supabase
+    .from("document_tracking")
+    .update({ president_signed_date: new Date().toISOString() })
+    .eq("reference_id", cancellationId);
+
+  await logAudit(supabase, actorId, "complete_leave_cancellation", "leave_cancellation_request", cancellationId, {
+    leave_request_id: cancel.leave_request_id,
+  });
+
+  if (leave) {
+    const { data: lt } = await supabase
+      .from("leave_types").select("name").eq("id", leave.leave_type_id).single();
+    await createNotificationInternal(
+      supabase, leave.employee_id, "leave_status_update",
+      `คำขอยกเลิกใบ${lt?.name ?? "ลา"}ของคุณได้รับอนุมัติครบ — ใบลาถูกยกเลิกและคืนสิทธิ์แล้ว`,
+    );
+  }
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath("/dashboard/hr/leaves");
+  revalidatePath("/dashboard/hr/documents");
+}
+
+/** ปฏิเสธคำขอยกเลิก (ทุกขั้น) — ใบลาเดิมคง completed */
+export async function rejectCancellationAtStage(
+  cancellationId: string,
+  level: "hr" | "director" | "dean" | "president",
+  reason: string,
+) {
+  if (!UUID_RE.test(cancellationId)) throw new Error("รหัสคำขอยกเลิกไม่ถูกต้อง");
+  const sanitizedReason = validateTextField(reason, "เหตุผล", 500);
+  if (!["hr", "director", "dean", "president"].includes(level)) {
+    throw new Error("ระดับการปฏิเสธไม่ถูกต้อง");
+  }
+
+  const supabase = await createClient();
+  const actorId = await requireHrAdmin(supabase);
+
+  const { data: updated, error } = await supabase
+    .from("leave_cancellation_requests")
+    .update({ status: "rejected" as const, approver_id: actorId, updated_at: new Date().toISOString() })
+    .eq("id", cancellationId)
+    .in("status", ["pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"])
+    .select("leave_request_id")
+    .single();
+  if (error || !updated) throw new Error("ไม่สามารถปฏิเสธคำขอยกเลิกได้ (สถานะอาจเปลี่ยนไปแล้ว)");
+
+  await supabase
+    .from("document_tracking")
+    .update({
+      rejected_at: new Date().toISOString(),
+      rejected_by: actorId,
+      reject_reason: sanitizedReason,
+      reject_level: level,
+    })
+    .eq("reference_id", cancellationId);
+
+  await logAudit(supabase, actorId, "reject_leave_cancellation", "leave_cancellation_request", cancellationId, {
+    level, reason: sanitizedReason,
+  });
+
+  const { data: leave } = await supabase
+    .from("leave_requests").select("employee_id, leave_type_id").eq("id", updated.leave_request_id).single();
+  if (leave) {
+    const { data: lt } = await supabase
+      .from("leave_types").select("name").eq("id", leave.leave_type_id).single();
+    const msg = sanitizedReason
+      ? `คำขอยกเลิกใบ${lt?.name ?? "ลา"}ของคุณไม่ผ่านการพิจารณา เหตุผล: ${sanitizedReason}`
+      : `คำขอยกเลิกใบ${lt?.name ?? "ลา"}ของคุณไม่ผ่านการพิจารณา`;
+    await createNotificationInternal(supabase, leave.employee_id, "leave_rejected", msg);
+  }
+
+  revalidatePath("/dashboard/leaves");
+  revalidatePath("/dashboard/hr/leaves");
+  revalidatePath("/dashboard/hr/documents");
+}

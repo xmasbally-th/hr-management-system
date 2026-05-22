@@ -1022,6 +1022,40 @@ export interface Database {
         Relationships: [];
       };
 
+      leave_cancellation_requests: {
+        Row: {
+          id: string;
+          leave_request_id: string;
+          requested_by: string;
+          reason: string;
+          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          leave_request_id: string;
+          requested_by: string;
+          reason: string;
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          leave_request_id?: string;
+          requested_by?: string;
+          reason?: string;
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
       employee_trainings: {
         Row: {
           id: string;
