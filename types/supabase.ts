@@ -1022,6 +1022,40 @@ export interface Database {
         Relationships: [];
       };
 
+      document_templates: {
+        Row: {
+          id: string;
+          doc_type: string;
+          leave_type_code: string | null;
+          name: string;
+          storage_path: string;
+          is_active: boolean;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          doc_type?: string;
+          leave_type_code?: string | null;
+          name: string;
+          storage_path: string;
+          is_active?: boolean;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          doc_type?: string;
+          leave_type_code?: string | null;
+          name?: string;
+          storage_path?: string;
+          is_active?: boolean;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
       leave_cancellation_requests: {
         Row: {
           id: string;

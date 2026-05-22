@@ -12,7 +12,7 @@ import { getDocumentUrl } from "@/lib/actions/storage-actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FileUpload } from "@/components/file-upload";
-import { CheckCircle, XCircle, Ban, Loader2, FileText } from "lucide-react";
+import { CheckCircle, XCircle, Ban, Loader2, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -23,6 +23,7 @@ interface Props {
   isSick: boolean;
   employeeName: string;
   existingMedicalCert: string | null;
+  canDownloadDoc?: boolean;
 }
 
 export function LeaveDetailActions({
@@ -33,11 +34,37 @@ export function LeaveDetailActions({
   isSick,
   employeeName,
   existingMedicalCert,
+  canDownloadDoc = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "cancel" | null>(null);
   const [medicalCertUrl, setMedicalCertUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadDoc() {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/documents/leave-form/${requestId}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "ดาวน์โหลดไม่สำเร็จ");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''(.+)$/);
+      a.download = m ? decodeURIComponent(m[1]) : `leave-${requestId}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ดาวน์โหลดไม่สำเร็จ");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   // Resolve signed URL for existing medical certificate (for read-only view)
   useEffect(() => {
@@ -85,7 +112,7 @@ export function LeaveDetailActions({
     }
   }
 
-  if (!showApproverActions && !showCancelAction && !showMedicalCertUpload && !existingMedicalCert) {
+  if (!showApproverActions && !showCancelAction && !showMedicalCertUpload && !existingMedicalCert && !canDownloadDoc) {
     return null;
   }
 
@@ -115,6 +142,16 @@ export function LeaveDetailActions({
                 label=""
               />
             )}
+          </div>
+        )}
+
+        {/* HR/Admin: download the filled .docx leave form */}
+        {canDownloadDoc && (
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={handleDownloadDoc} disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              ดาวน์โหลดใบลา (.docx)
+            </Button>
           </div>
         )}
 

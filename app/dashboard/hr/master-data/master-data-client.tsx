@@ -10,8 +10,10 @@ import {
   Award,
   Settings2,
   CalendarCheck2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { LeaveTemplate } from "@/lib/actions/template-actions";
 import { DepartmentsSection } from "./_sections/departments-section";
 import { PositionsSection } from "./_sections/positions-section";
 import { LeaveTypesSection } from "./_sections/leave-types-section";
@@ -20,6 +22,7 @@ import { EducationLevelsSection } from "./_sections/education-levels-section";
 import { DecorationCatalogSection } from "./_sections/decoration-catalog-section";
 import { LeaveSettingsSection } from "./_sections/leave-settings-section";
 import { HolidaysSection } from "./_sections/holidays-section";
+import { DocumentTemplatesSection } from "./_sections/document-templates-section";
 
 type TabKey =
   | "departments"
@@ -29,7 +32,8 @@ type TabKey =
   | "holidays"
   | "employee-types"
   | "education-levels"
-  | "decoration-catalog";
+  | "decoration-catalog"
+  | "doc-templates";
 
 interface DeptRow {
   id: string;
@@ -76,6 +80,8 @@ interface Props {
   employeeTypes: NameOrderRow[];
   educationLevels: NameOrderRow[];
   decorationCatalog: DecorationCatalogRow[];
+  documentTemplates: LeaveTemplate[];
+  canManageTemplates: boolean;
 }
 
 export function MasterDataClient({
@@ -89,6 +95,8 @@ export function MasterDataClient({
   employeeTypes,
   educationLevels,
   decorationCatalog,
+  documentTemplates,
+  canManageTemplates,
 }: Props) {
   const [active, setActive] = useState<TabKey>("departments");
 
@@ -106,6 +114,7 @@ export function MasterDataClient({
     { key: "employee-types", label: "ประเภทบุคลากร", count: employeeTypes.length, icon: IdCard },
     { key: "education-levels", label: "วุฒิการศึกษา", count: educationLevels.length, icon: GraduationCap },
     { key: "decoration-catalog", label: "เครื่องราชฯ", count: decorationCatalog.length, icon: Award },
+    { key: "doc-templates", label: "เทมเพลตเอกสาร", count: documentTemplates.length, icon: FileText },
   ];
 
   return (
@@ -162,6 +171,9 @@ export function MasterDataClient({
         {active === "employee-types" && <EmployeeTypesSection rows={employeeTypes} />}
         {active === "education-levels" && <EducationLevelsSection rows={educationLevels} />}
         {active === "decoration-catalog" && <DecorationCatalogSection rows={decorationCatalog} />}
+        {active === "doc-templates" && (
+          <DocumentTemplatesSection templates={documentTemplates} canManage={canManageTemplates} />
+        )}
       </div>
     </div>
   );

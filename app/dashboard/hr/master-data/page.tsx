@@ -7,6 +7,8 @@ import {
 } from "@/lib/actions/master-data-actions";
 import { getLeaveTypeSettings, getLeaveOnlineEnabled } from "@/lib/actions/settings-actions";
 import { getHolidays } from "@/lib/actions/holiday-actions";
+import { getLeaveTemplates } from "@/lib/actions/template-actions";
+import { getMyProfile } from "@/lib/actions/profile-actions";
 import { currentFiscalYear, getFiscalYearOptions } from "@/lib/date-ranges";
 import { MasterDataClient } from "./master-data-client";
 
@@ -26,6 +28,8 @@ export default async function MasterDataPage() {
     employeeTypes,
     educationLevels,
     decorationCatalog,
+    documentTemplates,
+    profile,
   ] = await Promise.all([
     getDepartments(),
     getPositions(),
@@ -35,6 +39,8 @@ export default async function MasterDataPage() {
     getEmployeeTypes(),
     getEducationLevels(),
     getDecorationCatalog(),
+    getLeaveTemplates(),
+    getMyProfile(),
   ]);
 
   return (
@@ -58,6 +64,8 @@ export default async function MasterDataPage() {
         employeeTypes={employeeTypes}
         educationLevels={educationLevels}
         decorationCatalog={decorationCatalog}
+        documentTemplates={documentTemplates}
+        canManageTemplates={profile.role === "admin"}
       />
     </div>
   );

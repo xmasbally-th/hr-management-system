@@ -139,6 +139,7 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         isSick={isSick}
         employeeName={l.employee?.full_name ?? ""}
         existingMedicalCert={leave.medical_cert_url ?? null}
+        canDownloadDoc={profile?.role === "hr" || profile?.role === "admin"}
       />
     </div>
   );
