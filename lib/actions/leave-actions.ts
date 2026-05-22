@@ -872,6 +872,30 @@ export async function markDeanSigned(requestId: string) {
   });
 }
 
+/** Step 4.5 (optional): HR ส่งใบลาให้อธิการบดีลงนาม (หลังคณบดี — ไม่เปลี่ยน status) */
+export async function routeToPresident(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["approved"],
+    trackingDates: ["sent_to_president_date"],
+    audit: "route_to_president",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้อธิการบดีลงนามแล้ว`,
+  });
+}
+
+/** Step 4.6 (optional): อธิการบดีลงนาม + จัดเก็บเอกสารที่เซ็นกลับมา */
+export async function markPresidentSigned(requestId: string, presidentDocUrl: string) {
+  const url = validateTextField(presidentDocUrl, "ไฟล์เอกสารอธิการบดี", 500);
+  return runLeaveStage(requestId, {
+    from: ["approved"],
+    trackingDates: ["president_signed_date"],
+    trackingExtra: { president_document_url: url },
+    audit: "president_signed",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `อธิการบดีลงนามคำขอ${lt}ของคุณแล้ว`,
+  });
+}
+
 /** Step 5: HR สแกนใบลาที่เซ็นแล้ว อัปโหลดเก็บแฟ้ม */
 export async function markLeaveScanned(requestId: string, scannedUrl: string) {
   const url = validateTextField(scannedUrl, "ไฟล์สแกน", 500);
@@ -900,12 +924,12 @@ export async function markLeaveSentToUniversity(requestId: string) {
 /** Reject at any stage (HR validation / ผอ. / คณบดี). Releases reserved balance. */
 export async function rejectLeaveAtStage(
   requestId: string,
-  level: "hr" | "director" | "dean",
+  level: "hr" | "director" | "dean" | "president",
   reason: string,
 ) {
   if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
   const sanitizedReason = validateTextField(reason, "เหตุผล", 500);
-  if (!["hr", "director", "dean"].includes(level)) {
+  if (!["hr", "director", "dean", "president"].includes(level)) {
     throw new Error("ระดับการปฏิเสธไม่ถูกต้อง");
   }
 
@@ -951,7 +975,11 @@ export async function rejectLeaveAtStage(
   const { data: lt } = await supabase
     .from("leave_types").select("name").eq("id", updated.leave_type_id).single();
   const ltName = lt?.name ?? "ลา";
-  const levelLabel = level === "director" ? "ผู้อำนวยการ" : level === "dean" ? "คณบดี" : "HR";
+  const levelLabel =
+    level === "director" ? "ผู้อำนวยการ"
+    : level === "dean" ? "คณบดี"
+    : level === "president" ? "อธิการบดี"
+    : "HR";
   const msg = sanitizedReason
     ? `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel}) เหตุผล: ${sanitizedReason}`
     : `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel})`;

@@ -971,6 +971,9 @@ export interface Database {
           rejected_by: string | null;
           reject_reason: string | null;
           reject_level: string | null;
+          sent_to_president_date: string | null;
+          president_signed_date: string | null;
+          president_document_url: string | null;
         };
         Insert: {
           id?: string;
@@ -990,6 +993,9 @@ export interface Database {
           rejected_by?: string | null;
           reject_reason?: string | null;
           reject_level?: string | null;
+          sent_to_president_date?: string | null;
+          president_signed_date?: string | null;
+          president_document_url?: string | null;
         };
         Update: {
           id?: string;
@@ -1009,6 +1015,9 @@ export interface Database {
           rejected_by?: string | null;
           reject_reason?: string | null;
           reject_level?: string | null;
+          sent_to_president_date?: string | null;
+          president_signed_date?: string | null;
+          president_document_url?: string | null;
         };
         Relationships: [];
       };
