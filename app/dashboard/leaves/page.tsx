@@ -12,8 +12,12 @@ import { StatusFilter } from "@/components/status-filter";
 export const metadata = { title: "ประวัติการลา" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "รออนุมัติ", variant: "secondary" },
+  pending: { label: "รอตรวจสอบ", variant: "secondary" },
+  awaiting_director: { label: "รอผอ.ลงนาม", variant: "secondary" },
+  awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติ", variant: "default" },
+  awaiting_university: { label: "รออธิการบดี", variant: "secondary" },
+  completed: { label: "เสร็จสิ้น", variant: "default" },
   rejected: { label: "ไม่อนุมัติ", variant: "destructive" },
   cancelled: { label: "ยกเลิก", variant: "outline" },
 };

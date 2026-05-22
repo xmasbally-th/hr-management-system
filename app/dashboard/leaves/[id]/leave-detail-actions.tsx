@@ -3,44 +3,55 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  approveLeaveRequest,
-  rejectLeaveRequest,
   cancelLeaveRequest,
+  createLeaveCancellationRequest,
   updateLeaveMedicalCert,
 } from "@/lib/actions/leave-actions";
 import { getDocumentUrl } from "@/lib/actions/storage-actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FileUpload } from "@/components/file-upload";
-import { CheckCircle, XCircle, Ban, Loader2, FileText, Download } from "lucide-react";
+import { Ban, Loader2, FileText, Download, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
   requestId: string;
   status: string;
   isOwner: boolean;
-  isApprover: boolean;
   isSick: boolean;
-  employeeName: string;
   existingMedicalCert: string | null;
   canDownloadDoc?: boolean;
 }
+
+const CANCELLABLE_INPROCESS = [
+  "pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university",
+];
 
 export function LeaveDetailActions({
   requestId,
   status,
   isOwner,
-  isApprover,
   isSick,
-  employeeName,
   existingMedicalCert,
   canDownloadDoc = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "cancel" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"cancel" | "requestCancel" | null>(null);
   const [medicalCertUrl, setMedicalCertUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    if (existingMedicalCert) {
+      getDocumentUrl(existingMedicalCert).then(setMedicalCertUrl).catch(() => setMedicalCertUrl(null));
+    }
+  }, [existingMedicalCert]);
+
+  const showMedicalCertUpload = isOwner && isSick && status === "pending";
+  // เจ้าของยกเลิกระหว่างกระบวนการ
+  const showInProcessCancel = isOwner && CANCELLABLE_INPROCESS.includes(status);
+  // ยื่นขอยกเลิกใบที่เสร็จสิ้นแล้ว (เจ้าของ หรือ HR/Admin)
+  const showRequestCancel = status === "completed" && (isOwner || canDownloadDoc);
 
   async function handleDownloadDoc() {
     setDownloading(true);
@@ -66,34 +77,22 @@ export function LeaveDetailActions({
     }
   }
 
-  // Resolve signed URL for existing medical certificate (for read-only view)
-  useEffect(() => {
-    if (existingMedicalCert) {
-      getDocumentUrl(existingMedicalCert).then(setMedicalCertUrl).catch(() => setMedicalCertUrl(null));
-    }
-  }, [existingMedicalCert]);
-
-  const isPending2 = status === "pending";
-  const showApproverActions = isApprover && isPending2;
-  const showCancelAction = isOwner && isPending2;
-  const showMedicalCertUpload = isOwner && isSick && isPending2;
-
   function handleConfirm(reason?: string) {
-    if (!confirmAction) return;
     const action = confirmAction;
     setConfirmAction(null);
-
+    if (!action) return;
     startTransition(async () => {
       try {
-        if (action === "approve") {
-          await approveLeaveRequest(requestId);
-          toast.success("อนุมัติคำขอลาแล้ว");
-        } else if (action === "reject") {
-          await rejectLeaveRequest(requestId, reason);
-          toast.success("ปฏิเสธคำขอลาแล้ว");
-        } else if (action === "cancel") {
+        if (action === "cancel") {
           await cancelLeaveRequest(requestId);
           toast.success("ยกเลิกคำขอลาแล้ว");
+        } else if (action === "requestCancel") {
+          if (!reason || !reason.trim()) {
+            toast.error("กรุณาระบุเหตุผลการยกเลิก");
+            return;
+          }
+          await createLeaveCancellationRequest(requestId, reason);
+          toast.success("ยื่นคำขอยกเลิกแล้ว — รอเดินเอกสาร");
         }
         router.refresh();
       } catch (err) {
@@ -112,14 +111,15 @@ export function LeaveDetailActions({
     }
   }
 
-  if (!showApproverActions && !showCancelAction && !showMedicalCertUpload && !existingMedicalCert && !canDownloadDoc) {
-    return null;
-  }
+  const hasAnything =
+    showMedicalCertUpload || showInProcessCancel || showRequestCancel ||
+    existingMedicalCert || canDownloadDoc;
+  if (!hasAnything) return null;
 
   return (
     <>
       <div className="space-y-4">
-        {/* Medical certificate section (sick leave only) */}
+        {/* Medical certificate (sick leave) */}
         {isSick && (existingMedicalCert || showMedicalCertUpload) && (
           <div className="border rounded-lg p-4 bg-card space-y-3">
             <p className="text-sm font-medium">ใบรับรองแพทย์</p>
@@ -130,8 +130,7 @@ export function LeaveDetailActions({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
               >
-                <FileText className="h-4 w-4" />
-                ดูเอกสาร
+                <FileText className="h-4 w-4" /> ดูเอกสาร
               </a>
             ) : null}
             {showMedicalCertUpload && (
@@ -145,79 +144,47 @@ export function LeaveDetailActions({
           </div>
         )}
 
-        {/* HR/Admin: download the filled .docx leave form */}
-        {canDownloadDoc && (
-          <div className="flex justify-end">
+        <div className="flex flex-wrap gap-2 justify-end">
+          {canDownloadDoc && (
             <Button variant="outline" onClick={handleDownloadDoc} disabled={downloading}>
               {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               ดาวน์โหลดใบลา (.docx)
             </Button>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        {(showApproverActions || showCancelAction) && (
-          <div className="flex flex-wrap gap-2 justify-end">
-            {showCancelAction && (
-              <Button
-                variant="outline"
-                onClick={() => setConfirmAction("cancel")}
-                disabled={isPending}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Ban className="h-4 w-4 mr-2" />}
-                ยกเลิกคำขอ
-              </Button>
-            )}
-            {showApproverActions && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setConfirmAction("reject")}
-                  disabled={isPending}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  ไม่อนุมัติ
-                </Button>
-                <Button
-                  onClick={() => setConfirmAction("approve")}
-                  disabled={isPending}
-                >
-                  {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                  อนุมัติ
-                </Button>
-              </>
-            )}
-          </div>
-        )}
+          )}
+          {showInProcessCancel && (
+            <Button variant="outline" className="text-destructive" onClick={() => setConfirmAction("cancel")} disabled={isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Ban className="h-4 w-4 mr-2" />}
+              ยกเลิกคำขอ
+            </Button>
+          )}
+          {showRequestCancel && (
+            <Button variant="outline" className="text-destructive" onClick={() => setConfirmAction("requestCancel")} disabled={isPending}>
+              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+              ยื่นขอยกเลิกใบลา
+            </Button>
+          )}
+        </div>
       </div>
 
-      <ConfirmDialog
-        open={confirmAction === "approve"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการอนุมัติ"
-        description={`อนุมัติคำขอลาของ ${employeeName} ใช่หรือไม่?`}
-        confirmLabel="อนุมัติ"
-        onConfirm={() => handleConfirm()}
-      />
-      <ConfirmDialog
-        open={confirmAction === "reject"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการไม่อนุมัติ"
-        description={`ไม่อนุมัติคำขอลาของ ${employeeName} ใช่หรือไม่?`}
-        confirmLabel="ไม่อนุมัติ"
-        variant="destructive"
-        withInput
-        inputLabel="เหตุผลที่ไม่อนุมัติ (ไม่บังคับ)"
-        onConfirm={handleConfirm}
-      />
       <ConfirmDialog
         open={confirmAction === "cancel"}
         onOpenChange={(open) => !open && setConfirmAction(null)}
         title="ยืนยันการยกเลิก"
-        description="ยกเลิกคำขอลานี้ใช่หรือไม่? การยกเลิกไม่สามารถเปลี่ยนกลับได้"
+        description="ยกเลิกคำขอลานี้ใช่หรือไม่? ระบบจะคืนสิทธิ์วันลา"
         confirmLabel="ยกเลิกคำขอ"
         variant="destructive"
         onConfirm={() => handleConfirm()}
+      />
+      <ConfirmDialog
+        open={confirmAction === "requestCancel"}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title="ยื่นคำขอยกเลิกใบลา (ที่เสร็จสิ้นแล้ว)"
+        description="ใบลานี้ลงนามครบแล้ว การยกเลิกต้องเดินเอกสารผ่าน ผอ. → คณบดี → อธิการบดี ก่อนคืนสิทธิ์"
+        confirmLabel="ยื่นคำขอยกเลิก"
+        variant="destructive"
+        withInput
+        inputLabel="เหตุผลการยกเลิก"
+        onConfirm={handleConfirm}
       />
     </>
   );

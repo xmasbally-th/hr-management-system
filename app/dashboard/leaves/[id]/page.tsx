@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLeaveRequestById } from "@/lib/actions/leave-actions";
+import { getDocumentsByReference } from "@/lib/actions/document-actions";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft } from "lucide-react";
 import { LeaveDetailActions } from "./leave-detail-actions";
+import { LeaveWorkflowPanel } from "./leave-workflow-panel";
 
 export const metadata = { title: "รายละเอียดคำขอลา" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "รออนุมัติ", variant: "secondary" },
-  approved: { label: "อนุมัติ", variant: "default" },
+  pending: { label: "รอตรวจสอบ", variant: "secondary" },
+  awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary" },
+  awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
+  approved: { label: "อนุมัติ (คณบดีลงนาม)", variant: "default" },
+  awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดี", variant: "secondary" },
+  completed: { label: "เสร็จสิ้น", variant: "default" },
   rejected: { label: "ไม่อนุมัติ", variant: "destructive" },
   cancelled: { label: "ยกเลิก", variant: "outline" },
 };
@@ -40,8 +46,19 @@ export default async function LeaveDetailPage({ params }: PageProps) {
     .single();
 
   const isOwner = leave.employee_id === user!.id;
-  const isApprover = profile && ["hr", "admin", "manager"].includes(profile.role);
+  const isHrAdmin = !!profile && ["hr", "admin"].includes(profile.role);
   const status = statusMap[leave.status] ?? { label: leave.status, variant: "outline" as const };
+
+  // Document-tracking row for the workflow panel (HR/admin)
+  let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
+  if (isHrAdmin) {
+    try {
+      const docs = await getDocumentsByReference(id);
+      tracking = docs.find((d) => d.document_type === "leave") ?? docs[0] ?? null;
+    } catch {
+      tracking = null;
+    }
+  }
 
   // Type narrowing via cast — Supabase nested select returns dynamic shape
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,16 +147,23 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      {/* Actions (medical cert upload, approve/reject, cancel) */}
+      {/* HR/Admin signature workflow panel (ผอ. → คณบดี → อธิการบดี) */}
+      {isHrAdmin && (
+        <LeaveWorkflowPanel
+          requestId={leave.id}
+          status={leave.status}
+          tracking={tracking}
+        />
+      )}
+
+      {/* Owner cancel / completed-cancellation request / medical cert / download */}
       <LeaveDetailActions
         requestId={leave.id}
         status={leave.status}
         isOwner={isOwner}
-        isApprover={Boolean(isApprover)}
         isSick={isSick}
-        employeeName={l.employee?.full_name ?? ""}
         existingMedicalCert={leave.medical_cert_url ?? null}
-        canDownloadDoc={profile?.role === "hr" || profile?.role === "admin"}
+        canDownloadDoc={isHrAdmin}
       />
     </div>
   );
