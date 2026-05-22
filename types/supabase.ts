@@ -733,7 +733,7 @@ export interface Database {
           medical_cert_url: string | null;
           expected_delivery_date: string | null;
           submission_channel: string | null;
-          status: "pending" | "approved" | "rejected" | "cancelled";
+          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
           approver_id: string | null;
           created_at: string;
           updated_at: string;
@@ -751,7 +751,7 @@ export interface Database {
           medical_cert_url?: string | null;
           expected_delivery_date?: string | null;
           submission_channel?: string | null;
-          status?: "pending" | "approved" | "rejected" | "cancelled";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -769,7 +769,7 @@ export interface Database {
           medical_cert_url?: string | null;
           expected_delivery_date?: string | null;
           submission_channel?: string | null;
-          status?: "pending" | "approved" | "rejected" | "cancelled";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -962,6 +962,15 @@ export interface Database {
           scanned_upload_date: string | null;
           sent_to_agency_date: string | null;
           notes: string | null;
+          sent_to_director_date: string | null;
+          director_signed_date: string | null;
+          sent_to_dean_date: string | null;
+          dean_signed_date: string | null;
+          scanned_document_url: string | null;
+          rejected_at: string | null;
+          rejected_by: string | null;
+          reject_reason: string | null;
+          reject_level: string | null;
         };
         Insert: {
           id?: string;
@@ -972,6 +981,15 @@ export interface Database {
           scanned_upload_date?: string | null;
           sent_to_agency_date?: string | null;
           notes?: string | null;
+          sent_to_director_date?: string | null;
+          director_signed_date?: string | null;
+          sent_to_dean_date?: string | null;
+          dean_signed_date?: string | null;
+          scanned_document_url?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          reject_reason?: string | null;
+          reject_level?: string | null;
         };
         Update: {
           id?: string;
@@ -982,6 +1000,15 @@ export interface Database {
           scanned_upload_date?: string | null;
           sent_to_agency_date?: string | null;
           notes?: string | null;
+          sent_to_director_date?: string | null;
+          director_signed_date?: string | null;
+          sent_to_dean_date?: string | null;
+          dean_signed_date?: string | null;
+          scanned_document_url?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
+          reject_reason?: string | null;
+          reject_level?: string | null;
         };
         Relationships: [];
       };
@@ -1097,7 +1124,14 @@ export interface Database {
         | "pre_registered"
         | "awaiting_confirmation"
         | "awaiting_correction";
-      request_status: "pending" | "approved" | "rejected" | "cancelled";
+      request_status:
+        | "pending"
+        | "awaiting_director"
+        | "awaiting_dean"
+        | "approved"
+        | "completed"
+        | "rejected"
+        | "cancelled";
     };
     CompositeTypes: {
       [_ in never]: never;
