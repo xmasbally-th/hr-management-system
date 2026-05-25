@@ -348,14 +348,6 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
         </div>
       )}
 
-      {/* Scanned document upload (always shown for paper channel) */}
-      <FileUpload
-        pathPrefix={`leaves/${employeeId || "unknown"}/scanned`}
-        onUploaded={() => {}}
-        label="แนบสแกนเอกสาร (ถ้ามี)"
-        disabled={isPending}
-      />
-
       {/* Submit */}
       <div className="flex gap-4 justify-end pt-4 border-t">
         <Button
