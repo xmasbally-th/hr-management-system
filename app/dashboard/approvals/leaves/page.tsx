@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { getAllLeaveRequests } from "@/lib/actions/leave-actions";
 import { HrLeavesClient } from "../../hr/leaves/hr-leaves-client";
@@ -28,9 +29,17 @@ export default async function ApproveLeavesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">อนุมัติการลา</h1>
-        <p className="text-muted-foreground">ตรวจสอบและอนุมัติ/ปฏิเสธคำขอลาของพนักงาน</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">อนุมัติการลา</h1>
+          <p className="text-muted-foreground">ตรวจสอบและอนุมัติ/ปฏิเสธคำขอลาของพนักงาน</p>
+        </div>
+        <Link
+          href="/dashboard/leaves/calendar"
+          className="inline-flex items-center gap-1.5 text-sm text-sky-700 hover:text-sky-900 underline-offset-2 hover:underline"
+        >
+          ดูปฏิทินการลา →
+        </Link>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
