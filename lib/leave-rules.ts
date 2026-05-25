@@ -156,14 +156,16 @@ export async function enforceLeaveTypeRules(
   medicalCertUrl: string | null | undefined,
   expectedDeliveryDate: string | null | undefined,
 ): Promise<EnforceRulesResult> {
-  // 1. Fetch leave type code + name
+  // 1. Fetch leave type code + name + entitlement (max_days_per_year is the
+  //    FY cap HR sets in master-data — M1)
   const { data: lt } = await supabase
     .from("leave_types")
-    .select("code, name")
+    .select("code, name, max_days_per_year")
     .eq("id", leaveTypeId)
     .single();
   const code = lt?.code ?? null;
   const leaveTypeName = lt?.name ?? "ลา";
+  const maxDays = lt?.max_days_per_year ?? 0;
 
   // 2. Fetch employee profile (gender, employee_type, full_name)
   const { data: emp } = await supabase
@@ -194,12 +196,12 @@ export async function enforceLeaveTypeRules(
   // 6. Validate based on leave type code
   switch (code) {
     case "SICK": {
-      if (workingDays > 30) {
-        throw new Error("ลาป่วยต่อครั้งไม่เกิน 30 วันทำการ");
+      if (workingDays > maxDays) {
+        throw new Error(`ลาป่วยต่อครั้งไม่เกิน ${maxDays} วันทำการ`);
       }
-      if (usedDays + workingDays > 30) {
+      if (usedDays + workingDays > maxDays) {
         throw new Error(
-          `ลาป่วยเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน 30 วัน)`,
+          `ลาป่วยเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน ${maxDays} วัน)`,
         );
       }
       if (workingDays > 2 && !medicalCertUrl) {
@@ -209,17 +211,18 @@ export async function enforceLeaveTypeRules(
     }
 
     case "PERSONAL": {
-      if (usedDays + workingDays > 10) {
+      if (usedDays + workingDays > maxDays) {
         throw new Error(
-          `ลากิจเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน 10 วัน)`,
+          `ลากิจเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน ${maxDays} วัน)`,
         );
       }
       break;
     }
 
     case "VACATION": {
-      // Uses the balance fetched above (single source).
-      const annualDays = 10;
+      // Uses the balance fetched above (single source) +
+      // max_days_per_year from leave_types (M1) instead of hardcoded 10.
+      const annualDays = maxDays;
       const accumulated = balance?.accumulated_days ?? 0;
       const entitlement = balance?.total_days ?? annualDays;
       const cap = await getVacationAccumulationCap(supabase, emp?.employee_type ?? null);
