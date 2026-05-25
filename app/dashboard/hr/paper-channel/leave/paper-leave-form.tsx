@@ -108,8 +108,10 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
           medical_cert_url: medicalCertPath || null,
           expected_delivery_date: isMaternity ? expectedDeliveryDate || null : null,
           vacation_details: isVacation ? {
-            accumulated_days: Number(accumulatedDays) || 0,
-            annual_days: Number(annualDays) || 0,
+            // B2: accumulated_days/annual_days are snapshotted from
+            // leave_balances on the server. The HR-entered values in this
+            // paper form's inputs are ignored — D3 will clean up the UI to
+            // match digital (read-only balance breakdown).
             substitute_1_id: substitute1Id || null,
             substitute_2_id: substitute2Id || null,
             substitute_3_id: substitute3Id || null,

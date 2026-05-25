@@ -41,6 +41,7 @@ interface Balance {
   typeName: string;
   totalDays: number;
   usedDays: number;
+  accumulatedDays: number;
 }
 
 interface Props {
@@ -220,9 +221,8 @@ export function LeaveRequestForm({
   const [pregnancyWeeks, setPregnancyWeeks] = useState("");
   const [emergencyContact, setEmergencyContact] = useState("");
 
-  // Vacation-specific
-  const [accumulatedDays, setAccumulatedDays] = useState("");
-  const [annualDays, setAnnualDays] = useState("");
+  // Vacation-specific (accumulated/annual days are read from leave_balances on
+  // the server — single source of truth, B2)
   const [substitute1Id, setSubstitute1Id] = useState("");
   const [substitute2Id, setSubstitute2Id] = useState("");
   const [substitute3Id, setSubstitute3Id] = useState("");
@@ -361,6 +361,9 @@ export function LeaveRequestForm({
       submission_channel: "digital",
     };
 
+    if (kind === "personal") {
+      input.personal_plan = personalPlan;
+    }
     if (kind === "maternity" && expectedDeliveryDate) {
       input.expected_delivery_date = expectedDeliveryDate;
     }
@@ -368,9 +371,10 @@ export function LeaveRequestForm({
       input.medical_cert_url = medicalCertPath;
     }
     if (kind === "vacation") {
+      // B2: accumulated_days/annual_days are filled by the server from
+      // leave_balances (single source of truth) — form only sends substitutes
+      // and branch-head opinion.
       input.vacation_details = {
-        accumulated_days: Number(accumulatedDays) || 0,
-        annual_days: Number(annualDays) || 0,
         substitute_1_id: substitute1Id || null,
         substitute_2_id: substitute2Id || null,
         substitute_3_id: substitute3Id || null,
@@ -704,21 +708,27 @@ export function LeaveRequestForm({
                     <Loader2 className="inline h-3 w-3 animate-spin ml-2" />
                   )}
                 </span>
-                {activeBalance && (
-                  <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xs">
-                    <div className="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full rounded-full", TONE_BG[meta.tone])}
-                        style={{
-                          width: `${Math.min(((activeBalance.usedDays + totalDays) / activeBalance.totalDays) * 100, 100)}%`,
-                        }}
-                      />
+                {activeBalance && (() => {
+                  // B3: balance is measured in working days (calendar days for
+                  // female maternity per Thai law). Use the matching unit so
+                  // the progress bar reflects how the server will deduct.
+                  const consumed = isFemaleMaternity ? totalDays : effectiveWorkingDays;
+                  return (
+                    <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xs">
+                      <div className="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
+                        <div
+                          className={cn("h-full rounded-full", TONE_BG[meta.tone])}
+                          style={{
+                            width: `${Math.min(((activeBalance.usedDays + consumed) / activeBalance.totalDays) * 100, 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        เหลือ {activeBalance.totalDays - activeBalance.usedDays - consumed} วัน
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      เหลือ {activeBalance.totalDays - activeBalance.usedDays - totalDays} วัน
-                    </span>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -832,43 +842,36 @@ export function LeaveRequestForm({
           {/* Vacation-specific */}
           {kind === "vacation" && (
             <div className="space-y-5 border-t border-border pt-5">
-              {/* Vacation accumulation cap info */}
-              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs flex items-start gap-2 text-sky-900">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-semibold">สิทธิ์ลาพักผ่อน:</span>{" "}
-                  10 วันทำการ/ปี
-                  {getVacationCapLabel(employeeType).cap > 0 ? (
-                    <> + สะสมจากปีก่อนสูงสุด {getVacationCapLabel(employeeType).cap} วัน ({getVacationCapLabel(employeeType).label})</>
-                  ) : (
-                    <> · {getVacationCapLabel(employeeType).label}</>
-                  )}
+              {/* Vacation balance breakdown — read-only from leave_balances (B2) */}
+              {activeBalance ? (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs space-y-1.5 text-sky-900">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <div className="space-y-0.5">
+                      <div>
+                        <span className="font-semibold">สิทธิ์ลาพักผ่อนปีนี้:</span>{" "}
+                        <span className="font-mono">{activeBalance.totalDays - activeBalance.accumulatedDays}</span> วัน{" "}
+                        + สะสมจากปีก่อน <span className="font-mono">{activeBalance.accumulatedDays}</span> วัน{" "}
+                        = รวม <span className="font-mono font-semibold">{activeBalance.totalDays}</span> วัน
+                      </div>
+                      <div className="text-sky-800">
+                        ใช้ไปแล้ว <span className="font-mono">{activeBalance.usedDays}</span> วัน · คงเหลือ{" "}
+                        <span className="font-mono font-semibold">
+                          {activeBalance.totalDays - activeBalance.usedDays}
+                        </span>{" "}
+                        วัน · {getVacationCapLabel(employeeType).label}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>วันสะสมจากปีก่อน</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={accumulatedDays}
-                    onChange={(e) => setAccumulatedDays(e.target.value)}
-                    disabled={isPending}
-                  />
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs flex items-start gap-2 text-amber-900">
+                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div>
+                    ยังไม่มีสิทธิ์ลาพักผ่อนในระบบสำหรับปีงบประมาณนี้ — กรุณาติดต่อ HR เพื่อเริ่มต้นสิทธิ์
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>วันลาประจำปี</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={annualDays}
-                    onChange={(e) => setAnnualDays(e.target.value)}
-                    disabled={isPending}
-                  />
-                </div>
-              </div>
+              )}
 
               {[
                 { label: "ผู้ปฏิบัติหน้าที่แทนคนที่ 1 *", v: substitute1Id, set: setSubstitute1Id, required: true },

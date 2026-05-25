@@ -155,6 +155,10 @@ export async function enforceLeaveTypeRules(
   totalDays: number,
   medicalCertUrl: string | null | undefined,
   expectedDeliveryDate: string | null | undefined,
+  /** Personal-leave plan — when "planned", server enforces the
+   *  advance-notice window from leave_policy. Omitted = HR/paper
+   *  channel (HR may backdate). */
+  personalPlan?: "planned" | "urgent",
 ): Promise<EnforceRulesResult> {
   // 1. Fetch leave type code + name + entitlement (max_days_per_year is the
   //    FY cap HR sets in master-data — M1)
@@ -173,8 +177,13 @@ export async function enforceLeaveTypeRules(
     .select("value")
     .eq("key", "leave_policy")
     .maybeSingle();
-  const policy = (policyRow?.value as { sick_cert_threshold_working_days?: number } | null) ?? null;
+  const policy =
+    (policyRow?.value as {
+      sick_cert_threshold_working_days?: number;
+      personal_advance_notice_days?: number;
+    } | null) ?? null;
   const certThreshold = policy?.sick_cert_threshold_working_days ?? 2;
+  const advanceNoticeDays = policy?.personal_advance_notice_days ?? 3;
 
   // 2. Fetch employee profile (gender, employee_type, full_name)
   const { data: emp } = await supabase
@@ -224,6 +233,22 @@ export async function enforceLeaveTypeRules(
         throw new Error(
           `ลากิจเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน ${maxDays} วัน)`,
         );
+      }
+      // Advance-notice rule — only when caller declares the request as
+      // "planned" (digital channel). HR/paper channel omits personalPlan
+      // and may backdate.
+      if (personalPlan === "planned") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const start = new Date(startDate);
+        const daysUntil = Math.floor(
+          (start.getTime() - today.getTime()) / 86400000,
+        );
+        if (daysUntil < advanceNoticeDays) {
+          throw new Error(
+            `ลากิจแบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย ${advanceNoticeDays} วัน (เหลือ ${daysUntil} วัน)`,
+          );
+        }
       }
       break;
     }

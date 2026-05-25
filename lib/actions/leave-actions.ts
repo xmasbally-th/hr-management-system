@@ -103,6 +103,32 @@ async function releaseLeaveBalance(
     .eq("id", bal.id);
 }
 
+/**
+ * B2: snapshot `accumulated_days` and `annual_days` from leave_balances for
+ * the current fiscal year — single source of truth. Used when inserting
+ * `leave_vacation_details` so users can no longer self-report these.
+ *
+ * Returns 0/0 if no balance row exists (e.g. employee hasn't been initialized).
+ * `annual_days` is derived as `total_days - accumulated_days` so the two
+ * always sum back to the entitlement shown on the form.
+ */
+async function readVacationBalanceSnapshot(
+  supabase: SupabaseClient<Database>,
+  employeeId: string,
+  leaveTypeId: string,
+): Promise<{ accumulated: number; annual: number }> {
+  const { data: bal } = await supabase
+    .from("leave_balances")
+    .select("accumulated_days, total_days")
+    .eq("employee_id", employeeId)
+    .eq("leave_type_id", leaveTypeId)
+    .eq("fiscal_year", currentFiscalYear())
+    .maybeSingle();
+  const accumulated = bal?.accumulated_days ?? 0;
+  const annual = Math.max(0, (bal?.total_days ?? 0) - accumulated);
+  return { accumulated, annual };
+}
+
 /** Create the document_tracking row that drives the signature workflow. */
 async function createLeaveDocumentTracking(
   admin: SupabaseClient<Database>,
@@ -355,10 +381,14 @@ export interface CreateLeaveRequestInput {
   medical_cert_url?: string | null;
   expected_delivery_date?: string | null;
   submission_channel: "digital" | "paper";
-  // Vacation-specific fields
+  /** Personal-leave plan type — when "planned" the server enforces the
+   *  advance-notice window from leave_policy. Omitted = paper/HR channel
+   *  (HR can backdate). */
+  personal_plan?: "planned" | "urgent";
+  // Vacation-specific fields. accumulated_days/annual_days are derived from
+  // leave_balances on the server (B2 single source of truth) — input only
+  // carries substitutes + branch-head opinion.
   vacation_details?: {
-    accumulated_days: number;
-    annual_days: number;
     substitute_1_id: string | null;
     substitute_2_id: string | null;
     substitute_3_id: string | null;
@@ -392,6 +422,7 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     supabase, input.leave_type_id, user.id,
     input.start_date, input.end_date, input.total_days,
     input.medical_cert_url, input.expected_delivery_date,
+    input.personal_plan,
   );
 
   const { data: request, error } = await supabase
@@ -420,12 +451,16 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
 
   if (input.vacation_details && request) {
     const sanitizedOpinion = validateTextField(input.vacation_details.branch_head_opinion, "ความเห็นหัวหน้า", 500);
+    // B2: snapshot accumulated/annual days from leave_balances (single source).
+    const { accumulated, annual } = await readVacationBalanceSnapshot(
+      supabase, user.id, input.leave_type_id,
+    );
     const { error: vacError } = await supabase
       .from("leave_vacation_details")
       .insert({
         request_id: request.id,
-        accumulated_days: input.vacation_details.accumulated_days,
-        annual_days: input.vacation_details.annual_days,
+        accumulated_days: accumulated,
+        annual_days: annual,
         substitute_1_id: input.vacation_details.substitute_1_id,
         substitute_2_id: input.vacation_details.substitute_2_id,
         substitute_3_id: input.vacation_details.substitute_3_id,
@@ -485,6 +520,7 @@ export async function createLeaveRequestByHr(
   await validateEmployeeExists(supabase, employeeId);
 
   // ── Enforce business rules (no toggle check — paper channel) ──
+  // personal_plan intentionally omitted: HR can backdate paper requests.
   const { workingDays, leaveTypeName, employeeName } = await enforceLeaveTypeRules(
     supabase, input.leave_type_id, employeeId,
     input.start_date, input.end_date, input.total_days,
@@ -517,12 +553,16 @@ export async function createLeaveRequestByHr(
 
   if (input.vacation_details && request) {
     const sanitizedOpinion = validateTextField(input.vacation_details.branch_head_opinion, "ความเห็นหัวหน้า", 500);
+    // B2: snapshot accumulated/annual days from leave_balances (single source).
+    const { accumulated, annual } = await readVacationBalanceSnapshot(
+      supabase, employeeId, input.leave_type_id,
+    );
     const { error: vacError } = await supabase
       .from("leave_vacation_details")
       .insert({
         request_id: request.id,
-        accumulated_days: input.vacation_details.accumulated_days,
-        annual_days: input.vacation_details.annual_days,
+        accumulated_days: accumulated,
+        annual_days: annual,
         substitute_1_id: input.vacation_details.substitute_1_id,
         substitute_2_id: input.vacation_details.substitute_2_id,
         substitute_3_id: input.vacation_details.substitute_3_id,

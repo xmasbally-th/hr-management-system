@@ -33,6 +33,7 @@ export default async function NewLeavePage() {
       typeName: lt?.name ?? "",
       totalDays: Number(r.total_days ?? 0),
       usedDays: Number(r.used_days ?? 0),
+      accumulatedDays: Number(r.accumulated_days ?? 0),
     };
   });
 
