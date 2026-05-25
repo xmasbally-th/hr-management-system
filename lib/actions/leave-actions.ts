@@ -450,9 +450,9 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     .select("id")
     .in("role", ["hr", "admin"]);
   if (hrUsers) {
-    for (const hr of hrUsers) {
-      await createNotificationInternal(supabase, hr.id, "new_leave_request", notifMsg);
-    }
+    await Promise.all(
+      hrUsers.map((hr) => createNotificationInternal(supabase, hr.id, "new_leave_request", notifMsg)),
+    );
   }
 
   revalidatePath("/dashboard/leaves");
@@ -547,9 +547,9 @@ export async function createLeaveRequestByHr(
     .in("role", ["hr", "admin"])
     .neq("id", user.id);
   if (hrUsers) {
-    for (const hr of hrUsers) {
-      await createNotificationInternal(supabase, hr.id, "new_leave_request", notifMsg);
-    }
+    await Promise.all(
+      hrUsers.map((hr) => createNotificationInternal(supabase, hr.id, "new_leave_request", notifMsg)),
+    );
   }
 
   revalidatePath("/dashboard/leaves");
@@ -721,9 +721,9 @@ export async function cancelLeaveRequest(requestId: string) {
       .select("id")
       .in("role", ["hr", "admin"]);
     if (hrUsers) {
-      for (const hr of hrUsers) {
-        await createNotificationInternal(supabase, hr.id, "new_leave_request", cancelMsg);
-      }
+      await Promise.all(
+        hrUsers.map((hr) => createNotificationInternal(supabase, hr.id, "new_leave_request", cancelMsg)),
+      );
     }
   } catch {
     // Non-blocking: notification failure shouldn't fail cancellation
