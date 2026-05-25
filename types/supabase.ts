@@ -315,6 +315,7 @@ export interface Database {
           id: string;
           name: string;
           sort_order: number;
+          vacation_accumulation_cap: number;
           created_at: string;
           updated_at: string;
         };
@@ -322,6 +323,7 @@ export interface Database {
           id?: string;
           name: string;
           sort_order?: number;
+          vacation_accumulation_cap?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -329,6 +331,7 @@ export interface Database {
           id?: string;
           name?: string;
           sort_order?: number;
+          vacation_accumulation_cap?: number;
           created_at?: string;
           updated_at?: string;
         };

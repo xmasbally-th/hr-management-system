@@ -77,7 +77,7 @@ interface Props {
   holidays: HolidayRow[];
   fiscalYearOptions: number[];
   currentFiscalYear: number;
-  employeeTypes: NameOrderRow[];
+  employeeTypes: (NameOrderRow & { vacation_accumulation_cap: number })[];
   educationLevels: NameOrderRow[];
   decorationCatalog: DecorationCatalogRow[];
   documentTemplates: LeaveTemplate[];

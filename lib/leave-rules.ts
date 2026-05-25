@@ -62,18 +62,25 @@ export function getLeaveStage(status: string): { label: string; step: number } {
 
 // ─── Vacation accumulation cap by employee_type ────────────
 
-/** Max carry-over days for vacation leave by civil-service category. */
-export function getVacationAccumulationCap(employeeType: string | null): number {
-  switch (employeeType) {
-    case "ข้าราชการ":
-      return 30;
-    case "พนักงานมหาวิทยาลัย":
-      return 20;
-    case "พนักงานราชการ":
-      return 15;
-    default:
-      return 0; // ลูกจ้างชั่วคราว, ลูกจ้างประจำ, etc. — ไม่สะสม
-  }
+/**
+ * Max carry-over days for vacation leave — read from the
+ * employee_types table (managed by HR in master-data, M3).
+ *
+ * Replaces the previous hardcoded switch which silently returned 0 for
+ * any name that didn't match exactly (e.g. "พนักงานมหาวิทยาลัย(สายสนับสนุน)"
+ * lost its accumulation).
+ */
+export async function getVacationAccumulationCap(
+  supabase: SupabaseClient<Database>,
+  employeeType: string | null,
+): Promise<number> {
+  if (!employeeType) return 0;
+  const { data } = await supabase
+    .from("employee_types")
+    .select("vacation_accumulation_cap")
+    .eq("name", employeeType)
+    .maybeSingle();
+  return data?.vacation_accumulation_cap ?? 0;
 }
 
 // ─── Get used leave days for current FY (committed statuses) ────
@@ -215,7 +222,7 @@ export async function enforceLeaveTypeRules(
       const annualDays = 10;
       const accumulated = balance?.accumulated_days ?? 0;
       const entitlement = balance?.total_days ?? annualDays;
-      const cap = getVacationAccumulationCap(emp?.employee_type ?? null);
+      const cap = await getVacationAccumulationCap(supabase, emp?.employee_type ?? null);
 
       if (usedDays + workingDays > entitlement) {
         throw new Error(

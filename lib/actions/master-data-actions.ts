@@ -234,19 +234,24 @@ export async function getEmployeeTypes() {
   return data;
 }
 
-export async function createEmployeeType(name: string, sort_order = 0) {
+export async function createEmployeeType(
+  name: string,
+  sort_order = 0,
+  vacation_accumulation_cap = 0,
+) {
   const supabase = await createClient();
   const actorId = await checkHrAdminRole(supabase);
   const clean = validateName(name, "ชื่อประเภทบุคลากร");
+  const cap = Math.max(0, Math.floor(vacation_accumulation_cap));
 
   const { data, error } = await supabase
     .from("employee_types")
-    .insert({ name: clean, sort_order })
+    .insert({ name: clean, sort_order, vacation_accumulation_cap: cap })
     .select()
     .single();
   if (error) throw new Error("เพิ่มประเภทบุคลากรไม่สำเร็จ — อาจมีชื่อนี้อยู่แล้ว");
   await logAudit(supabase, actorId, "create_employee_type", "employee_type", data.id, {
-    name: clean,
+    name: clean, vacation_accumulation_cap: cap,
   });
   revalidatePath("/dashboard/hr/master-data");
   return data;
@@ -256,13 +261,17 @@ export async function updateEmployeeType(
   id: string,
   name: string,
   sort_order?: number,
+  vacation_accumulation_cap?: number,
 ) {
   const supabase = await createClient();
   const actorId = await checkHrAdminRole(supabase);
   const clean = validateName(name, "ชื่อประเภทบุคลากร");
 
-  const update: { name: string; sort_order?: number } = { name: clean };
+  const update: { name: string; sort_order?: number; vacation_accumulation_cap?: number } = { name: clean };
   if (typeof sort_order === "number") update.sort_order = sort_order;
+  if (typeof vacation_accumulation_cap === "number") {
+    update.vacation_accumulation_cap = Math.max(0, Math.floor(vacation_accumulation_cap));
+  }
 
   const { error } = await supabase.from("employee_types").update(update).eq("id", id);
   if (error) throw new Error("แก้ไขประเภทบุคลากรไม่สำเร็จ");

@@ -1070,7 +1070,7 @@ export async function initializeLeaveBalances(
 
     // VACATION: calculate accumulated from previous FY
     if (lt.code === "VACATION") {
-      const cap = getVacationAccumulationCap(emp?.employee_type ?? null);
+      const cap = await getVacationAccumulationCap(supabase, emp?.employee_type ?? null);
       if (cap > 0) {
         const prevFy = fy - 1;
         const { data: prevBalance } = await supabase
@@ -1173,6 +1173,13 @@ export async function initializeAllEmployeesBalances(
     }
   }
 
+  // M3: vacation cap by employee_type — fetch once, look up per employee
+  const { data: empTypeRows } = await supabase
+    .from("employee_types").select("name, vacation_accumulation_cap");
+  const capByEmployeeType = new Map(
+    (empTypeRows ?? []).map((r) => [r.name, r.vacation_accumulation_cap]),
+  );
+
   const toInsert: Database["public"]["Tables"]["leave_balances"]["Insert"][] = [];
   let skipped = 0;
 
@@ -1184,7 +1191,7 @@ export async function initializeAllEmployeesBalances(
       }
       let accumulated = 0;
       if (lt.code === "VACATION") {
-        const cap = getVacationAccumulationCap(emp.employee_type ?? null);
+        const cap = capByEmployeeType.get(emp.employee_type ?? "") ?? 0;
         accumulated = cap > 0 ? Math.min(prevVacByEmployee.get(emp.id) ?? 0, cap) : 0;
       }
       const annual = lt.max_days_per_year;
@@ -1297,6 +1304,13 @@ export async function importLeaveBalances(
     (existing ?? []).map((b) => [`${b.employee_id}:${b.leave_type_id}`, b.id]),
   );
 
+  // M3: vacation cap by employee_type (one-shot fetch, look up per row)
+  const { data: empTypeRows } = await supabase
+    .from("employee_types").select("name, vacation_accumulation_cap");
+  const capByEmployeeType = new Map(
+    (empTypeRows ?? []).map((r) => [r.name, r.vacation_accumulation_cap]),
+  );
+
   type BalRow = Database["public"]["Tables"]["leave_balances"]["Insert"];
   const inserts: BalRow[] = [];
   const updates: Array<{ id: string; data: Partial<BalRow> }> = [];
@@ -1340,7 +1354,7 @@ export async function importLeaveBalances(
 
       let accumulated = 0;
       if (p.code === "VACATION") {
-        const cap = getVacationAccumulationCap(prof.employee_type ?? null);
+        const cap = capByEmployeeType.get(prof.employee_type ?? "") ?? 0;
         const requested = p.accumulatedInput ?? 0;
         accumulated = cap > 0 ? Math.min(requested, cap) : 0;
         if (requested > accumulated) {

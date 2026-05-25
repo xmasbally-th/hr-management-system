@@ -26,6 +26,7 @@ interface Row {
   id: string;
   name: string;
   sort_order: number;
+  vacation_accumulation_cap: number;
 }
 
 export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
@@ -33,9 +34,11 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
   const [isPending, startTransition] = useTransition();
   const [newName, setNewName] = useState("");
   const [newOrder, setNewOrder] = useState("");
+  const [newCap, setNewCap] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editOrder, setEditOrder] = useState("");
+  const [editCap, setEditCap] = useState("");
   const [search, setSearch] = useState("");
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
 
@@ -49,10 +52,11 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
     if (!newName.trim()) return;
     startTransition(async () => {
       try {
-        await createEmployeeType(newName, Number(newOrder) || 0);
+        await createEmployeeType(newName, Number(newOrder) || 0, Number(newCap) || 0);
         toast.success("เพิ่มประเภทบุคลากรแล้ว");
         setNewName("");
         setNewOrder("");
+        setNewCap("");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "เพิ่มไม่สำเร็จ");
@@ -64,18 +68,20 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
     setEditingId(r.id);
     setEditName(r.name);
     setEditOrder(String(r.sort_order ?? 0));
+    setEditCap(String(r.vacation_accumulation_cap ?? 0));
   }
   function cancelEdit() {
     setEditingId(null);
     setEditName("");
     setEditOrder("");
+    setEditCap("");
   }
   function saveEdit() {
     if (!editingId || !editName.trim()) return;
     const id = editingId;
     startTransition(async () => {
       try {
-        await updateEmployeeType(id, editName, Number(editOrder) || 0);
+        await updateEmployeeType(id, editName, Number(editOrder) || 0, Number(editCap) || 0);
         toast.success("บันทึกการแก้ไขแล้ว");
         cancelEdit();
         router.refresh();
@@ -127,6 +133,18 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
               disabled={isPending}
             />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="newEmpCap" className="text-xs">เพดานวันลาพักผ่อนสะสม (วัน)</Label>
+            <Input
+              id="newEmpCap"
+              type="number"
+              min={0}
+              value={newCap}
+              onChange={(e) => setNewCap(e.target.value)}
+              placeholder="0 = ไม่สะสม"
+              disabled={isPending}
+            />
+          </div>
           <Button type="submit" className="w-full" disabled={isPending || !newName.trim()}>
             {isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -155,13 +173,14 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
               <TableRow>
                 <TableHead>ชื่อประเภท</TableHead>
                 <TableHead className="w-[100px] text-center">ลำดับ</TableHead>
+                <TableHead className="w-[140px] text-center">เพดานสะสม (วัน)</TableHead>
                 <TableHead className="w-[140px] text-right">จัดการ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground text-sm">
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground text-sm">
                     {search ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประเภทบุคลากร"}
                   </TableCell>
                 </TableRow>
@@ -192,6 +211,20 @@ export function EmployeeTypesSection({ rows }: { rows: Row[] }) {
                           />
                         ) : (
                           <span className="font-mono text-xs text-muted-foreground">{row.sort_order}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            value={editCap}
+                            onChange={(e) => setEditCap(e.target.value)}
+                            className="h-9 w-20 text-center mx-auto"
+                            disabled={isPending}
+                          />
+                        ) : (
+                          <span className="font-mono text-xs">{row.vacation_accumulation_cap}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
