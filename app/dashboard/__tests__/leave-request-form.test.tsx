@@ -77,6 +77,7 @@ function renderForm(overrides?: Partial<React.ComponentProps<typeof LeaveRequest
       leaveOnlineEnabled={true}
       gender="หญิง"
       employeeType="ข้าราชการ"
+      policy={{ sick_cert_threshold_working_days: 2, personal_advance_notice_days: 3 }}
       {...overrides}
     />
   );

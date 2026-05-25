@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LeaveTemplate } from "@/lib/actions/template-actions";
+import type { LeavePolicy } from "@/lib/actions/settings-actions";
 import { DepartmentsSection } from "./_sections/departments-section";
 import { PositionsSection } from "./_sections/positions-section";
 import { LeaveTypesSection } from "./_sections/leave-types-section";
@@ -82,6 +83,7 @@ interface Props {
   decorationCatalog: DecorationCatalogRow[];
   documentTemplates: LeaveTemplate[];
   canManageTemplates: boolean;
+  leavePolicy: LeavePolicy;
 }
 
 export function MasterDataClient({
@@ -97,6 +99,7 @@ export function MasterDataClient({
   decorationCatalog,
   documentTemplates,
   canManageTemplates,
+  leavePolicy,
 }: Props) {
   const [active, setActive] = useState<TabKey>("departments");
 
@@ -160,7 +163,9 @@ export function MasterDataClient({
           <PositionsSection rows={positions} departments={departments} />
         )}
         {active === "leave-types" && <LeaveTypesSection rows={leaveTypes} />}
-        {active === "leave-settings" && <LeaveSettingsSection enabled={leaveOnlineEnabled} />}
+        {active === "leave-settings" && (
+          <LeaveSettingsSection enabled={leaveOnlineEnabled} policy={leavePolicy} />
+        )}
         {active === "holidays" && (
           <HolidaysSection
             rows={holidays}

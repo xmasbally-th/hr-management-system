@@ -167,6 +167,15 @@ export async function enforceLeaveTypeRules(
   const leaveTypeName = lt?.name ?? "ลา";
   const maxDays = lt?.max_days_per_year ?? 0;
 
+  // Policy thresholds (M5) — HR-configurable in master-data
+  const { data: policyRow } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "leave_policy")
+    .maybeSingle();
+  const policy = (policyRow?.value as { sick_cert_threshold_working_days?: number } | null) ?? null;
+  const certThreshold = policy?.sick_cert_threshold_working_days ?? 2;
+
   // 2. Fetch employee profile (gender, employee_type, full_name)
   const { data: emp } = await supabase
     .from("profiles")
@@ -204,8 +213,8 @@ export async function enforceLeaveTypeRules(
           `ลาป่วยเกินสิทธิ์ปีงบประมาณ (ใช้ไป ${usedDays} วัน + ครั้งนี้ ${workingDays} วัน เกิน ${maxDays} วัน)`,
         );
       }
-      if (workingDays > 2 && !medicalCertUrl) {
-        throw new Error("ลาป่วยเกิน 2 วันทำการต้องแนบใบรับรองแพทย์");
+      if (workingDays > certThreshold && !medicalCertUrl) {
+        throw new Error(`ลาป่วยเกิน ${certThreshold} วันทำการต้องแนบใบรับรองแพทย์`);
       }
       break;
     }

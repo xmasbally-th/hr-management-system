@@ -3,19 +3,20 @@ import {
   getEmployeesForSelection,
   getMyLeaveBalances,
 } from "@/lib/actions/leave-actions";
-import { getLeaveOnlineEnabled } from "@/lib/actions/settings-actions";
+import { getLeaveOnlineEnabled, getLeavePolicy } from "@/lib/actions/settings-actions";
 import { getMyProfile } from "@/lib/actions/profile-actions";
 import { LeaveRequestForm } from "./leave-request-form";
 
 export const metadata = { title: "ยื่นคำขอลา" };
 
 export default async function NewLeavePage() {
-  const [leaveTypes, balancesRaw, leaveOnlineEnabled, profile] =
+  const [leaveTypes, balancesRaw, leaveOnlineEnabled, profile, policy] =
     await Promise.all([
       getLeaveTypes(),
       getMyLeaveBalances().catch(() => []),
       getLeaveOnlineEnabled(),
       getMyProfile(),
+      getLeavePolicy(),
     ]);
 
   let employees: { id: string; full_name: string; email: string }[] = [];
@@ -43,6 +44,7 @@ export default async function NewLeavePage() {
       leaveOnlineEnabled={leaveOnlineEnabled}
       gender={profile.gender ?? null}
       employeeType={profile.employee_type ?? null}
+      policy={policy}
     />
   );
 }

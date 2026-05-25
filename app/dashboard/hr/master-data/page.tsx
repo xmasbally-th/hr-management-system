@@ -5,7 +5,7 @@ import {
   getEducationLevels,
   getDecorationCatalog,
 } from "@/lib/actions/master-data-actions";
-import { getLeaveTypeSettings, getLeaveOnlineEnabled } from "@/lib/actions/settings-actions";
+import { getLeaveTypeSettings, getLeaveOnlineEnabled, getLeavePolicy } from "@/lib/actions/settings-actions";
 import { getHolidays } from "@/lib/actions/holiday-actions";
 import { getLeaveTemplates } from "@/lib/actions/template-actions";
 import { getMyProfile } from "@/lib/actions/profile-actions";
@@ -30,6 +30,7 @@ export default async function MasterDataPage() {
     decorationCatalog,
     documentTemplates,
     profile,
+    leavePolicy,
   ] = await Promise.all([
     getDepartments(),
     getPositions(),
@@ -41,6 +42,7 @@ export default async function MasterDataPage() {
     getDecorationCatalog(),
     getLeaveTemplates(),
     getMyProfile(),
+    getLeavePolicy(),
   ]);
 
   return (
@@ -66,6 +68,7 @@ export default async function MasterDataPage() {
         decorationCatalog={decorationCatalog}
         documentTemplates={documentTemplates}
         canManageTemplates={profile.role === "admin"}
+        leavePolicy={leavePolicy}
       />
     </div>
   );

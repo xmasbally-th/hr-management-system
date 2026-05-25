@@ -7,6 +7,7 @@ import {
   previewWorkingDays,
   type CreateLeaveRequestInput,
 } from "@/lib/actions/leave-actions";
+import type { LeavePolicy } from "@/lib/actions/settings-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ interface Props {
   leaveOnlineEnabled: boolean;
   gender: string | null;
   employeeType: string | null;
+  policy: LeavePolicy;
 }
 
 const KIND_META: Record<
@@ -159,7 +161,10 @@ export function LeaveRequestForm({
   leaveOnlineEnabled,
   gender,
   employeeType,
+  policy,
 }: Props) {
+  const certThreshold = policy.sick_cert_threshold_working_days;
+  const advanceNoticeDays = policy.personal_advance_notice_days;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -279,10 +284,10 @@ export function LeaveRequestForm({
   const showMaternity = gender === "หญิง" || gender === "ชาย";
   // For female maternity, always require cert; for male, no cert required
   const isFemaleMaternity = kind === "maternity" && gender === "หญิง";
-  // Sick cert required when > 2 working days (use workingDays if available, fallback to totalDays)
+  // Sick cert required when > certThreshold working days (use workingDays if available, fallback to totalDays)
   const effectiveWorkingDays = workingDays ?? totalDays;
   const requiresMedicalCert =
-    (kind === "sick" && effectiveWorkingDays > 2) || isFemaleMaternity;
+    (kind === "sick" && effectiveWorkingDays > certThreshold) || isFemaleMaternity;
   const meta = KIND_META[kind];
 
   function validate(): string | null {
@@ -293,8 +298,8 @@ export function LeaveRequestForm({
 
     if (kind === "sick") {
       if (!symptoms.trim()) return "กรุณาระบุอาการเจ็บป่วย";
-      if (effectiveWorkingDays > 2 && !medicalCertPath)
-        return "ลาป่วยเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์";
+      if (effectiveWorkingDays > certThreshold && !medicalCertPath)
+        return `ลาป่วยเกิน ${certThreshold} วันทำการ ต้องแนบใบรับรองแพทย์`;
     }
     if (kind === "personal") {
       if (!reason.trim() || reason.trim().length < 10)
@@ -304,8 +309,8 @@ export function LeaveRequestForm({
         today.setHours(0, 0, 0, 0);
         const start = new Date(startDate);
         const daysUntil = Math.floor((start.getTime() - today.getTime()) / 86400000);
-        if (daysUntil < 3)
-          return "ลากิจแบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน";
+        if (daysUntil < advanceNoticeDays)
+          return `ลากิจแบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย ${advanceNoticeDays} วัน`;
       }
     }
     if (kind === "maternity") {
@@ -533,9 +538,9 @@ export function LeaveRequestForm({
             {kind === "vacation" &&
               "ลาพักผ่อน — เลือกผู้ปฏิบัติแทนคนที่ 1 บังคับ (สูงสุด 3 คน) และระบุความเห็นหัวหน้าสาขา (ถ้ามี)"}
             {kind === "sick" &&
-              "ลาป่วย — ลาเกิน 2 วันทำการ ต้องแนบใบรับรองแพทย์ · สูงสุด 30 วันทำการ/ปีงบประมาณ"}
+              `ลาป่วย — ลาเกิน ${certThreshold} วันทำการ ต้องแนบใบรับรองแพทย์ · สูงสุด 30 วันทำการ/ปีงบประมาณ`}
             {kind === "personal" &&
-              "ลากิจ — แบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย 3 วัน · เหตุผลต้องมีอย่างน้อย 10 ตัวอักษร · สูงสุด 10 วันทำการ/ปีงบประมาณ"}
+              `ลากิจ — แบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย ${advanceNoticeDays} วัน · เหตุผลต้องมีอย่างน้อย 10 ตัวอักษร · สูงสุด 10 วันทำการ/ปีงบประมาณ`}
             {kind === "maternity" && gender === "หญิง" &&
               "ลาคลอด — ระบบจะคำนวณช่วงวันลา 90 วันจากวันกำหนดคลอดอัตโนมัติ · ต้องแนบใบรับรองแพทย์"}
             {kind === "maternity" && gender === "ชาย" &&
@@ -811,7 +816,7 @@ export function LeaveRequestForm({
               <Label>
                 ใบรับรองแพทย์{" "}
                 <span className="text-rose-600 font-semibold">
-                  {isFemaleMaternity || (kind === "sick" && effectiveWorkingDays > 2)
+                  {isFemaleMaternity || (kind === "sick" && effectiveWorkingDays > certThreshold)
                     ? "(บังคับ)"
                     : "(ถ้ามี)"}
                 </span>

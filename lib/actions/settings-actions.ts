@@ -176,6 +176,67 @@ export async function updateLeaveOnlineEnabled(enabled: boolean): Promise<void> 
 }
 
 // =============================================================================
+// Leave policy thresholds (M5) — sick cert + personal advance notice
+// =============================================================================
+
+export interface LeavePolicy {
+  sick_cert_threshold_working_days: number;
+  personal_advance_notice_days: number;
+}
+
+const DEFAULT_LEAVE_POLICY: LeavePolicy = {
+  sick_cert_threshold_working_days: 2,
+  personal_advance_notice_days: 3,
+};
+
+/** Read leave_policy. Any authenticated user — the form needs it too. */
+export async function getLeavePolicy(): Promise<LeavePolicy> {
+  const supabase = await createClient();
+  await getAuthUser(supabase);
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "leave_policy")
+    .maybeSingle();
+  const v = data?.value as Partial<LeavePolicy> | null;
+  return {
+    sick_cert_threshold_working_days:
+      v?.sick_cert_threshold_working_days ?? DEFAULT_LEAVE_POLICY.sick_cert_threshold_working_days,
+    personal_advance_notice_days:
+      v?.personal_advance_notice_days ?? DEFAULT_LEAVE_POLICY.personal_advance_notice_days,
+  };
+}
+
+/** HR/Admin: update leave_policy thresholds. */
+export async function updateLeavePolicy(input: LeavePolicy): Promise<void> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  const policy: LeavePolicy = {
+    sick_cert_threshold_working_days: Math.max(0, Math.floor(input.sick_cert_threshold_working_days)),
+    personal_advance_notice_days: Math.max(0, Math.floor(input.personal_advance_notice_days)),
+  };
+
+  const { error } = await supabase
+    .from("system_settings")
+    .upsert(
+      {
+        key: "leave_policy",
+        value: policy as unknown as import("@/types/supabase").Database["public"]["Tables"]["system_settings"]["Insert"]["value"],
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      },
+      { onConflict: "key" },
+    );
+  if (error) throw new Error("บันทึกนโยบายไม่สำเร็จ");
+
+  await logAudit(supabase, user.id, "update_leave_policy", "system_setting", "leave_policy", { ...policy });
+  revalidatePath("/dashboard/hr/master-data");
+  revalidatePath("/dashboard/leaves/new");
+}
+
+// =============================================================================
 // Departments / System stats — relaxed RBAC where appropriate
 // =============================================================================
 
