@@ -121,7 +121,14 @@ export default async function LeaveDetailPage({ params }: PageProps) {
           <Field label="ตำแหน่ง" value={l.employee?.position_title ?? "-"} />
           <Field label="วันที่เริ่ม" value={leave.start_date} />
           <Field label="วันที่สิ้นสุด" value={leave.end_date} />
-          <Field label="จำนวนวัน" value={`${leave.total_days} วัน`} />
+          <Field
+            label="จำนวนวัน"
+            value={
+              leave.working_days != null && leave.working_days !== leave.total_days
+                ? `${leave.total_days} วันปฏิทิน (${leave.working_days} วันทำการ)`
+                : `${leave.total_days} วัน`
+            }
+          />
           <Field label="ช่องทาง" value={leave.submission_channel === "paper" ? "กระดาษ" : "ดิจิทัล"} />
           <Field label="เบอร์ติดต่อ" value={leave.contact_number ?? "-"} />
           <Field label="ยื่นเมื่อ" value={new Date(leave.created_at).toLocaleString("th-TH")} />

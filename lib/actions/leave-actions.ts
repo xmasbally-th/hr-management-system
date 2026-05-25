@@ -384,7 +384,7 @@ export async function getEmployeesForSelection() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, email, gender, employee_type")
     .eq("status", "approved")
     .order("full_name");
 

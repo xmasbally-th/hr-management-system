@@ -15,9 +15,31 @@ import { Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { LeaveType } from "@/types/supabase";
 
+interface PaperEmployee {
+  id: string;
+  full_name: string;
+  email: string;
+  gender: string | null;
+  employee_type: string | null;
+}
+
 interface Props {
   leaveTypes: LeaveType[];
-  employees: { id: string; full_name: string; email: string }[];
+  employees: PaperEmployee[];
+}
+
+/** Vacation accumulation cap label per employee type (mirrors digital form). */
+function vacationCapLabel(employeeType: string | null): string {
+  switch (employeeType) {
+    case "ข้าราชการ":
+      return "ข้าราชการ — สะสมสูงสุด 30 วัน";
+    case "พนักงานมหาวิทยาลัย":
+      return "พนักงานมหาวิทยาลัย — สะสมสูงสุด 20 วัน";
+    case "พนักงานราชการ":
+      return "พนักงานราชการ — สะสมสูงสุด 15 วัน";
+    default:
+      return "ประเภทนี้ไม่มีสิทธิ์สะสมวันลาข้ามปี";
+  }
 }
 
 export function PaperLeaveForm({ leaveTypes, employees }: Props) {
@@ -34,13 +56,19 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
   const [medicalCertPath, setMedicalCertPath] = useState("");
 
-  // Vacation-specific
-  const [accumulatedDays, setAccumulatedDays] = useState("");
-  const [annualDays, setAnnualDays] = useState("");
+  // Vacation-specific (accumulated/annual days come from leave_balances on
+  // the server — B2). Form only collects substitutes + opinion.
   const [substitute1Id, setSubstitute1Id] = useState("");
   const [substitute2Id, setSubstitute2Id] = useState("");
   const [substitute3Id, setSubstitute3Id] = useState("");
   const [branchHeadOpinion, setBranchHeadOpinion] = useState("");
+
+  // Selected employee — drives gender/employee_type-dependent UI (D3)
+  const selectedEmployee = employees.find((e) => e.id === employeeId) ?? null;
+  const empGender = selectedEmployee?.gender ?? null;
+  const empType = selectedEmployee?.employee_type ?? null;
+  const isFemaleMaternity = empGender === "หญิง" || empGender === "female";
+  const isMaleMaternity = empGender === "ชาย" || empGender === "male";
 
   // Working days preview
   const [workingDays, setWorkingDays] = useState<number | null>(null);
@@ -108,10 +136,8 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
           medical_cert_url: medicalCertPath || null,
           expected_delivery_date: isMaternity ? expectedDeliveryDate || null : null,
           vacation_details: isVacation ? {
-            // B2: accumulated_days/annual_days are snapshotted from
-            // leave_balances on the server. The HR-entered values in this
-            // paper form's inputs are ignored — D3 will clean up the UI to
-            // match digital (read-only balance breakdown).
+            // accumulated/annual days are read from leave_balances on the
+            // server (B2 single source of truth).
             substitute_1_id: substitute1Id || null,
             substitute_2_id: substitute2Id || null,
             substitute_3_id: substitute3Id || null,
@@ -239,9 +265,18 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
         </div>
       )}
 
-      {/* Maternity-specific */}
-      {isMaternity && (
+      {/* Maternity-specific — D3: gender-aware */}
+      {isMaternity && employeeId && !isFemaleMaternity && !isMaleMaternity && (
+        <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-900 flex items-start gap-2">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            พนักงานคนนี้ยังไม่ได้ระบุเพศในโปรไฟล์ — กรุณาให้พนักงานอัปเดตโปรไฟล์ก่อนยื่นลาคลอด
+          </span>
+        </div>
+      )}
+      {isMaternity && isFemaleMaternity && (
         <div className="space-y-2 p-4 border rounded-lg bg-pink-50/50">
+          <p className="text-sm font-medium">ลาคลอด (หญิง) — ≤ 90 วันปฏิทิน</p>
           <Label htmlFor="deliveryDate">วันที่คาดว่าจะคลอด</Label>
           <Input
             id="deliveryDate"
@@ -252,35 +287,33 @@ export function PaperLeaveForm({ leaveTypes, employees }: Props) {
           />
         </div>
       )}
+      {isMaternity && isMaleMaternity && (
+        <div className="space-y-2 p-4 border rounded-lg bg-sky-50">
+          <p className="text-sm font-medium">ลาดูแลภรรยาคลอด (ชาย) — ≤ 15 วันทำการ</p>
+          <Label htmlFor="deliveryDate">วันที่คาดว่าจะคลอด (ถ้าทราบ)</Label>
+          <Input
+            id="deliveryDate"
+            type="date"
+            value={expectedDeliveryDate}
+            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+            disabled={isPending}
+          />
+        </div>
+      )}
 
-      {/* Vacation-specific */}
+      {/* Vacation-specific — D3: cap label from employee_type, balance pulled
+          server-side (B2). No more manual accumulated/annual inputs. */}
       {isVacation && (
         <div className="space-y-4 p-4 border rounded-lg bg-blue-50/50">
           <p className="text-sm font-medium">รายละเอียดลาพักผ่อน</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="accDays">วันสะสมจากปีก่อน</Label>
-              <Input
-                id="accDays"
-                type="number"
-                min="0"
-                value={accumulatedDays}
-                onChange={(e) => setAccumulatedDays(e.target.value)}
-                disabled={isPending}
-              />
+          {employeeId && (
+            <div className="rounded-md border border-sky-200 bg-white/60 p-2 text-xs text-sky-900 flex items-start gap-2">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                {vacationCapLabel(empType)} · วันสะสมและสิทธิ์ประจำปีถูกอ่านจากระบบโดยอัตโนมัติ
+              </span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="annDays">วันลาประจำปี</Label>
-              <Input
-                id="annDays"
-                type="number"
-                min="0"
-                value={annualDays}
-                onChange={(e) => setAnnualDays(e.target.value)}
-                disabled={isPending}
-              />
-            </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label>ผู้ปฏิบัติงานแทน (สูงสุด 3 คน)</Label>
