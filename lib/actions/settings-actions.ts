@@ -55,43 +55,15 @@ export async function getLeaveTypeSettings() {
   return data;
 }
 
-export async function createLeaveType(input: {
+export async function createLeaveType(_input: {
   name: string;
   max_days_per_year: number;
 }) {
-  const supabase = await createClient();
-  const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
-
-  const name = input.name.trim();
-  if (name.length === 0 || name.length > 100) {
-    throw new Error("ชื่อประเภทลาต้องมี 1-100 ตัวอักษร");
-  }
-  if (
-    !Number.isInteger(input.max_days_per_year) ||
-    input.max_days_per_year < 0 ||
-    input.max_days_per_year > 365
-  ) {
-    throw new Error("จำนวนวันต้องเป็นจำนวนเต็ม 0-365");
-  }
-
-  const { data, error } = await supabase
-    .from("leave_types")
-    .insert({
-      name,
-      max_days_per_year: input.max_days_per_year,
-      is_accumulative: false,
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error("เพิ่มประเภทลาไม่สำเร็จ — อาจมีชื่อนี้อยู่แล้ว");
-  await logAudit(supabase, user.id, "create_leave_type", "leave_type", data.id, {
-    name,
-    max_days_per_year: input.max_days_per_year,
-  });
-  revalidatePath("/dashboard/hr/master-data");
-  return data;
+  // M2: leave types are locked to the 4 codes (SICK / PERSONAL / VACATION /
+  // MATERNITY) because every business rule keys off `code`. A new type
+  // would have no code and silently bypass all validation. HR may only
+  // rename existing types and adjust max_days_per_year.
+  throw new Error("ไม่อนุญาตให้เพิ่มประเภทลาใหม่ (ระบบล็อกไว้ 4 ประเภทตามระเบียบ)");
 }
 
 export async function updateLeaveType(id: string, updates: { name?: string; max_days_per_year?: number }) {
@@ -132,26 +104,10 @@ export async function updateLeaveType(id: string, updates: { name?: string; max_
   revalidatePath("/dashboard/hr/master-data");
 }
 
-export async function deleteLeaveType(id: string) {
-  if (!UUID_RE.test(id)) throw new Error("รหัสประเภทลาไม่ถูกต้อง");
-
-  const supabase = await createClient();
-  const user = await getAuthUser(supabase);
-  await checkHrAdmin(supabase, user.id);
-
-  // FK protection — refuse delete if leave_requests reference this type
-  const { count } = await supabase
-    .from("leave_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("leave_type_id", id);
-  if ((count ?? 0) > 0) {
-    throw new Error(`ลบไม่ได้ — มีคำขอลา ${count} รายการใช้ประเภทนี้`);
-  }
-
-  const { error } = await supabase.from("leave_types").delete().eq("id", id);
-  if (error) throw new Error("ลบประเภทลาไม่สำเร็จ");
-  await logAudit(supabase, user.id, "delete_leave_type", "leave_type", id, {});
-  revalidatePath("/dashboard/hr/master-data");
+export async function deleteLeaveType(_id: string) {
+  // M2: deleting one of the 4 locked types would also wipe the matching
+  // leave_balances row (ON DELETE CASCADE) — refuse outright.
+  throw new Error("ไม่อนุญาตให้ลบประเภทลา (ระบบล็อกไว้ 4 ประเภทตามระเบียบ)");
 }
 
 export async function countRequestsByLeaveType(id: string): Promise<number> {

@@ -2,14 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  createLeaveType,
-  updateLeaveType,
-  deleteLeaveType,
-} from "@/lib/actions/settings-actions";
+import { updateLeaveType } from "@/lib/actions/settings-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -18,9 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Plus, Loader2, Check, X, Search } from "lucide-react";
+import { Pencil, Loader2, Check, X, Search } from "lucide-react";
 import { toast } from "sonner";
 
 interface LeaveTypeRow {
@@ -41,36 +35,16 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [newName, setNewName] = useState("");
-  const [newMax, setNewMax] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editMax, setEditMax] = useState("");
   const [search, setSearch] = useState("");
-  const [deleteRow, setDeleteRow] = useState<LeaveTypeRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => r.name.toLowerCase().includes(q));
   }, [rows, search]);
-
-  function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const days = Number.parseInt(newMax, 10);
-    if (!newName.trim() || !Number.isInteger(days) || days < 0) return;
-    startTransition(async () => {
-      try {
-        await createLeaveType({ name: newName, max_days_per_year: days });
-        toast.success("เพิ่มประเภทการลาแล้ว");
-        setNewName("");
-        setNewMax("");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "เพิ่มไม่สำเร็จ");
-      }
-    });
-  }
 
   function startEdit(r: LeaveTypeRow) {
     setEditingId(r.id);
@@ -102,64 +76,15 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
     });
   }
 
-  function handleDelete() {
-    if (!deleteRow) return;
-    const id = deleteRow.id;
-    setDeleteRow(null);
-    startTransition(async () => {
-      try {
-        await deleteLeaveType(id);
-        toast.success("ลบประเภทการลาแล้ว");
-        router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
-      }
-    });
-  }
-
   return (
     <div className="grid md:grid-cols-3 gap-6">
-      <div className="md:col-span-1 border border-border rounded-lg p-4 bg-card h-fit">
-        <h3 className="font-semibold mb-4 text-sm">เพิ่มประเภทการลา</h3>
-        <form onSubmit={handleAdd} className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="newName" className="text-xs">ชื่อประเภท *</Label>
-            <Input
-              id="newName"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="เช่น ลาคลอด"
-              disabled={isPending}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="newMax" className="text-xs">จำนวนวันสูงสุด/ปี *</Label>
-            <Input
-              id="newMax"
-              type="number"
-              min={0}
-              max={365}
-              value={newMax}
-              onChange={(e) => setNewMax(e.target.value)}
-              placeholder="90"
-              disabled={isPending}
-              required
-            />
-          </div>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isPending || !newName.trim() || !newMax}
-          >
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            เพิ่ม
-          </Button>
-        </form>
+      <div className="md:col-span-1 border border-border rounded-lg p-4 bg-sky-50 border-sky-200 h-fit">
+        <h3 className="font-semibold mb-2 text-sm text-sky-900">ระบบล็อก 4 ประเภทลา</h3>
+        <p className="text-xs text-sky-900 leading-relaxed">
+          ประเภทการลาในระบบเป็นไปตามระเบียบราชการ (ป่วย / กิจ / พักผ่อน / คลอด) —
+          แก้ไขได้เฉพาะ <b>ชื่อแสดง</b> และ <b>จำนวนวันสูงสุด/ปี</b> ของแต่ละประเภท
+          ไม่อนุญาตให้เพิ่ม/ลบประเภทใหม่
+        </p>
       </div>
 
       <div className="md:col-span-2 space-y-3">
@@ -260,26 +185,15 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
                             </Button>
                           </div>
                         ) : (
-                          <div className="inline-flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8"
-                              onClick={() => startEdit(row)}
-                              disabled={isPending}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setDeleteRow(row)}
-                              disabled={isPending}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => startEdit(row)}
+                            disabled={isPending}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -291,15 +205,6 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={!!deleteRow}
-        onOpenChange={(open) => !open && setDeleteRow(null)}
-        title="ยืนยันการลบประเภทการลา"
-        description={`ต้องการลบ "${deleteRow?.name ?? ""}" ใช่หรือไม่? ระบบจะปฏิเสธหากมีคำขอลาใช้ประเภทนี้อยู่`}
-        confirmLabel="ลบ"
-        variant="destructive"
-        onConfirm={handleDelete}
-      />
     </div>
   );
 }
