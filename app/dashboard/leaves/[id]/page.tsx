@@ -9,6 +9,7 @@ import { ChevronLeft } from "lucide-react";
 import { LeaveDetailActions } from "./leave-detail-actions";
 import { LeaveWorkflowPanel } from "./leave-workflow-panel";
 import { CancellationWorkflowPanel } from "./cancellation-workflow-panel";
+import { DocumentWorkflowTimeline } from "@/components/document-workflow-timeline";
 
 export const metadata = { title: "รายละเอียดคำขอลา" };
 
@@ -50,19 +51,21 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   const isHrAdmin = !!profile && ["hr", "admin"].includes(profile.role);
   const status = statusMap[leave.status] ?? { label: leave.status, variant: "outline" as const };
 
-  // Document-tracking row for the workflow panel (HR/admin)
+  // Document-tracking row (timeline shown to ALL viewers — owner/manager/HR)
   let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
   let cancellation: { id: string; status: string; reason: string } | null = null;
   let cancellationTracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
-  if (isHrAdmin) {
-    try {
-      const docs = await getDocumentsByReference(id);
-      tracking = docs.find((d) => d.document_type === "leave") ?? docs[0] ?? null;
-    } catch {
-      tracking = null;
-    }
+  try {
+    const docs = await getDocumentsByReference(id);
+    tracking = docs.find((d) => d.document_type === "leave") ?? docs[0] ?? null;
+  } catch {
+    tracking = null;
+  }
 
-    // Active (latest) cancellation request for this leave, if any
+  // Active (latest) cancellation request — managers + HR/admin can see; owner
+  // can see only their own (RLS).
+  const canSeeCancellation = isHrAdmin || isOwner || profile?.role === "manager";
+  if (canSeeCancellation) {
     const { data: cancel } = await supabase
       .from("leave_cancellation_requests")
       .select("id, status, reason")
@@ -185,6 +188,23 @@ export default async function LeaveDetailPage({ params }: PageProps) {
           reason={cancellation.reason}
           tracking={cancellationTracking}
         />
+      )}
+
+      {/* Document timeline — visible to everyone who can see this leave */}
+      <div className="border rounded-lg p-4 bg-card">
+        <p className="text-sm font-semibold mb-3">เส้นทางเอกสาร</p>
+        <DocumentWorkflowTimeline tracking={tracking} docType="leave" />
+      </div>
+
+      {/* Cancellation timeline — visible whenever a cancellation exists */}
+      {cancellation && (
+        <div className="border rounded-lg p-4 bg-amber-50/30">
+          <p className="text-sm font-semibold mb-1">เส้นทางใบขอยกเลิก</p>
+          {cancellation.reason && (
+            <p className="text-xs text-muted-foreground mb-3">เหตุผล: {cancellation.reason}</p>
+          )}
+          <DocumentWorkflowTimeline tracking={cancellationTracking} docType="leave_cancellation" />
+        </div>
       )}
 
       {/* Owner cancel / completed-cancellation request / medical cert / download */}

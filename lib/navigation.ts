@@ -79,6 +79,12 @@ export const navigationGroups: NavGroup[] = [
         icon: "ClipboardList",
         roles: ["admin", "hr", "manager"],
       },
+      {
+        title: "ติดตามเอกสาร",
+        href: "/dashboard/approvals/documents",
+        icon: "FolderSearch",
+        roles: ["admin", "hr", "manager"],
+      },
     ],
   },
   {

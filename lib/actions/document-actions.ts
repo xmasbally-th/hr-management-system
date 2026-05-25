@@ -70,9 +70,12 @@ export async function getDocumentsByReference(referenceId: string) {
     .eq("id", user.id)
     .single();
 
-  const isHrOrAdmin = profile?.role === "hr" || profile?.role === "admin";
+  // Manager + above can read any tracking row (matches the
+  // "manager+ read all" RLS policy on document_tracking).
+  const canReadAll =
+    profile?.role === "hr" || profile?.role === "admin" || profile?.role === "manager";
 
-  if (!isHrOrAdmin) {
+  if (!canReadAll) {
     const [leaveRes, travelRes] = await Promise.all([
       supabase.from("leave_requests").select("id").eq("id", referenceId).eq("employee_id", user.id),
       supabase.from("travel_requests").select("id").eq("id", referenceId).eq("employee_id", user.id),
