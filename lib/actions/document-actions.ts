@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logAudit } from "@/lib/audit-log";
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,6 +29,7 @@ export async function getAllDocumentTracking() {
   const { data, error } = await supabase
     .from("document_tracking")
     .select("*")
+    .is("deleted_at", null)
     .order("sent_for_signature_date", { ascending: false, nullsFirst: false });
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
@@ -54,6 +56,7 @@ export async function getMyDocuments() {
     .from("document_tracking")
     .select("*")
     .in("reference_id", myRefIds)
+    .is("deleted_at", null)
     .order("sent_for_signature_date", { ascending: false, nullsFirst: false });
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
@@ -88,6 +91,7 @@ export async function getDocumentsByReference(referenceId: string) {
     .from("document_tracking")
     .select("*")
     .eq("reference_id", referenceId)
+    .is("deleted_at", null)
     .order("sent_for_signature_date", { ascending: false });
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
@@ -196,11 +200,15 @@ export async function deleteDocumentTracking(docId: string) {
   const user = await getAuthUser(supabase);
   await checkHrAdmin(supabase, user.id);
 
+  // Soft-delete (W9): stamp deleted_at instead of removing the row.
+  // Read paths filter `deleted_at IS NULL` so the row disappears from UI.
   const { error } = await supabase
     .from("document_tracking")
-    .delete()
-    .eq("id", docId);
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", docId)
+    .is("deleted_at", null);
 
   if (error) throw new Error("ไม่สามารถลบรายการเอกสารได้");
+  await logAudit(supabase, user.id, "soft_delete_document_tracking", "document_tracking", docId, {});
   revalidatePath("/dashboard/hr/documents");
 }

@@ -974,6 +974,7 @@ export interface Database {
           sent_to_president_date: string | null;
           president_signed_date: string | null;
           president_document_url: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -996,6 +997,7 @@ export interface Database {
           sent_to_president_date?: string | null;
           president_signed_date?: string | null;
           president_document_url?: string | null;
+          deleted_at?: string | null;
         };
         Update: {
           id?: string;
@@ -1018,6 +1020,7 @@ export interface Database {
           sent_to_president_date?: string | null;
           president_signed_date?: string | null;
           president_document_url?: string | null;
+          deleted_at?: string | null;
         };
         Relationships: [];
       };

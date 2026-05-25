@@ -36,6 +36,7 @@ export default async function ApprovalsDocumentsPage() {
   const { data: documents } = await supabase
     .from("document_tracking")
     .select("*")
+    .is("deleted_at", null)
     .order("sent_to_director_date", { ascending: false, nullsFirst: false })
     .limit(100);
 
