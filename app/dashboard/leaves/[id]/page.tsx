@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft } from "lucide-react";
 import { LeaveDetailActions } from "./leave-detail-actions";
 import { LeaveWorkflowPanel } from "./leave-workflow-panel";
+import { CancellationWorkflowPanel } from "./cancellation-workflow-panel";
 
 export const metadata = { title: "รายละเอียดคำขอลา" };
 
@@ -51,12 +52,32 @@ export default async function LeaveDetailPage({ params }: PageProps) {
 
   // Document-tracking row for the workflow panel (HR/admin)
   let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
+  let cancellation: { id: string; status: string; reason: string } | null = null;
+  let cancellationTracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
   if (isHrAdmin) {
     try {
       const docs = await getDocumentsByReference(id);
       tracking = docs.find((d) => d.document_type === "leave") ?? docs[0] ?? null;
     } catch {
       tracking = null;
+    }
+
+    // Active (latest) cancellation request for this leave, if any
+    const { data: cancel } = await supabase
+      .from("leave_cancellation_requests")
+      .select("id, status, reason")
+      .eq("leave_request_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (cancel) {
+      cancellation = cancel;
+      try {
+        const cancelDocs = await getDocumentsByReference(cancel.id);
+        cancellationTracking = cancelDocs[0] ?? null;
+      } catch {
+        cancellationTracking = null;
+      }
     }
   }
 
@@ -153,6 +174,16 @@ export default async function LeaveDetailPage({ params }: PageProps) {
           requestId={leave.id}
           status={leave.status}
           tracking={tracking}
+        />
+      )}
+
+      {/* Cancellation request workflow (only for HR/Admin when one exists) */}
+      {isHrAdmin && cancellation && (
+        <CancellationWorkflowPanel
+          cancellationId={cancellation.id}
+          status={cancellation.status}
+          reason={cancellation.reason}
+          tracking={cancellationTracking}
         />
       )}
 

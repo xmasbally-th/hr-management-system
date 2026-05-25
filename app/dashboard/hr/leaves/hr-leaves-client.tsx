@@ -1,14 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition, useState } from "react";
-import { approveLeaveRequest, rejectLeaveRequest } from "@/lib/actions/leave-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, XCircle, Loader2, Eye, FileCheck, FileX } from "lucide-react";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { toast } from "sonner";
+import { Eye, FileCheck, FileX } from "lucide-react";
 
 interface LeaveRequestRow {
   id: string;
@@ -38,44 +34,8 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
 };
 
 export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Record<string, unknown>)[] }) {
-  const [isPending, startTransition] = useTransition();
-  const [confirmAction, setConfirmAction] = useState<{
-    type: "approve" | "reject";
-    id: string;
-    employeeName: string;
-  } | null>(null);
-
-  function openApproveDialog(id: string, name: string) {
-    setConfirmAction({ type: "approve", id, employeeName: name });
-  }
-
-  function openRejectDialog(id: string, name: string) {
-    setConfirmAction({ type: "reject", id, employeeName: name });
-  }
-
-  function handleConfirm(reason?: string) {
-    if (!confirmAction) return;
-    const { type, id } = confirmAction;
-    setConfirmAction(null);
-
-    startTransition(async () => {
-      try {
-        if (type === "approve") {
-          await approveLeaveRequest(id);
-          toast.success("อนุมัติการลาเรียบร้อยแล้ว");
-        } else {
-          await rejectLeaveRequest(id, reason || undefined);
-          toast.success("ปฏิเสธการลาเรียบร้อยแล้ว");
-        }
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-      }
-    });
-  }
-
   return (
     <div className="space-y-4">
-      {/* Table */}
       <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
@@ -134,35 +94,12 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      <Link href={`/dashboard/leaves/${req.id}`}>
-                        <Button size="icon" variant="ghost" title="ดูรายละเอียด">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      {req.status === "pending" && (
-                        <>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openApproveDialog(req.id, req.employee?.full_name ?? "-")}
-                            disabled={isPending}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          >
-                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openRejectDialog(req.id, req.employee?.full_name ?? "-")}
-                            disabled={isPending}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                    <Link href={`/dashboard/leaves/${req.id}`}>
+                      <Button size="sm" variant="outline">
+                        <Eye className="h-4 w-4 mr-1.5" />
+                        เดินเอกสาร
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               );
@@ -177,28 +114,6 @@ export function HrLeavesClient({ requests }: { requests: (LeaveRequestRow | Reco
           </TableBody>
         </Table>
       </div>
-
-      {/* Confirmation dialogs */}
-      <ConfirmDialog
-        open={confirmAction?.type === "approve"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันอนุมัติการลา"
-        description={`คุณต้องการอนุมัติคำขอลาของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
-        confirmLabel="อนุมัติ"
-        onConfirm={handleConfirm}
-      />
-      <ConfirmDialog
-        open={confirmAction?.type === "reject"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันปฏิเสธการลา"
-        description={`คุณต้องการปฏิเสธคำขอลาของ ${confirmAction?.employeeName ?? ""} ใช่หรือไม่?`}
-        confirmLabel="ปฏิเสธ"
-        variant="destructive"
-        withInput
-        inputLabel="เหตุผล (ถ้ามี)"
-        inputPlaceholder="ระบุเหตุผลที่ไม่อนุมัติ..."
-        onConfirm={handleConfirm}
-      />
     </div>
   );
 }
