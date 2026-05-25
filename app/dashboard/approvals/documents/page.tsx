@@ -41,6 +41,53 @@ export default async function ApprovalsDocumentsPage() {
 
   const rows = documents ?? [];
 
+  // Enrich reference_id → employee + leave/travel info (W8)
+  const leaveIds = rows
+    .filter((d) => d.document_type === "leave" || d.document_type === "leave_request")
+    .map((d) => d.reference_id);
+  const travelIds = rows
+    .filter((d) => d.document_type === "travel_order" || d.document_type === "travel_claim")
+    .map((d) => d.reference_id);
+  const [leavesRes, travelsRes] = await Promise.all([
+    leaveIds.length
+      ? supabase
+          .from("leave_requests")
+          .select(
+            "id, start_date, end_date, leave_type:leave_types(name), employee:profiles!leave_requests_employee_id_fkey(full_name)",
+          )
+          .in("id", leaveIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    travelIds.length
+      ? supabase
+          .from("travel_requests")
+          .select(
+            "id, start_date, end_date, employee:profiles!travel_requests_employee_id_fkey(full_name)",
+          )
+          .in("id", travelIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+  ]);
+  const refInfo: Record<string, { employeeName: string; typeName: string; startDate: string | null; endDate: string | null }> = {};
+  for (const raw of leavesRes.data ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const l = raw as any;
+    refInfo[l.id] = {
+      employeeName: l.employee?.full_name ?? "",
+      typeName: l.leave_type?.name ?? "",
+      startDate: l.start_date ?? null,
+      endDate: l.end_date ?? null,
+    };
+  }
+  for (const raw of travelsRes.data ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = raw as any;
+    refInfo[t.id] = {
+      employeeName: t.employee?.full_name ?? "",
+      typeName: "",
+      startDate: t.start_date ?? null,
+      endDate: t.end_date ?? null,
+    };
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,12 +107,26 @@ export default async function ApprovalsDocumentsPage() {
             const label = docTypeLabels[doc.document_type] ?? doc.document_type;
             return (
               <div key={doc.id} className="border rounded-lg p-4 bg-card space-y-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Badge variant="secondary">{label}</Badge>
-                    <span className="text-xs font-mono text-muted-foreground truncate">
-                      {doc.reference_id.slice(0, 8)}…
-                    </span>
+                    <Badge variant="secondary" className="shrink-0">{label}</Badge>
+                    {refInfo[doc.reference_id] ? (
+                      <div className="text-sm min-w-0">
+                        <p className="truncate font-medium">
+                          {refInfo[doc.reference_id].employeeName || "—"}
+                          {refInfo[doc.reference_id].typeName ? ` · ${refInfo[doc.reference_id].typeName}` : ""}
+                        </p>
+                        {refInfo[doc.reference_id].startDate && refInfo[doc.reference_id].endDate && (
+                          <p className="text-xs text-muted-foreground">
+                            {refInfo[doc.reference_id].startDate} ~ {refInfo[doc.reference_id].endDate}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-mono text-muted-foreground truncate">
+                        {doc.reference_id.slice(0, 8)}…
+                      </span>
+                    )}
                   </div>
                   {href && (
                     <Link

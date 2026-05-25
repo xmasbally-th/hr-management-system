@@ -44,8 +44,17 @@ interface DocumentRecord {
   notes: string | null;
 }
 
+export interface DocRefInfo {
+  employeeName: string;
+  typeName: string;
+  startDate: string | null;
+  endDate: string | null;
+}
+
 const docTypeLabels: Record<string, string> = {
   leave: "ใบลา",
+  leave_request: "ใบลา", // legacy rows before W2/W8
+  leave_cancellation: "คำขอยกเลิกใบลา",
   travel_order: "คำสั่งเดินทาง",
   travel_claim: "เบิกค่าเดินทาง",
   other: "อื่นๆ",
@@ -68,7 +77,13 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-export function HrDocumentsClient({ documents: initialDocs }: { documents: DocumentRecord[] }) {
+export function HrDocumentsClient({
+  documents: initialDocs,
+  refInfo = {},
+}: {
+  documents: DocumentRecord[];
+  refInfo?: Record<string, DocRefInfo>;
+}) {
   const [documents, setDocuments] = useState(initialDocs);
   const [isPending, startTransition] = useTransition();
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -174,9 +189,32 @@ export function HrDocumentsClient({ documents: initialDocs }: { documents: Docum
                       <span className="font-medium text-sm">
                         {docTypeLabels[doc.document_type] ?? doc.document_type}
                       </span>
-                      <p className="text-xs text-muted-foreground truncate max-w-[140px]" title={doc.reference_id}>
-                        {doc.reference_id.substring(0, 8)}...
-                      </p>
+                      {(() => {
+                        const info = refInfo[doc.reference_id];
+                        if (!info) {
+                          return (
+                            <p
+                              className="text-xs text-muted-foreground truncate max-w-[140px]"
+                              title={doc.reference_id}
+                            >
+                              {doc.reference_id.substring(0, 8)}...
+                            </p>
+                          );
+                        }
+                        return (
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p className="truncate max-w-[200px]">
+                              {info.employeeName || "—"}
+                              {info.typeName ? ` · ${info.typeName}` : ""}
+                            </p>
+                            {info.startDate && info.endDate && (
+                              <p>
+                                {info.startDate} ~ {info.endDate}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell>
