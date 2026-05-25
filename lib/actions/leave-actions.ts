@@ -10,7 +10,11 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { currentFiscalYear } from "@/lib/date-ranges";
 import { calculateWorkingDays, calculateCalendarDays } from "@/lib/working-days";
-import { enforceLeaveTypeRules, getVacationAccumulationCap } from "@/lib/leave-rules";
+import {
+  COMMITTED_LEAVE_STATUSES,
+  enforceLeaveTypeRules,
+  getVacationAccumulationCap,
+} from "@/lib/leave-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
@@ -127,6 +131,44 @@ async function readVacationBalanceSnapshot(
   const accumulated = bal?.accumulated_days ?? 0;
   const annual = Math.max(0, (bal?.total_days ?? 0) - accumulated);
   return { accumulated, annual };
+}
+
+/**
+ * C1: refuse a new leave request when its date range overlaps with another
+ * committed (non-rejected/cancelled) request from the same employee.
+ *
+ * Two ranges [a1,a2] and [b1,b2] overlap iff a1 <= b2 AND a2 >= b1.
+ * `excludeRequestId` lets the caller skip a specific row (currently unused —
+ * kept for future edit flows).
+ */
+async function checkLeaveOverlap(
+  supabase: SupabaseClient<Database>,
+  employeeId: string,
+  startDate: string,
+  endDate: string,
+  excludeRequestId?: string,
+): Promise<void> {
+  let query = supabase
+    .from("leave_requests")
+    .select("id, start_date, end_date, status")
+    .eq("employee_id", employeeId)
+    .in("status", COMMITTED_LEAVE_STATUSES)
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
+    .limit(1);
+  if (excludeRequestId) query = query.neq("id", excludeRequestId);
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn("[leave-actions] overlap check failed:", error.message);
+    return; // fail open — don't block submission on infra glitch
+  }
+  if (data && data.length > 0) {
+    const c = data[0];
+    throw new Error(
+      `ช่วงวันที่ลาทับกับคำขออื่นที่ยังไม่ปิด (${c.start_date} ถึง ${c.end_date}) กรุณายกเลิกใบเดิมหรือเลือกวันใหม่`,
+    );
+  }
 }
 
 /** Create the document_tracking row that drives the signature workflow. */
@@ -417,6 +459,9 @@ export async function createLeaveRequest(input: CreateLeaveRequestInput) {
     }
   }
 
+  // ── C1: refuse if this overlaps with another in-flight request ──
+  await checkLeaveOverlap(supabase, user.id, input.start_date, input.end_date);
+
   // ── Enforce business rules + calculate working days ──
   const { workingDays, leaveTypeName, employeeName } = await enforceLeaveTypeRules(
     supabase, input.leave_type_id, user.id,
@@ -518,6 +563,9 @@ export async function createLeaveRequestByHr(
   }
 
   await validateEmployeeExists(supabase, employeeId);
+
+  // ── C1: refuse if this overlaps with another in-flight request ──
+  await checkLeaveOverlap(supabase, employeeId, input.start_date, input.end_date);
 
   // ── Enforce business rules (no toggle check — paper channel) ──
   // personal_plan intentionally omitted: HR can backdate paper requests.
@@ -701,13 +749,18 @@ export async function cancelLeaveRequest(requestId: string) {
   const user = await getAuthUser(supabase);
   checkRateLimit(user.id);
 
+  // C2: HR/admin may cancel on behalf of any employee — fetch role first
+  // so we know whether to require ownership.
+  const profile = await getProfile(supabase, user.id);
+  const isHrAdmin = profile?.role === "hr" || profile?.role === "admin";
+
   // Read current status so we know whether to restore balance
-  const { data: req } = await supabase
+  let reqQuery = supabase
     .from("leave_requests")
     .select("id, status, employee_id, leave_type_id, working_days, total_days")
-    .eq("id", requestId)
-    .eq("employee_id", user.id)
-    .single();
+    .eq("id", requestId);
+  if (!isHrAdmin) reqQuery = reqQuery.eq("employee_id", user.id);
+  const { data: req } = await reqQuery.single();
 
   if (!req) throw new Error("ไม่พบคำขอลานี้");
   // Cancellable while still in process (incl. sent to university awaiting
@@ -717,16 +770,16 @@ export async function cancelLeaveRequest(requestId: string) {
   if (!CANCELLABLE.includes(req.status)) {
     throw new Error("ยกเลิกได้เฉพาะคำขอที่ยังอยู่ในกระบวนการ — ใบที่เสร็จสิ้นแล้วต้องยื่นคำขอยกเลิกแยก");
   }
+  const cancelledByHr = isHrAdmin && req.employee_id !== user.id;
 
   // Atomic: only cancel if status hasn't changed since our read
-  const { data: cancelled, error } = await supabase
+  let updateQuery = supabase
     .from("leave_requests")
     .update({ status: "cancelled" })
     .eq("id", requestId)
-    .eq("employee_id", user.id)
-    .eq("status", req.status)           // ← guard against race condition
-    .select("id")
-    .single();
+    .eq("status", req.status); // ← guard against race condition
+  if (!isHrAdmin) updateQuery = updateQuery.eq("employee_id", user.id);
+  const { data: cancelled, error } = await updateQuery.select("id").single();
 
   if (error || !cancelled) {
     throw new Error("ไม่สามารถยกเลิกคำขอลาได้ (สถานะอาจเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า)");
@@ -743,9 +796,11 @@ export async function cancelLeaveRequest(requestId: string) {
 
   await logAudit(supabase, user.id, "cancel_leave", "leave_request", requestId, {
     prev_status: req.status,
+    cancelled_by_hr: cancelledByHr,
+    employee_id: req.employee_id,
   });
 
-  // ── Notify HR/Admin about cancellation ──
+  // ── Notify HR/Admin (always) + the owner if cancelled by HR (C2) ──
   try {
     const [{ data: empProfile }, { data: ltInfo }] = await Promise.all([
       supabase.from("profiles").select("full_name").eq("id", req.employee_id).single(),
@@ -754,17 +809,23 @@ export async function cancelLeaveRequest(requestId: string) {
     const empName = empProfile?.full_name ?? "พนักงาน";
     const ltName = ltInfo?.name ?? "ลา";
     const daysLabel = req.working_days ?? req.total_days;
-    const cancelMsg = `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) — วันลาถูกคืนกลับ`;
+    const cancelMsg = cancelledByHr
+      ? `HR ยกเลิกคำขอ${ltName} (${daysLabel} วัน) ของ ${empName} — วันลาถูกคืนกลับ`
+      : `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) — วันลาถูกคืนกลับ`;
 
     const { data: hrUsers } = await supabase
       .from("profiles")
       .select("id")
       .in("role", ["hr", "admin"]);
-    if (hrUsers) {
-      await Promise.all(
-        hrUsers.map((hr) => createNotificationInternal(supabase, hr.id, "new_leave_request", cancelMsg)),
-      );
-    }
+
+    const notifyTargets: string[] = (hrUsers ?? []).map((hr) => hr.id);
+    if (cancelledByHr) notifyTargets.push(req.employee_id);
+
+    await Promise.all(
+      notifyTargets.map((uid) =>
+        createNotificationInternal(supabase, uid, "new_leave_request", cancelMsg),
+      ),
+    );
   } catch {
     // Non-blocking: notification failure shouldn't fail cancellation
     console.error("[leave-actions] Failed to send cancel notification");

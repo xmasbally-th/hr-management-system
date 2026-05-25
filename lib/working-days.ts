@@ -14,6 +14,19 @@ import type { Database } from "@/types/supabase";
 // ─── Calendar days (no DB needed) ───────────────────────────
 
 /**
+ * Parse a "YYYY-MM-DD" string into a Date at LOCAL midnight.
+ *
+ * `new Date("2026-05-25")` is parsed as UTC midnight, which means
+ * `getDay()` (local) may return the previous day on servers west of
+ * UTC. Building from components fixes that — every read on the
+ * returned Date is consistent local-time.
+ */
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
  * Count every calendar day between `startDate` and `endDate` (inclusive).
  * Returns 0 if endDate < startDate.
  */
@@ -21,9 +34,9 @@ export function calculateCalendarDays(
   startDate: string,
   endDate: string,
 ): number {
-  const s = new Date(startDate);
-  const e = new Date(endDate);
-  const diff = Math.floor(
+  const s = parseLocalDate(startDate);
+  const e = parseLocalDate(endDate);
+  const diff = Math.round(
     (e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24),
   );
   return diff >= 0 ? diff + 1 : 0;
@@ -84,8 +97,8 @@ function countWorkingDays(
   endDate: string,
   holidays: Set<string>,
 ): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
 
   if (end < start) return 0;
 
@@ -93,8 +106,14 @@ function countWorkingDays(
   const cursor = new Date(start);
 
   while (cursor <= end) {
-    const dayOfWeek = cursor.getDay(); // 0=Sun, 6=Sat
-    const iso = cursor.toISOString().slice(0, 10); // YYYY-MM-DD
+    const dayOfWeek = cursor.getDay(); // local: 0=Sun, 6=Sat
+    // Build the ISO date from local components (not toISOString — that
+    // would shift to UTC and pick the wrong holiday key on negative-offset
+    // servers).
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth() + 1).padStart(2, "0");
+    const d = String(cursor.getDate()).padStart(2, "0");
+    const iso = `${y}-${m}-${d}`;
 
     if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidays.has(iso)) {
       count++;
