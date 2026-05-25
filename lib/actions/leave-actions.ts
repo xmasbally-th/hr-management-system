@@ -303,6 +303,109 @@ export async function getMyLeaveBalances() {
   return data;
 }
 
+/**
+ * D1: list every leave_balances row for a fiscal year, joined with employee
+ * and leave_type. Used by the HR balance manager.
+ */
+export async function getAllLeaveBalancesForFY(fy: number) {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+
+  const { data, error } = await supabase
+    .from("leave_balances")
+    .select(`
+      id, total_days, used_days, accumulated_days, fiscal_year,
+      employee:profiles!leave_balances_employee_id_fkey(
+        id, full_name, email, employee_type
+      ),
+      leave_type:leave_types(id, name, code)
+    `)
+    .eq("fiscal_year", fy)
+    .order("employee_id");
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลยอดวันลาได้");
+  return data;
+}
+
+/**
+ * D1: manual edit of a leave_balances row by HR/admin. Records before/after
+ * in audit_log. `used_days` must not exceed `total_days + accumulated_days`
+ * but we allow any non-negative number to support correction of bad imports.
+ */
+export async function updateLeaveBalance(
+  balanceId: string,
+  updates: {
+    total_days?: number;
+    used_days?: number;
+    accumulated_days?: number;
+  },
+) {
+  if (!UUID_RE.test(balanceId)) throw new Error("รหัสยอดวันลาไม่ถูกต้อง");
+
+  const sanitized: typeof updates = {};
+  for (const key of ["total_days", "used_days", "accumulated_days"] as const) {
+    const v = updates[key];
+    if (v === undefined) continue;
+    if (!Number.isFinite(v) || v < 0 || v > 9999) {
+      throw new Error(`ค่า ${key} ต้องเป็นตัวเลข 0-9999`);
+    }
+    sanitized[key] = v;
+  }
+  if (Object.keys(sanitized).length === 0) {
+    throw new Error("ไม่มีข้อมูลที่ต้องอัปเดต");
+  }
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+
+  // Read existing row for audit before/after + remaining_days recompute
+  const { data: before } = await supabase
+    .from("leave_balances")
+    .select("id, employee_id, leave_type_id, fiscal_year, total_days, used_days, accumulated_days")
+    .eq("id", balanceId)
+    .single();
+  if (!before) throw new Error("ไม่พบยอดวันลานี้");
+
+  const next = { ...before, ...sanitized };
+  const remaining = Math.max(0, next.total_days - next.used_days);
+
+  const { error } = await supabase
+    .from("leave_balances")
+    .update({
+      ...sanitized,
+      remaining_days: remaining,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", balanceId);
+  if (error) throw new Error("บันทึกยอดวันลาไม่สำเร็จ");
+
+  await logAudit(supabase, user.id, "edit_leave_balance", "leave_balance", balanceId, {
+    employee_id: before.employee_id,
+    fiscal_year: before.fiscal_year,
+    before: {
+      total_days: before.total_days,
+      used_days: before.used_days,
+      accumulated_days: before.accumulated_days,
+    },
+    after: {
+      total_days: next.total_days,
+      used_days: next.used_days,
+      accumulated_days: next.accumulated_days,
+    },
+  });
+
+  revalidatePath("/dashboard/hr/leave-balances");
+  return { success: true };
+}
+
 export async function getAllLeaveRequests(params?: PaginationParams): Promise<PaginatedResult<Record<string, unknown>>> {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);

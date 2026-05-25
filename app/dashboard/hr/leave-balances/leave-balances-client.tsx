@@ -10,6 +10,7 @@ import {
   type BalanceImportRow,
   type BalanceImportResult,
 } from "@/lib/actions/leave-actions";
+import { BalanceTableSection } from "./balance-table-section";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,6 +37,10 @@ import { toast } from "sonner";
 interface Props {
   currentFiscalYear: number;
   fiscalYearOptions: number[];
+  selectedFiscalYear: number;
+  // Loose typing — Supabase nested-select shapes are normalized by the section
+  // itself. Matches BalanceTableSection's accepted shape.
+  balances: Parameters<typeof BalanceTableSection>[0]["balances"];
 }
 
 const EXPECTED_HEADERS = [
@@ -48,9 +53,22 @@ const EXPECTED_HEADERS = [
 
 type ImportStep = "select" | "preview" | "result";
 
-export function LeaveBalancesClient({ currentFiscalYear, fiscalYearOptions }: Props) {
+export function LeaveBalancesClient({
+  currentFiscalYear,
+  fiscalYearOptions,
+  selectedFiscalYear,
+  balances,
+}: Props) {
   const router = useRouter();
-  const [fy, setFy] = useState(currentFiscalYear);
+  // FY is now URL-driven so the server can refetch the balance table.
+  const fy = selectedFiscalYear;
+  // currentFiscalYear is intentionally unused — kept in props for context
+  // future sections may want (e.g. "ปีงบฯ ปัจจุบัน").
+  void currentFiscalYear;
+  function changeFy(next: number) {
+    const url = next === currentFiscalYear ? "/dashboard/hr/leave-balances" : `/dashboard/hr/leave-balances?fy=${next}`;
+    router.replace(url);
+  }
 
   // ── Init section ──
   const [isIniting, startInit] = useTransition();
@@ -166,7 +184,7 @@ export function LeaveBalancesClient({ currentFiscalYear, fiscalYearOptions }: Pr
         <select
           id="fy"
           value={fy}
-          onChange={(e) => setFy(Number(e.target.value))}
+          onChange={(e) => changeFy(Number(e.target.value))}
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
         >
           {fiscalYearOptions.map((y) => (
@@ -373,6 +391,9 @@ export function LeaveBalancesClient({ currentFiscalYear, fiscalYearOptions }: Pr
           </div>
         )}
       </div>
+
+      {/* ── D1: per-employee balance table + manual edit ── */}
+      <BalanceTableSection balances={balances} fiscalYear={fy} />
     </div>
   );
 }
