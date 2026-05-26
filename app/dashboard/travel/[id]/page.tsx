@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTravelRequestById } from "@/lib/actions/travel-actions";
+import { getDocumentsByReference } from "@/lib/actions/document-actions";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft } from "lucide-react";
 import { TravelDetailActions } from "./travel-detail-actions";
 import { TravelExpensesTable } from "./travel-expenses-table";
+import { TravelWorkflowPanel } from "./travel-workflow-panel";
+import { CancellationWorkflowPanel } from "./cancellation-workflow-panel";
+import { DocumentWorkflowTimeline } from "@/components/document-workflow-timeline";
 
 export const metadata = { title: "รายละเอียดการเดินทางราชการ" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "รออนุมัติ", variant: "secondary" },
-  approved: { label: "อนุมัติ", variant: "default" },
+  pending: { label: "รอตรวจสอบ", variant: "secondary" },
+  awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary" },
+  awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
+  approved: { label: "อนุมัติ (คณบดีลงนาม)", variant: "default" },
+  awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดี", variant: "secondary" },
+  completed: { label: "เสร็จสิ้น", variant: "default" },
   rejected: { label: "ไม่อนุมัติ", variant: "destructive" },
   cancelled: { label: "ยกเลิก", variant: "outline" },
-  completed: { label: "เสร็จสิ้น", variant: "default" },
 };
 
 const travelTypeLabels: Record<string, string> = {
@@ -50,6 +57,37 @@ export default async function TravelDetailPage({ params }: PageProps) {
   const isHr = profile && ["hr", "admin"].includes(profile.role);
 
   const status = statusMap[travel.status] ?? { label: travel.status, variant: "outline" as const };
+
+  // D5: document_tracking + latest cancellation (mirrors leaves/[id]/page.tsx)
+  let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
+  let cancellation: { id: string; status: string; reason: string } | null = null;
+  let cancellationTracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
+  try {
+    const docs = await getDocumentsByReference(travel.id);
+    tracking = docs.find((d) => d.document_type === "travel") ?? null;
+  } catch {
+    tracking = null;
+  }
+
+  const canSeeCancellation = isHr || isOwner || profile?.role === "manager";
+  if (canSeeCancellation) {
+    const { data: cancel } = await supabase
+      .from("travel_cancellation_requests")
+      .select("id, status, reason")
+      .eq("travel_request_id", travel.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (cancel) {
+      cancellation = cancel;
+      try {
+        const cancelDocs = await getDocumentsByReference(cancel.id);
+        cancellationTracking = cancelDocs.find((d) => d.document_type === "travel_cancellation") ?? cancelDocs[0] ?? null;
+      } catch {
+        cancellationTracking = null;
+      }
+    }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = travel as any;
@@ -123,7 +161,43 @@ export default async function TravelDetailPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Actions */}
+      {/* HR/Admin workflow panel (ผอ. → คณบดี → อธิการบดี) */}
+      {isHr && (
+        <TravelWorkflowPanel
+          requestId={travel.id}
+          status={travel.status}
+          tracking={tracking}
+        />
+      )}
+
+      {/* Cancellation workflow (HR/Admin only when a cancellation exists) */}
+      {isHr && cancellation && (
+        <CancellationWorkflowPanel
+          cancellationId={cancellation.id}
+          status={cancellation.status}
+          reason={cancellation.reason}
+          tracking={cancellationTracking}
+        />
+      )}
+
+      {/* Document timeline — visible to everyone who can see this travel request */}
+      <div className="border rounded-lg p-4 bg-card">
+        <p className="text-sm font-semibold mb-3">เส้นทางเอกสาร</p>
+        <DocumentWorkflowTimeline tracking={tracking} docType="travel" />
+      </div>
+
+      {/* Cancellation timeline */}
+      {cancellation && (
+        <div className="border rounded-lg p-4 bg-amber-50/30">
+          <p className="text-sm font-semibold mb-1">เส้นทางใบขอยกเลิก</p>
+          {cancellation.reason && (
+            <p className="text-xs text-muted-foreground mb-3">เหตุผล: {cancellation.reason}</p>
+          )}
+          <DocumentWorkflowTimeline tracking={cancellationTracking} docType="travel_cancellation" />
+        </div>
+      )}
+
+      {/* Owner-side actions (cancel pending / request cancellation when completed / docx download) */}
       <TravelDetailActions
         requestId={travel.id}
         status={travel.status}
@@ -132,6 +206,7 @@ export default async function TravelDetailPage({ params }: PageProps) {
         isHr={Boolean(isHr)}
         employeeName={t.employee?.full_name ?? ""}
         scannedDocumentPath={travel.order_document_url ?? null}
+        hasActiveCancellation={Boolean(cancellation && cancellation.status !== "rejected" && cancellation.status !== "cancelled")}
       />
     </div>
   );

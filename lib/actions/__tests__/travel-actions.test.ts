@@ -27,9 +27,6 @@ import { createNotificationInternal } from "@/lib/actions/notification-actions";
 import {
   createTravelRequest,
   createTravelRequestByHr,
-  approveTravelRequest,
-  rejectTravelRequest,
-  completeTravelRequest,
   updateActualExpense,
   getMyTravelRequests,
   getAllTravelRequests,
@@ -235,164 +232,10 @@ describe("createTravelRequestByHr", () => {
   });
 });
 
-/* ── approveTravelRequest ─────────────────────────────────────────────── */
-
-describe("approveTravelRequest", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("atomic update with status guard", async () => {
-    const profileChain = createMockChain({ data: profileRow("hr") });
-    const travelChain = createMockChain({ data: { employee_id: "emp-1" } });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await approveTravelRequest(REQUEST_ID);
-    expect(travelChain.update).toHaveBeenCalled();
-    expect(travelChain.eq).toHaveBeenCalledWith("id", REQUEST_ID);
-    expect(travelChain.eq).toHaveBeenCalledWith("status", "pending");
-    expect(travelChain.single).toHaveBeenCalled();
-    expect(createNotificationInternal).toHaveBeenCalledWith(
-      expect.anything(),
-      "emp-1",
-      "travel_approved",
-      expect.any(String)
-    );
-  });
-
-  it("rejects invalid UUID", async () => {
-    mockSupabase();
-    await expect(approveTravelRequest(INVALID_UUID)).rejects.toThrow("รหัสคำขอไม่ถูกต้อง");
-  });
-
-  it("rejects if caller is not HR/admin/manager", async () => {
-    const profileChain = createMockChain({ data: profileRow("employee") });
-    mockSupabase({ fromOverrides: { profiles: profileChain } });
-
-    await expect(approveTravelRequest(REQUEST_ID)).rejects.toThrow("Forbidden");
-  });
-
-  it("rejects if not pending", async () => {
-    const profileChain = createMockChain({ data: profileRow("hr") });
-    const travelChain = createMockChain({
-      data: null,
-      error: { message: "No rows" },
-    });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await expect(approveTravelRequest(REQUEST_ID)).rejects.toThrow("อาจถูกดำเนินการแล้ว");
-  });
-});
-
-/* ── rejectTravelRequest ──────────────────────────────────────────────── */
-
-describe("rejectTravelRequest", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("updates status to rejected with status guard", async () => {
-    const profileChain = createMockChain({ data: profileRow("manager") });
-    const travelChain = createMockChain({ data: { employee_id: "emp-1" } });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await rejectTravelRequest(REQUEST_ID);
-    expect(travelChain.update).toHaveBeenCalled();
-    expect(travelChain.eq).toHaveBeenCalledWith("status", "pending");
-    expect(createNotificationInternal).toHaveBeenCalledWith(
-      expect.anything(),
-      "emp-1",
-      "travel_rejected",
-      expect.any(String)
-    );
-  });
-
-  it("throws if already processed", async () => {
-    const profileChain = createMockChain({ data: profileRow("hr") });
-    const travelChain = createMockChain({ data: null, error: { message: "conflict" } });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await expect(rejectTravelRequest(REQUEST_ID)).rejects.toThrow("อาจถูกดำเนินการแล้ว");
-  });
-});
-
-/* ── completeTravelRequest ────────────────────────────────────────────── */
-
-describe("completeTravelRequest", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("only works on approved requests (status guard)", async () => {
-    const profileChain = createMockChain({ data: profileRow("hr") });
-    const travelChain = createMockChain({ data: { id: REQUEST_ID } });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await completeTravelRequest(REQUEST_ID);
-    expect(travelChain.update).toHaveBeenCalled();
-    expect(travelChain.eq).toHaveBeenCalledWith("status", "approved");
-    expect(travelChain.single).toHaveBeenCalled();
-    expect(revalidatePath).toHaveBeenCalled();
-  });
-
-  it("rejects if not approved", async () => {
-    const profileChain = createMockChain({ data: profileRow("hr") });
-    const travelChain = createMockChain({ data: null, error: { message: "no rows" } });
-
-    mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        travel_requests: travelChain,
-      },
-    });
-
-    await expect(completeTravelRequest(REQUEST_ID)).rejects.toThrow(
-      "สถานะไม่ใช่ 'อนุมัติแล้ว'"
-    );
-  });
-
-  it("rejects invalid UUID", async () => {
-    mockSupabase();
-    await expect(completeTravelRequest(INVALID_UUID)).rejects.toThrow("รหัสคำขอไม่ถูกต้อง");
-  });
-
-  it("rejects non-HR/admin", async () => {
-    const profileChain = createMockChain({ data: profileRow("manager") });
-    mockSupabase({ fromOverrides: { profiles: profileChain } });
-
-    await expect(completeTravelRequest(REQUEST_ID)).rejects.toThrow("Forbidden");
-  });
-});
+/* D5: tests for the removed legacy approveTravelRequest / rejectTravelRequest
+   / completeTravelRequest were dropped along with those functions. The new
+   workflow stages live in travel-actions.ts but aren't covered by mocked
+   tests yet — verification happens end-to-end through the UI (see plan). */
 
 /* ── updateActualExpense ──────────────────────────────────────────────── */
 

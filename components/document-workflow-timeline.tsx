@@ -55,11 +55,29 @@ function cancellationStages(t: Tracking): Stage[] {
 }
 
 function travelStages(t: Tracking): Stage[] {
+  // D5: travel now follows the leave 2-level signature flow + optional
+  // university step. Columns are the same shared `document_tracking`
+  // columns used by leave.
   return [
-    { label: "ส่งลงนาม", date: t.sent_for_signature_date },
-    { label: "รับคืน", date: t.returned_date },
-    { label: "สแกน", date: t.scanned_upload_date, fileUrl: t.scanned_document_url },
-    { label: "ส่งหน่วยงาน", date: t.sent_to_agency_date },
+    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
+    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
+    { label: "คณบดีลงนาม (อนุมัติ)", date: t.dean_signed_date },
+    { label: "สแกน + อัปโหลดคำสั่ง (ระดับคณะ)", date: t.scanned_upload_date, fileUrl: t.scanned_document_url },
+    { label: "ส่งมหาวิทยาลัย/อธิการบดี", date: t.sent_to_president_date },
+    { label: "รับเอกสารคืน (อธิการบดีลงนาม) — เสร็จสิ้น", date: t.president_signed_date, fileUrl: t.president_document_url },
+  ];
+}
+
+/** D5: cancellation of a completed travel order — mirrors cancellationStages. */
+function travelCancellationStages(t: Tracking): Stage[] {
+  return [
+    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
+    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
+    { label: "คณบดีลงนาม", date: t.dean_signed_date },
+    { label: "ส่งอธิการบดี", date: t.sent_to_president_date },
+    { label: "อธิการบดีรับทราบ — ยกเลิกคำสั่งเดินทาง", date: t.president_signed_date },
   ];
 }
 
@@ -94,6 +112,7 @@ export function DocumentWorkflowTimeline({
 
   const stages =
     docType === "leave_cancellation" ? cancellationStages(tracking)
+    : docType === "travel_cancellation" ? travelCancellationStages(tracking)
     : docType === "leave" ? leaveStages(tracking)
     : travelStages(tracking);
 

@@ -3,24 +3,18 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  approveTravelRequest,
-  rejectTravelRequest,
   cancelTravelRequest,
-  completeTravelRequest,
-  updateTravelScannedDocument,
+  createTravelCancellationRequest,
 } from "@/lib/actions/travel-actions";
 import { getDocumentUrl } from "@/lib/actions/storage-actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { FileUpload } from "@/components/file-upload";
 import {
-  CheckCircle,
-  XCircle,
   Ban,
   Loader2,
   FileText,
   FileDown,
-  CheckCheck,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,20 +26,31 @@ interface Props {
   isHr: boolean;
   employeeName: string;
   scannedDocumentPath: string | null;
+  hasActiveCancellation: boolean;
 }
 
+/**
+ * Owner-facing + .docx-download actions for a travel request.
+ *
+ * D5 reshape:
+ * - HR/Admin workflow buttons moved to <TravelWorkflowPanel>; this panel
+ *   only handles owner cancel + post-completion cancellation request +
+ *   docx download + scanned-document viewer.
+ */
 export function TravelDetailActions({
   requestId,
   status,
   isOwner,
-  isApprover,
   isHr,
-  employeeName,
   scannedDocumentPath,
-}: Props) {
+  hasActiveCancellation,
+}: Omit<Props, "isApprover" | "employeeName"> & {
+  isApprover?: boolean;
+  employeeName?: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "cancel" | "complete" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"cancel" | "request_cancellation" | null>(null);
   const [scannedUrl, setScannedUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,13 +59,12 @@ export function TravelDetailActions({
     }
   }, [scannedDocumentPath]);
 
-  const isPendingStatus = status === "pending";
-  const isApproved = status === "approved";
-  const showApproverActions = isApprover && isPendingStatus;
-  const showCancelAction = isOwner && isPendingStatus;
-  const showCompleteAction = isHr && isApproved;
-  const showOrderDownload = isHr && (isApproved || status === "completed");
-  const showScannedUpload = isHr && (isApproved || status === "completed");
+  const showCancelAction = isOwner && status === "pending";
+  const showRequestCancellation = isOwner && status === "completed" && !hasActiveCancellation;
+  const showOrderDownload = isHr && (
+    status === "approved" || status === "awaiting_university" || status === "completed"
+  );
+  const showScannedView = !!scannedDocumentPath;
 
   function handleConfirm(reason?: string) {
     if (!confirmAction) return;
@@ -69,20 +73,16 @@ export function TravelDetailActions({
 
     startTransition(async () => {
       try {
-        if (action === "approve") {
-          await approveTravelRequest(requestId);
-          toast.success("อนุมัติคำขอเดินทางแล้ว");
-        } else if (action === "reject") {
-          // rejectTravelRequest doesn't accept reason — log only
-          void reason;
-          await rejectTravelRequest(requestId);
-          toast.success("ปฏิเสธคำขอเดินทางแล้ว");
-        } else if (action === "cancel") {
+        if (action === "cancel") {
           await cancelTravelRequest(requestId);
           toast.success("ยกเลิกคำขอแล้ว");
-        } else if (action === "complete") {
-          await completeTravelRequest(requestId);
-          toast.success("ปิดงานเดินทางแล้ว");
+        } else if (action === "request_cancellation") {
+          if (!reason || !reason.trim()) {
+            toast.error("กรุณาระบุเหตุผลการยกเลิก");
+            return;
+          }
+          await createTravelCancellationRequest(requestId, reason);
+          toast.success("ยื่นคำขอยกเลิกแล้ว — รอ HR ตรวจสอบและเริ่มเดินเอกสาร");
         }
         router.refresh();
       } catch (err) {
@@ -91,34 +91,21 @@ export function TravelDetailActions({
     });
   }
 
-  async function handleScannedUploaded(path: string) {
-    try {
-      await updateTravelScannedDocument(requestId, path);
-      toast.success(path ? "บันทึกเอกสารสแกนแล้ว" : "ลบเอกสารสแกนแล้ว");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
-    }
-  }
-
   const hasAnyContent =
-    showApproverActions ||
     showCancelAction ||
-    showCompleteAction ||
+    showRequestCancellation ||
     showOrderDownload ||
-    showScannedUpload ||
-    scannedDocumentPath;
+    showScannedView;
 
   if (!hasAnyContent) return null;
 
   return (
     <>
       <div className="space-y-4">
-        {/* Scanned document section (HR only, after approved) */}
-        {(showScannedUpload || scannedDocumentPath) && (
+        {showScannedView && (
           <div className="border rounded-lg p-4 bg-card space-y-3">
             <p className="text-sm font-medium">เอกสารคำสั่งเดินทาง (สแกนแล้ว)</p>
-            {scannedDocumentPath && scannedUrl ? (
+            {scannedUrl ? (
               <a
                 href={scannedUrl}
                 target="_blank"
@@ -128,19 +115,12 @@ export function TravelDetailActions({
                 <FileText className="h-4 w-4" />
                 ดูเอกสารที่สแกน
               </a>
-            ) : null}
-            {showScannedUpload && (
-              <FileUpload
-                pathPrefix={`travel/${requestId}/scanned`}
-                onUploaded={handleScannedUploaded}
-                existingPath={scannedDocumentPath}
-                label=""
-              />
+            ) : (
+              <p className="text-xs text-muted-foreground">กำลังโหลดไฟล์...</p>
             )}
           </div>
         )}
 
-        {/* Action buttons */}
         <div className="flex flex-wrap gap-2 justify-end">
           {showOrderDownload && (
             <Button
@@ -157,59 +137,23 @@ export function TravelDetailActions({
               onClick={() => setConfirmAction("cancel")}
               disabled={isPending}
             >
-              <Ban className="h-4 w-4 mr-2" />
+              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Ban className="h-4 w-4 mr-2" />}
               ยกเลิกคำขอ
             </Button>
           )}
-          {showCompleteAction && (
+          {showRequestCancellation && (
             <Button
-              variant="default"
-              onClick={() => setConfirmAction("complete")}
+              variant="outline"
+              onClick={() => setConfirmAction("request_cancellation")}
               disabled={isPending}
             >
-              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-2" />}
-              ปิดงานเดินทาง
+              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+              ยื่นคำขอยกเลิก (workflow แยก)
             </Button>
-          )}
-          {showApproverActions && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setConfirmAction("reject")}
-                disabled={isPending}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                ไม่อนุมัติ
-              </Button>
-              <Button
-                onClick={() => setConfirmAction("approve")}
-                disabled={isPending}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                อนุมัติ
-              </Button>
-            </>
           )}
         </div>
       </div>
 
-      <ConfirmDialog
-        open={confirmAction === "approve"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการอนุมัติ"
-        description={`อนุมัติคำขอเดินทางของ ${employeeName} ใช่หรือไม่?`}
-        confirmLabel="อนุมัติ"
-        onConfirm={() => handleConfirm()}
-      />
-      <ConfirmDialog
-        open={confirmAction === "reject"}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการไม่อนุมัติ"
-        description={`ไม่อนุมัติคำขอเดินทางของ ${employeeName} ใช่หรือไม่?`}
-        confirmLabel="ไม่อนุมัติ"
-        variant="destructive"
-        onConfirm={() => handleConfirm()}
-      />
       <ConfirmDialog
         open={confirmAction === "cancel"}
         onOpenChange={(open) => !open && setConfirmAction(null)}
@@ -220,12 +164,15 @@ export function TravelDetailActions({
         onConfirm={() => handleConfirm()}
       />
       <ConfirmDialog
-        open={confirmAction === "complete"}
+        open={confirmAction === "request_cancellation"}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการปิดงาน"
-        description="ปิดงานเดินทางนี้ใช่หรือไม่? หลังปิดงานจะไม่สามารถแก้ไขสถานะได้อีก"
-        confirmLabel="ปิดงาน"
-        onConfirm={() => handleConfirm()}
+        title="ยื่นคำขอยกเลิกคำสั่งเดินทาง"
+        description="คำสั่งเดินทางเสร็จสิ้นแล้ว — การยกเลิกต้องเดินเอกสารผ่าน ผอ./คณบดี/อธิการบดี อีกครั้ง กรุณาระบุเหตุผล"
+        confirmLabel="ยื่นคำขอยกเลิก"
+        variant="destructive"
+        withInput
+        inputLabel="เหตุผลการยกเลิก"
+        onConfirm={handleConfirm}
       />
     </>
   );

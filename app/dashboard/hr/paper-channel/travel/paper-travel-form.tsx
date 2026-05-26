@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createTravelRequestByHr } from "@/lib/actions/travel-actions";
-import { createDocumentTracking } from "@/lib/actions/document-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,7 +77,7 @@ export function PaperTravelForm({ employees }: Props) {
 
     startTransition(async () => {
       try {
-        const result = await createTravelRequestByHr(employeeId, {
+        await createTravelRequestByHr(employeeId, {
           travel_type: travelType as "training" | "supervision" | "official_contact",
           title,
           location,
@@ -88,18 +87,8 @@ export function PaperTravelForm({ employees }: Props) {
           expenses: validExpenses,
         });
 
-        // Create document tracking record
-        if (result.id) {
-          try {
-            await createDocumentTracking({
-              reference_id: result.id,
-              document_type: "travel_request",
-              notes: `คำขอเดินทาง: ${title} - ช่องทางกระดาษ`,
-            });
-          } catch {
-            console.error("[paper-travel] Document tracking creation failed");
-          }
-        }
+        // D5: document_tracking is created server-side inside
+        // createTravelRequestByHr — no separate call needed here.
 
         toast.success("บันทึกคำขอเดินทางเรียบร้อยแล้ว");
         router.push("/dashboard/hr/travel");
