@@ -2,15 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { COMMITTED_LEAVE_STATUSES } from "@/lib/leave-rules";
+import { getDepartmentList } from "@/lib/actions/settings-actions";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, CalendarRange } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DepartmentFilter } from "./department-filter";
 
 export const metadata = { title: "ปฏิทินการลา" };
 
 interface PageProps {
-  searchParams?: Promise<{ m?: string }>;
+  searchParams?: Promise<{ m?: string; dept?: string }>;
 }
 
 // ─── Date helpers (local-time, ISO YYYY-MM-DD) ──────────────
@@ -78,6 +80,7 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
   );
   const monthStartIso = toIso(monthStart);
   const monthEndIso = toIso(monthEnd);
+  const deptFilter = sp.dept && /^[0-9a-f-]{36}$/i.test(sp.dept) ? sp.dept : null;
 
   // Grid spans full weeks Sun..Sat that cover this month
   const gridStart = new Date(monthStart);
@@ -90,13 +93,16 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
     .from("leave_requests")
     .select(`
       id, start_date, end_date, status,
-      employee:profiles!leave_requests_employee_id_fkey(id, full_name),
+      employee:profiles!leave_requests_employee_id_fkey(id, full_name, department_id),
       leave_type:leave_types(name, code)
     `)
     .in("status", [...COMMITTED_LEAVE_STATUSES])
     .lte("start_date", monthEndIso)
     .gte("end_date", monthStartIso)
     .order("start_date");
+
+  // ── Departments for filter ──
+  const departments = await getDepartmentList();
 
   // ── Fetch holidays in the month ──
   const { data: holidaysRaw } = await supabase
@@ -122,6 +128,8 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
     const r = l as any;
     const emp = Array.isArray(r.employee) ? r.employee[0] : r.employee;
     const lt = Array.isArray(r.leave_type) ? r.leave_type[0] : r.leave_type;
+    // D2 dept filter — skip leaves whose employee isn't in the selected dept
+    if (deptFilter && emp?.department_id !== deptFilter) continue;
     const entry: DayLeaveEntry = {
       id: r.id,
       employeeName: emp?.full_name ?? "พนักงาน",
@@ -157,6 +165,13 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
   const nextMonth = shiftMonths(monthStart, 1);
   const today = new Date();
   const todayIso = toIso(today);
+  // Build query strings that preserve the department filter
+  const deptSuffix = deptFilter ? `&dept=${deptFilter}` : "";
+  const prevHref = `/dashboard/leaves/calendar?m=${monthKey(prevMonth)}${deptSuffix}`;
+  const nextHref = `/dashboard/leaves/calendar?m=${monthKey(nextMonth)}${deptSuffix}`;
+  const todayHref = deptFilter
+    ? `/dashboard/leaves/calendar?dept=${deptFilter}`
+    : "/dashboard/leaves/calendar";
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -165,28 +180,31 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
           <CalendarRange className="h-5 w-5 text-sky-600" />
           <h1 className="text-2xl font-bold tracking-tight">ปฏิทินการลา</h1>
         </div>
-        <div className="flex items-center gap-1">
-          <Link
-            href={`/dashboard/leaves/calendar?m=${monthKey(prevMonth)}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-          <div className="px-4 py-1.5 text-sm font-semibold min-w-[12rem] text-center">
-            {TH_MONTH_NAMES[monthStart.getMonth()]} {monthStart.getFullYear() + 543}
+        <div className="flex items-center gap-2 flex-wrap">
+          <DepartmentFilter departments={departments} selected={deptFilter} />
+          <div className="flex items-center gap-1">
+            <Link
+              href={prevHref}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+            <div className="px-4 py-1.5 text-sm font-semibold min-w-[12rem] text-center">
+              {TH_MONTH_NAMES[monthStart.getMonth()]} {monthStart.getFullYear() + 543}
+            </div>
+            <Link
+              href={nextHref}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href={todayHref}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "ml-2")}
+            >
+              วันนี้
+            </Link>
           </div>
-          <Link
-            href={`/dashboard/leaves/calendar?m=${monthKey(nextMonth)}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/dashboard/leaves/calendar"
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "ml-2")}
-          >
-            วันนี้
-          </Link>
         </div>
       </div>
 
