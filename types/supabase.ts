@@ -866,7 +866,7 @@ export interface Database {
           end_date: string;
           total_days: number;
           submission_channel: string | null;
-          status: "pending" | "approved" | "rejected" | "cancelled" | "completed";
+          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id: string | null;
           order_document_url: string | null;
           created_at: string;
@@ -882,7 +882,7 @@ export interface Database {
           end_date: string;
           total_days: number;
           submission_channel?: string | null;
-          status?: "pending" | "approved" | "rejected" | "cancelled" | "completed";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           order_document_url?: string | null;
           created_at?: string;
@@ -898,7 +898,7 @@ export interface Database {
           end_date?: string;
           total_days?: number;
           submission_channel?: string | null;
-          status?: "pending" | "approved" | "rejected" | "cancelled" | "completed";
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
           order_document_url?: string | null;
           created_at?: string;
@@ -1086,6 +1086,40 @@ export interface Database {
         Update: {
           id?: string;
           leave_request_id?: string;
+          requested_by?: string;
+          reason?: string;
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      travel_cancellation_requests: {
+        Row: {
+          id: string;
+          travel_request_id: string;
+          requested_by: string;
+          reason: string;
+          status: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          travel_request_id: string;
+          requested_by: string;
+          reason: string;
+          status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
+          approver_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          travel_request_id?: string;
           requested_by?: string;
           reason?: string;
           status?: "pending" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
