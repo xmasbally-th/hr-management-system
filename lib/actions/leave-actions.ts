@@ -529,11 +529,12 @@ export async function getEmployeesForSelection() {
     .order("full_name");
 
   if (error) {
+    // Keep the structured server log; throw a user-facing Thai message.
     console.error(
       "[getEmployeesForSelection] supabase error:",
       JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }),
     );
-    throw new Error(`ไม่สามารถดึงรายชื่อพนักงานได้: ${error.message}`);
+    throw new Error("ไม่สามารถดึงรายชื่อพนักงานได้");
   }
   return data;
 }

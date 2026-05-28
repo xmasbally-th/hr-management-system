@@ -33,31 +33,18 @@ export default async function PaperLeavePage() {
     redirect("/dashboard");
   }
 
-  // Fetch each separately so the route logs name which call failed when
-  // anything throws. This is intentionally verbose during the debug phase
-  // for the production "Server Components render" error; can be collapsed
-  // back into Promise.all once the root cause is identified.
-  let leaveTypes: Awaited<ReturnType<typeof getLeaveTypes>>;
-  let employees: Awaited<ReturnType<typeof getEmployeesForSelection>>;
-  let policy: LeavePolicy;
-  try {
-    leaveTypes = await getLeaveTypes();
-  } catch (err) {
-    console.error("[paper-leave] getLeaveTypes failed:", err);
-    throw err;
-  }
-  try {
-    employees = await getEmployeesForSelection();
-  } catch (err) {
-    console.error("[paper-leave] getEmployeesForSelection failed:", err);
-    throw err;
-  }
-  try {
-    policy = await getLeavePolicy();
-  } catch (err) {
-    console.error("[paper-leave] getLeavePolicy failed, using defaults:", err);
-    policy = DEFAULT_POLICY;
-  }
+  // Fetch in parallel. getLeavePolicy falls back to defaults so a transient
+  // system_settings read can't blank the page; other failures bubble up to
+  // the route's error.tsx (which exposes the digest for cross-referencing
+  // with Vercel runtime logs).
+  const [leaveTypes, employees, policy] = await Promise.all([
+    getLeaveTypes(),
+    getEmployeesForSelection(),
+    getLeavePolicy().catch((err) => {
+      console.error("[paper-leave] getLeavePolicy failed, using defaults:", err);
+      return DEFAULT_POLICY;
+    }),
+  ]);
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
