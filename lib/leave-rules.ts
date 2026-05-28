@@ -83,6 +83,34 @@ export async function getVacationAccumulationCap(
   return data?.vacation_accumulation_cap ?? 0;
 }
 
+/**
+ * Pure-UI cap label for vacation accumulation. Used by both the digital
+ * leave form and the paper form. Returns `{ cap, label }` so callers can
+ * branch on whether the employee type carries any accumulation.
+ *
+ * NOTE: the hardcoded thresholds here predate M3 (which moved the real
+ * cap onto `employee_types.vacation_accumulation_cap`). They stay in
+ * sync for the 3 canonical types; for novel employee_type strings the
+ * label falls through to "no accumulation" while the DB column still
+ * controls enforcement. Refactoring this to read from the DB would
+ * require an async lookup at render time — left as a follow-up.
+ */
+export function vacationCapLabel(employeeType: string | null): {
+  cap: number;
+  label: string;
+} {
+  switch (employeeType) {
+    case "ข้าราชการ":
+      return { cap: 30, label: "ข้าราชการ — สะสมสูงสุด 30 วัน" };
+    case "พนักงานมหาวิทยาลัย":
+      return { cap: 20, label: "พนักงานมหาวิทยาลัย — สะสมสูงสุด 20 วัน" };
+    case "พนักงานราชการ":
+      return { cap: 15, label: "พนักงานราชการ — สะสมสูงสุด 15 วัน" };
+    default:
+      return { cap: 0, label: "ประเภทนี้ไม่มีสิทธิ์สะสมวันลาข้ามปี" };
+  }
+}
+
 // ─── Get used leave days for current FY (committed statuses) ────
 
 /**

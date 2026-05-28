@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { getLeaveTypes, getEmployeesForSelection } from "@/lib/actions/leave-actions";
+import { getLeavePolicy } from "@/lib/actions/settings-actions";
 import { PaperLeaveForm } from "./paper-leave-form";
 
 export const metadata: Metadata = { title: "บันทึกใบลา (กระดาษ)" };
 
 export default async function PaperLeavePage() {
-  const [leaveTypes, employees] = await Promise.all([
+  const [leaveTypes, employees, policy] = await Promise.all([
     getLeaveTypes(),
     getEmployeesForSelection(),
+    getLeavePolicy(),
   ]);
 
   return (
@@ -20,7 +22,7 @@ export default async function PaperLeavePage() {
       </div>
 
       <div className="border rounded-xl p-6 bg-card shadow-sm">
-        <PaperLeaveForm leaveTypes={leaveTypes} employees={employees} />
+        <PaperLeaveForm leaveTypes={leaveTypes} employees={employees} policy={policy} />
       </div>
     </div>
   );

@@ -304,6 +304,43 @@ export async function getMyLeaveBalances() {
 }
 
 /**
+ * HR/Admin: fetch any employee's leave_balances for a fiscal year.
+ *
+ * Powers the paper-channel form's per-type balance feedback — HR picks an
+ * employee and sees their current entitlement / used / remaining so they
+ * don't submit a paper slip that the server will reject for exceeding cap.
+ * Same row shape as `getMyLeaveBalances` so the caller can reuse the
+ * Balance interface.
+ */
+export async function getEmployeeLeaveBalances(
+  employeeId: string,
+  fiscalYear?: number,
+) {
+  if (!UUID_RE.test(employeeId)) throw new Error("รหัสพนักงานไม่ถูกต้อง");
+
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
+    throw new Error("Forbidden: HR/Admin only");
+  }
+
+  const fy = fiscalYear ?? currentFiscalYear();
+
+  const { data, error } = await supabase
+    .from("leave_balances")
+    .select(`
+      *,
+      leave_type:leave_types(name, code)
+    `)
+    .eq("employee_id", employeeId)
+    .eq("fiscal_year", fy);
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลวันลาคงเหลือได้");
+  return data ?? [];
+}
+
+/**
  * D1: list every leave_balances row for a fiscal year, joined with employee
  * and leave_type. Used by the HR balance manager.
  */

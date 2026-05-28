@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { LeaveType } from "@/types/supabase";
+import { vacationCapLabel as getVacationCapLabel } from "@/lib/leave-rules";
 
 type Kind = "vacation" | "sick" | "personal" | "maternity";
 
@@ -141,20 +142,6 @@ const STORAGE_KEY = "hr-leave-form-kind";
  * - Maternity auto-fills date range from EDD (start = EDD - 30, end = +89)
  * - Sick requires medical cert when total_days > 3 (handled via FileUpload)
  */
-/** Vacation accumulation cap per employee type */
-function getVacationCapLabel(employeeType: string | null): { cap: number; label: string } {
-  switch (employeeType) {
-    case "ข้าราชการ":
-      return { cap: 30, label: "ข้าราชการ — สะสมสูงสุด 30 วัน" };
-    case "พนักงานมหาวิทยาลัย":
-      return { cap: 20, label: "พนักงานมหาวิทยาลัย — สะสมสูงสุด 20 วัน" };
-    case "พนักงานราชการ":
-      return { cap: 15, label: "พนักงานราชการ — สะสมสูงสุด 15 วัน" };
-    default:
-      return { cap: 0, label: "ประเภทของคุณไม่มีสิทธิ์สะสมวันลาข้ามปี" };
-  }
-}
-
 export function LeaveRequestForm({
   leaveTypes,
   employees,
