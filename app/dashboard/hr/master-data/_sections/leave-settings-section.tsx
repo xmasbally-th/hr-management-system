@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -7,12 +8,13 @@ import {
   updateLeavePolicy,
   type LeavePolicy,
 } from "@/lib/actions/settings-actions";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Wifi, WifiOff, Save, SlidersHorizontal } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Save, SlidersHorizontal, Wallet, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Props {
   enabled: boolean;
@@ -182,6 +184,29 @@ export function LeaveSettingsSection({ enabled, policy }: Props) {
           )}
           บันทึกนโยบาย
         </Button>
+      </div>
+
+      {/* Cross-link → operational sibling page (initialize + import + edit per
+          employee). Lives here because HR who tunes leave config is the same
+          person who tends to year-rollover balance work. */}
+      <div className="border border-dashed border-sky-300 rounded-lg p-4 bg-sky-50/40 flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-2 min-w-0">
+          <Wallet className="h-4 w-4 mt-0.5 text-sky-600 shrink-0" />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm">จัดการยอดวันลาพนักงาน</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+              ตั้งต้นสิทธิ์วันลาประจำปีงบประมาณ · นำเข้ายอดคงเหลือจาก CSV ·
+              ดูตารางพนักงาน × ประเภทลา · แก้ไขรายคนพร้อม audit log
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/dashboard/hr/leave-balances"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+        >
+          ไปยังหน้า
+          <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+        </Link>
       </div>
     </div>
   );
