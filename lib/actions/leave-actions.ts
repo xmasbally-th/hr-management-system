@@ -528,7 +528,13 @@ export async function getEmployeesForSelection() {
     .eq("status", "approved")
     .order("full_name");
 
-  if (error) throw new Error("ไม่สามารถดึงรายชื่อพนักงานได้");
+  if (error) {
+    console.error(
+      "[getEmployeesForSelection] supabase error:",
+      JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }),
+    );
+    throw new Error(`ไม่สามารถดึงรายชื่อพนักงานได้: ${error.message}`);
+  }
   return data;
 }
 
