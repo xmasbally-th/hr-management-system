@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   createLeaveRequestByHr,
@@ -88,6 +88,22 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
   const activeBalance: EmployeeBalance | null = balances.find(
     (b) => b.typeName.toLowerCase() === typeName,
   ) ?? null;
+
+  // Base UI's <Select.Value> renders the raw value (a UUID) by default —
+  // it only displays a human label when the Root has an `items` map.
+  // Build value → label dictionaries once per render.
+  const employeeItems = useMemo(
+    () => Object.fromEntries(employees.map((e) => [e.id, `${e.full_name} (${e.email})`])),
+    [employees],
+  );
+  const leaveTypeItems = useMemo(
+    () => Object.fromEntries(leaveTypes.map((t) => [t.id, t.name])),
+    [leaveTypes],
+  );
+  const substituteItems = useMemo(
+    () => ({ none: "ไม่ระบุ", ...Object.fromEntries(employees.map((e) => [e.id, e.full_name])) }),
+    [employees],
+  );
 
   function calculateDays(): number {
     if (!startDate || !endDate) return 0;
@@ -221,7 +237,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
       {/* Employee selection */}
       <div className="space-y-2">
         <Label>พนักงาน <span className="text-destructive">*</span></Label>
-        <Select value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
+        <Select items={employeeItems} value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกพนักงาน..." />
           </SelectTrigger>
@@ -238,7 +254,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
       {/* Leave type */}
       <div className="space-y-2">
         <Label>ประเภทการลา <span className="text-destructive">*</span></Label>
-        <Select value={leaveTypeId} onValueChange={(v) => setLeaveTypeId(v ?? "")} disabled={isPending}>
+        <Select items={leaveTypeItems} value={leaveTypeId} onValueChange={(v) => setLeaveTypeId(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกประเภทการลา..." />
           </SelectTrigger>
@@ -421,7 +437,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
 
           <div className="space-y-2">
             <Label>ผู้ปฏิบัติงานแทน (สูงสุด 3 คน)</Label>
-            <Select value={substitute1Id} onValueChange={(v) => setSubstitute1Id(v ?? "")} disabled={isPending}>
+            <Select items={substituteItems} value={substitute1Id} onValueChange={(v) => setSubstitute1Id(v ?? "")} disabled={isPending}>
               <SelectTrigger>
                 <SelectValue placeholder="เลือกผู้ปฏิบัติงานแทนคนที่ 1..." />
               </SelectTrigger>
@@ -432,7 +448,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={substitute2Id} onValueChange={(v) => setSubstitute2Id(v ?? "")} disabled={isPending}>
+            <Select items={substituteItems} value={substitute2Id} onValueChange={(v) => setSubstitute2Id(v ?? "")} disabled={isPending}>
               <SelectTrigger>
                 <SelectValue placeholder="เลือกผู้ปฏิบัติงานแทนคนที่ 2..." />
               </SelectTrigger>
@@ -443,7 +459,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={substitute3Id} onValueChange={(v) => setSubstitute3Id(v ?? "")} disabled={isPending}>
+            <Select items={substituteItems} value={substitute3Id} onValueChange={(v) => setSubstitute3Id(v ?? "")} disabled={isPending}>
               <SelectTrigger>
                 <SelectValue placeholder="เลือกผู้ปฏิบัติงานแทนคนที่ 3..." />
               </SelectTrigger>
