@@ -1,15 +1,27 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { getMyLeaveRequests, getMyLeaveBalances } from "@/lib/actions/leave-actions";
+import {
+  getMyLeaveRequests,
+  getMyLeaveBalances,
+  getMyLeaveCountsByType,
+} from "@/lib/actions/leave-actions";
+import {
+  currentFiscalYear,
+  currentCycle,
+  fiscalYearRange,
+  performanceCycleRange,
+  formatThai,
+} from "@/lib/date-ranges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, Info, Thermometer, Briefcase, Palmtree, Baby, CalendarDays } from "lucide-react";
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
 import { StatusFilter } from "@/components/status-filter";
+import { LeavePeriodFilter } from "./leave-period-filter";
 
-export const metadata = { title: "ประวัติการลา" };
+export const metadata = { title: "การลางาน" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
@@ -29,8 +41,16 @@ const statusOptions = [
   { value: "rejected", label: "ไม่อนุมัติ" },
 ];
 
+/** Icon per leave-type code (matches the summary cards in the design). */
+const leaveTypeIcon: Record<string, typeof Thermometer> = {
+  SICK: Thermometer,
+  PERSONAL: Briefcase,
+  VACATION: Palmtree,
+  MATERNITY: Baby,
+};
+
 interface LeavesPageProps {
-  searchParams: Promise<{ page?: string; search?: string; status?: string }>;
+  searchParams: Promise<{ page?: string; search?: string; status?: string; fy?: string; round?: string }>;
 }
 
 export default async function LeavesPage({ searchParams }: LeavesPageProps) {
@@ -38,101 +58,159 @@ export default async function LeavesPage({ searchParams }: LeavesPageProps) {
   const page = Number(params.page) || 1;
   const search = params.search ?? "";
   const status = params.status ?? "all";
+  const fy = Number(params.fy) || currentFiscalYear();
+  const round = (Number(params.round) || currentCycle().half) as 1 | 2;
 
-  const [result, balances] = await Promise.all([
-    getMyLeaveRequests({ page, search, status }),
-    getMyLeaveBalances(),
+  const [result, balances, counts] = await Promise.all([
+    getMyLeaveRequests({ page, search, status, fy, round }),
+    getMyLeaveBalances(fy),
+    getMyLeaveCountsByType(fy),
   ]);
+
+  const range = performanceCycleRange(fy, round);
+  const periodLabel = `ข้อมูล${fiscalYearRange(fy).label} (${formatThai(range.start)} – ${formatThai(range.end)})`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">ประวัติการลา</h1>
-          <p className="text-muted-foreground">ดูประวัติและยื่นคำขอลาใหม่</p>
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2 text-primary">
+            <CalendarDays className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">การลางาน</h1>
+            <p className="text-sm text-muted-foreground">{periodLabel}</p>
+          </div>
         </div>
-        <Link href="/dashboard/leaves/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            ยื่นคำขอลา
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Suspense>
+            <LeavePeriodFilter />
+          </Suspense>
+          <Link href="/dashboard/leaves/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              สร้างใบลา
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {balances.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {balances.map((b) => (
-            <div key={b.id} className="border rounded-lg p-4 bg-card">
-              <p className="text-sm text-muted-foreground">{(b.leave_type as { name: string } | null)?.name ?? "ไม่ทราบประเภท"}</p>
-              <p className="text-2xl font-bold">{b.remaining_days}</p>
-              <p className="text-xs text-muted-foreground">คงเหลือจาก {b.total_days} วัน</p>
+      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        {/* Left column: summary cards + criteria */}
+        <div className="space-y-4">
+          {(balances ?? []).map((b) => {
+            const lt = b.leave_type as { name: string; code: string | null } | null;
+            const Icon = leaveTypeIcon[lt?.code ?? ""] ?? CalendarDays;
+            const count = counts[b.leave_type_id as string] ?? 0;
+            return (
+              <div key={b.id} className="border rounded-lg p-4 bg-card flex items-start gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary shrink-0">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{lt?.name ?? "ไม่ทราบประเภท"}</p>
+                    <Badge variant="secondary" className="shrink-0">สิทธิ์ {b.total_days} วัน</Badge>
+                  </div>
+                  <p className="mt-1 text-sm">
+                    <span className="text-2xl font-bold">{b.used_days}</span> วัน
+                    <span className="text-muted-foreground"> | {count} ครั้ง</span>
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Leave criteria (static reference) */}
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-xs text-sky-900 space-y-2 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+            <div className="flex items-center gap-2 font-semibold">
+              <Info className="h-4 w-4" />
+              เกณฑ์การลาราชการ
             </div>
-          ))}
+            <ul className="space-y-1.5 list-disc pl-4 leading-relaxed">
+              <li>ลาป่วย: ครั้งละไม่เกิน 30 วัน (ลา 2 วันขึ้นไปต้องมีใบรับรองแพทย์)</li>
+              <li>ลากิจส่วนตัว: ครั้งละไม่เกิน 10 วัน และรวมปีละไม่เกิน 10 วันทำการ</li>
+              <li>ลาคลอดบุตร: ไม่เกิน 90 วัน (ได้รับเงินเดือนระหว่างลา)</li>
+              <li>ลาช่วยเหลือภริยาคลอด: ครั้งหนึ่งไม่เกิน 15 วันทำการ</li>
+              <li>ลาอุปสมบท: ไม่เกิน 120 วัน (ต้องรับราชการไม่น้อยกว่า 1 ปี)</li>
+            </ul>
+          </div>
         </div>
-      )}
 
-      {/* Search + Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Suspense>
-          <SearchInput placeholder="ค้นหาเหตุผล..." className="sm:w-64" />
-        </Suspense>
-        <Suspense>
-          <StatusFilter options={statusOptions} paramName="status" />
-        </Suspense>
-      </div>
+        {/* Right column: history */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">ประวัติการลาล่าสุด</h2>
 
-      <div className="border rounded-lg bg-card overflow-hidden">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>ประเภท</TableHead>
-              <TableHead>วันที่เริ่ม</TableHead>
-              <TableHead>วันที่สิ้นสุด</TableHead>
-              <TableHead>จำนวนวัน</TableHead>
-              <TableHead>สถานะ</TableHead>
-              <TableHead>วันที่ยื่น</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {result.data.map((req) => {
-              const s = statusMap[req.status as string] ?? { label: req.status as string, variant: "outline" as const };
-              return (
-                <TableRow key={req.id as string} className="hover:bg-muted/30">
-                  <TableCell className="font-medium">
-                    <Link href={`/dashboard/leaves/${req.id as string}`} className="hover:underline">
-                      {(req.leave_type as { name: string } | null)?.name ?? "-"}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{req.start_date as string}</TableCell>
-                  <TableCell>{req.end_date as string}</TableCell>
-                  <TableCell>{req.total_days as number}</TableCell>
-                  <TableCell>
-                    <Badge variant={s.variant}>{s.label}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(req.created_at as string).toLocaleDateString("th-TH")}
-                  </TableCell>
+          {/* Search + Filter */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Suspense>
+              <SearchInput placeholder="ค้นหาเหตุผล..." className="sm:w-64" />
+            </Suspense>
+            <Suspense>
+              <StatusFilter options={statusOptions} paramName="status" />
+            </Suspense>
+          </div>
+
+          <div className="border rounded-lg bg-card overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>วันที่ส่ง</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>ช่วงเวลา</TableHead>
+                  <TableHead>จำนวน</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                  <TableHead className="text-right">จัดการ</TableHead>
                 </TableRow>
-              );
-            })}
-            {result.data.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  {search || status !== "all" ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประวัติการลา"}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {result.data.map((req) => {
+                  const s = statusMap[req.status as string] ?? { label: req.status as string, variant: "outline" as const };
+                  const days = (req.working_days as number | null) ?? (req.total_days as number);
+                  return (
+                    <TableRow key={req.id as string} className="hover:bg-muted/30">
+                      <TableCell className="text-muted-foreground">
+                        {new Date(req.created_at as string).toLocaleDateString("th-TH")}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {(req.leave_type as { name: string } | null)?.name ?? "-"}
+                      </TableCell>
+                      <TableCell>
+                        {formatThai(req.start_date as string)} – {formatThai(req.end_date as string)}
+                      </TableCell>
+                      <TableCell>{days} วัน</TableCell>
+                      <TableCell>
+                        <Badge variant={s.variant}>{s.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/dashboard/leaves/${req.id as string}`} className="text-sm text-primary hover:underline">
+                          ดูรายละเอียด
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {result.data.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      {search || status !== "all" ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประวัติการลาในรอบนี้"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      <Suspense>
-        <PaginationControls
-          currentPage={result.page}
-          totalCount={result.totalCount}
-          pageSize={result.pageSize}
-        />
-      </Suspense>
+          <Suspense>
+            <PaginationControls
+              currentPage={result.page}
+              totalCount={result.totalCount}
+              pageSize={result.pageSize}
+            />
+          </Suspense>
+        </div>
+      </div>
     </div>
   );
 }

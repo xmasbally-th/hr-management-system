@@ -39,7 +39,7 @@ export const navigationGroups: NavGroup[] = [
     label: "บริการส่วนบุคคล",
     items: [
       {
-        title: "ประวัติการลา",
+        title: "การลางาน",
         href: "/dashboard/leaves",
         icon: "CalendarDays",
         roles: ["admin", "hr", "manager", "employee"],

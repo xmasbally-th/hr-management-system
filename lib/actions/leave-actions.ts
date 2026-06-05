@@ -8,7 +8,7 @@ import { createNotificationInternal } from "./notification-actions";
 import { UUID_RE, validateRequestDates, validateEmployeeExists, validateTextField } from "./validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
-import { currentFiscalYear } from "@/lib/date-ranges";
+import { currentFiscalYear, fiscalYearRange, performanceCycleRange } from "@/lib/date-ranges";
 import { calculateWorkingDays, calculateCalendarDays } from "@/lib/working-days";
 import {
   COMMITTED_LEAVE_STATUSES,
@@ -239,6 +239,10 @@ export interface PaginationParams {
   pageSize?: number;
   search?: string;
   status?: string;
+  /** Fiscal year (Gregorian) to scope leave history by. Default: current FY. */
+  fy?: number;
+  /** Half-year round (1 = Oct–Mar, 2 = Apr–Sep). Omit = whole fiscal year. */
+  round?: 1 | 2;
 }
 
 export interface PaginatedResult<T> {
@@ -259,13 +263,21 @@ export async function getMyLeaveRequests(params?: PaginationParams): Promise<Pag
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
+  // Scope by fiscal year + optional half-year round (filters start_date).
+  const fy = params?.fy ?? currentFiscalYear();
+  const range = params?.round
+    ? performanceCycleRange(fy, params.round)
+    : fiscalYearRange(fy);
+
   let query = supabase
     .from("leave_requests")
     .select(`
       *,
       leave_type:leave_types(name)
     `, { count: "exact" })
-    .eq("employee_id", user.id);
+    .eq("employee_id", user.id)
+    .gte("start_date", range.start)
+    .lte("start_date", range.end);
 
   if (params?.status && params.status !== "all") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,23 +296,54 @@ export async function getMyLeaveRequests(params?: PaginationParams): Promise<Pag
   return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
 }
 
-export async function getMyLeaveBalances() {
+export async function getMyLeaveBalances(fiscalYear?: number) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
 
-  const currentYear = currentFiscalYear();
+  const fy = fiscalYear ?? currentFiscalYear();
 
   const { data, error } = await supabase
     .from("leave_balances")
     .select(`
       *,
-      leave_type:leave_types(name)
+      leave_type:leave_types(name, code)
     `)
     .eq("employee_id", user.id)
-    .eq("fiscal_year", currentYear);
+    .eq("fiscal_year", fy);
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลวันลาคงเหลือได้");
   return data;
+}
+
+/**
+ * Count the current user's leave requests per leave_type for a fiscal year.
+ * Powers the "X ครั้ง" figure on the leave summary cards. Counts every
+ * request (any status) whose start_date falls in the FY range.
+ */
+export async function getMyLeaveCountsByType(
+  fiscalYear?: number,
+): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+
+  const fy = fiscalYear ?? currentFiscalYear();
+  const range = fiscalYearRange(fy);
+
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .select("leave_type_id")
+    .eq("employee_id", user.id)
+    .gte("start_date", range.start)
+    .lte("start_date", range.end);
+
+  if (error) throw new Error("ไม่สามารถดึงจำนวนครั้งการลาได้");
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const id = row.leave_type_id as string;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 /**
