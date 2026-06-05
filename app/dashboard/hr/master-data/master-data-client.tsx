@@ -57,6 +57,8 @@ interface HolidayRow {
   date: string;
   name: string;
   fiscal_year: number;
+  type: string;
+  note: string | null;
 }
 interface NameOrderRow {
   id: string;

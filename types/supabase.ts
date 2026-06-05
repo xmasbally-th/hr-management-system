@@ -609,6 +609,8 @@ export interface Database {
           date: string;
           name: string;
           fiscal_year: number;
+          type: string;
+          note: string | null;
           created_at: string;
           created_by: string | null;
         };
@@ -617,6 +619,8 @@ export interface Database {
           date: string;
           name: string;
           fiscal_year: number;
+          type?: string;
+          note?: string | null;
           created_at?: string;
           created_by?: string | null;
         };
@@ -625,6 +629,8 @@ export interface Database {
           date?: string;
           name?: string;
           fiscal_year?: number;
+          type?: string;
+          note?: string | null;
           created_at?: string;
           created_by?: string | null;
         };

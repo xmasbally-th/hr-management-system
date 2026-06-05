@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit-log";
 import { currentFiscalYear } from "@/lib/date-ranges";
+import { isHolidayType } from "@/lib/holiday-types";
 
 // ─── Auth helpers ──────────────────────────────────────────
 
@@ -30,6 +31,15 @@ async function checkHrAdmin(supabase: Awaited<ReturnType<typeof createClient>>, 
 }
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Validate + normalize an optional note (≤ 500 chars). Returns null when empty. */
+function normalizeNote(note: string | null | undefined): string | null {
+  if (note == null) return null;
+  const trimmed = note.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > 500) throw new Error("หมายเหตุต้องไม่เกิน 500 ตัวอักษร");
+  return trimmed;
+}
 
 // ─── Read ──────────────────────────────────────────────────
 
@@ -55,7 +65,12 @@ export async function getHolidays(fiscalYear?: number) {
 
 // ─── Create ────────────────────────────────────────────────
 
-export async function createHoliday(input: { date: string; name: string }) {
+export async function createHoliday(input: {
+  date: string;
+  name: string;
+  type?: string;
+  note?: string | null;
+}) {
   if (!ISO_DATE_RE.test(input.date)) {
     throw new Error("รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)");
   }
@@ -63,6 +78,11 @@ export async function createHoliday(input: { date: string; name: string }) {
   if (name.length === 0 || name.length > 200) {
     throw new Error("ชื่อวันหยุดต้องมี 1-200 ตัวอักษร");
   }
+  const type = input.type ?? "general";
+  if (!isHolidayType(type)) {
+    throw new Error("หมวดวันหยุดไม่ถูกต้อง");
+  }
+  const note = normalizeNote(input.note);
 
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
@@ -76,6 +96,8 @@ export async function createHoliday(input: { date: string; name: string }) {
     .insert({
       date: input.date,
       name,
+      type,
+      note,
       fiscal_year: fiscalYear,
       created_by: user.id,
     })
@@ -92,6 +114,8 @@ export async function createHoliday(input: { date: string; name: string }) {
   await logAudit(supabase, user.id, "create_holiday", "holiday", data.id, {
     date: input.date,
     name,
+    type,
+    note,
     fiscal_year: fiscalYear,
   });
 
@@ -103,12 +127,18 @@ export async function createHoliday(input: { date: string; name: string }) {
 
 export async function updateHoliday(
   id: string,
-  input: { date?: string; name?: string },
+  input: { date?: string; name?: string; type?: string; note?: string | null },
 ) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID_RE.test(id)) throw new Error("รหัสวันหยุดไม่ถูกต้อง");
 
-  const updates: { date?: string; name?: string; fiscal_year?: number } = {};
+  const updates: {
+    date?: string;
+    name?: string;
+    type?: string;
+    note?: string | null;
+    fiscal_year?: number;
+  } = {};
 
   if (input.date !== undefined) {
     if (!ISO_DATE_RE.test(input.date)) {
@@ -124,6 +154,17 @@ export async function updateHoliday(
       throw new Error("ชื่อวันหยุดต้องมี 1-200 ตัวอักษร");
     }
     updates.name = name;
+  }
+
+  if (input.type !== undefined) {
+    if (!isHolidayType(input.type)) {
+      throw new Error("หมวดวันหยุดไม่ถูกต้อง");
+    }
+    updates.type = input.type;
+  }
+
+  if (input.note !== undefined) {
+    updates.note = normalizeNote(input.note);
   }
 
   if (Object.keys(updates).length === 0) {
