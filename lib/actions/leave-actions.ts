@@ -521,6 +521,38 @@ export async function getAllLeaveRequests(params?: PaginationParams): Promise<Pa
   return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
 }
 
+/**
+ * All leave requests whose start_date falls within a fiscal year (Oct 1 – Sep 30).
+ * Not paginated — the HR leaves dashboard loads a whole FY at once and filters
+ * by round + tab client-side. ~hundreds of rows for ~100 staff.
+ */
+export async function getLeaveRequestsForFiscalYear(
+  fy: number,
+): Promise<Record<string, unknown>[]> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  const range = fiscalYearRange(fy);
+  const { data, error } = await supabase
+    .from("leave_requests")
+    .select(`
+      *,
+      leave_type:leave_types(name, code),
+      employee:profiles!leave_requests_employee_id_fkey(full_name, email, position_title)
+    `)
+    .gte("start_date", range.start)
+    .lte("start_date", range.end)
+    .order("start_date", { ascending: false });
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลการลาตามปีงบประมาณได้");
+  return data ?? [];
+}
+
 export async function getLeaveRequestById(requestId: string) {
   if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
 
