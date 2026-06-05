@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createTravelRequestByHr } from "@/lib/actions/travel-actions";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,17 @@ export function PaperTravelForm({ employees }: Props) {
     });
   }
 
+  // Base UI Select.Value needs an items map to render the chosen label.
+  const employeeItems = useMemo(
+    () => Object.fromEntries(employees.map((emp) => [emp.id, `${emp.full_name} (${emp.email})`])),
+    [employees],
+  );
+  const travelTypeItems: Record<string, string> = {
+    training: "อบรม/สัมมนา",
+    supervision: "นิเทศ",
+    official_contact: "ติดต่อราชการ",
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
@@ -109,7 +120,7 @@ export function PaperTravelForm({ employees }: Props) {
       {/* Employee selection */}
       <div className="space-y-2">
         <Label>พนักงาน <span className="text-destructive">*</span></Label>
-        <Select value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
+        <Select items={employeeItems} value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกพนักงาน..." />
           </SelectTrigger>
@@ -126,7 +137,7 @@ export function PaperTravelForm({ employees }: Props) {
       {/* Travel type */}
       <div className="space-y-2">
         <Label>ประเภทการเดินทาง <span className="text-destructive">*</span></Label>
-        <Select value={travelType} onValueChange={(v) => setTravelType(v ?? "")} disabled={isPending}>
+        <Select items={travelTypeItems} value={travelType} onValueChange={(v) => setTravelType(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกประเภท..." />
           </SelectTrigger>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createUserByAdmin } from "@/lib/actions/user-actions";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,22 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
     formData.positionId !== "none" &&
     formData.departmentId !== "none" &&
     !filteredPositions.some((p) => p.id === formData.positionId);
+
+  // Base UI Select.Value needs an items map; value differs from displayed label
+  const departmentItems = useMemo(
+    () => ({ none: "ไม่ระบุแผนก", ...Object.fromEntries(departments.map((d) => [d.id, d.name])) }),
+    [departments],
+  );
+  const positionItems = useMemo(
+    () => ({ none: "ไม่ระบุตำแหน่ง", ...Object.fromEntries(filteredPositions.map((p) => [p.id, p.name])) }),
+    [filteredPositions],
+  );
+  const roleItems: Record<string, string> = {
+    employee: "พนักงานทั่วไป (Employee)",
+    manager: "ผู้จัดการ (Manager)",
+    hr: "ฝ่ายบุคคล (HR)",
+    admin: "ผู้ดูแลระบบ (Admin)",
+  };
 
   const canSubmit =
     formData.fullName.trim().length > 0 &&
@@ -108,8 +124,9 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
 
         <div className="space-y-2">
           <Label>แผนก</Label>
-          <Select 
-            value={formData.departmentId} 
+          <Select
+            items={departmentItems}
+            value={formData.departmentId}
             onValueChange={(val) => setFormData({ ...formData, departmentId: val || "none", positionId: "none" })}
             disabled={isPending}
           >
@@ -128,6 +145,7 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
         <div className="space-y-2">
           <Label>ตำแหน่ง</Label>
           <Select
+            items={positionItems}
             value={formData.positionId}
             onValueChange={(val) => setFormData({ ...formData, positionId: val || "none" })}
             disabled={isPending || formData.departmentId === "none"}
@@ -156,8 +174,9 @@ export function AddUserClient({ departments, positions }: { departments: { id: s
 
         <div className="space-y-2 md:col-span-2">
           <Label>ระดับสิทธิ์การใช้งาน (Role)</Label>
-          <Select 
-            value={formData.role} 
+          <Select
+            items={roleItems}
+            value={formData.role}
             onValueChange={(val) => setFormData({ ...formData, role: val as UserRole })}
             disabled={isPending}
           >

@@ -69,6 +69,12 @@ export function PositionsSection({
     );
   }, [rows, search]);
 
+  // Base UI Select.Value needs an items map (value=UUID, label=name).
+  const departmentItems = useMemo(
+    () => Object.fromEntries(departments.map((d) => [d.id, d.name])),
+    [departments],
+  );
+
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim() || !newDept) return;
@@ -144,6 +150,7 @@ export function PositionsSection({
           <div className="space-y-1.5">
             <Label className="text-xs">สังกัดหน่วยงาน *</Label>
             <Select
+              items={departmentItems}
               value={newDept}
               onValueChange={(v) => setNewDept(v ?? "")}
               disabled={isPending}
@@ -217,6 +224,7 @@ export function PositionsSection({
                       <TableCell>
                         {isEditing ? (
                           <Select
+                            items={departmentItems}
                             value={editDept}
                             onValueChange={(v) => setEditDept(v ?? "")}
                             disabled={isPending}

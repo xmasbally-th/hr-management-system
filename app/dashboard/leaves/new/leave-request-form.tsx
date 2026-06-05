@@ -267,6 +267,13 @@ export function LeaveRequestForm({
     return balances.find((b) => KIND_META[kind].match.test(b.typeName));
   }, [balances, kind]);
 
+  // Substitute Select items map — Base UI's <Select.Value> renders the raw
+  // value (a UUID) unless given an items map at the Root.
+  const substituteItems = useMemo(
+    () => Object.fromEntries(employees.map((e) => [e.id, e.full_name])),
+    [employees],
+  );
+
   // Maternity visible only when gender is set
   const showMaternity = gender === "หญิง" || gender === "ชาย";
   // For female maternity, always require cert; for male, no cert required
@@ -868,6 +875,7 @@ export function LeaveRequestForm({
                 <div key={idx} className="space-y-1.5">
                   <Label>{s.label}</Label>
                   <Select
+                    items={substituteItems}
                     value={s.v}
                     onValueChange={(val) => s.set(val ?? "")}
                     disabled={isPending}

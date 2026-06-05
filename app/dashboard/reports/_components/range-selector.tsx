@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   type RangePreset,
@@ -63,6 +63,18 @@ export function RangeSelector({ current, initialPreset, initialYear }: Props) {
   );
 
   const yearOptions = getFiscalYearOptions();
+
+  // Base UI Select.Value needs an items map (value="2025" / label="ปี 2568").
+  const yearItems = useMemo(
+    () =>
+      Object.fromEntries(
+        yearOptions.map((y) => [
+          String(y),
+          preset === "calendar-year" ? `ปี ${y + 543}` : `ปีงบประมาณ ${y + 543}`,
+        ]),
+      ),
+    [yearOptions, preset],
+  );
 
   // Preview the range the user is *about* to apply (before clicking "ใช้รายงาน")
   const preview = resolveRange(preset, year, customStart, customEnd);
@@ -127,6 +139,7 @@ export function RangeSelector({ current, initialPreset, initialYear }: Props) {
           <div className="space-y-1.5">
             <Label className="text-xs">ปี</Label>
             <Select
+              items={yearItems}
               value={String(year)}
               onValueChange={(v) => setYear(Number(v) || currentFiscalYear())}
               disabled={isPending}

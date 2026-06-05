@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Select,
@@ -36,8 +37,14 @@ export function DepartmentFilter({ departments, selected }: Props) {
     router.push(`/dashboard/leaves/calendar${qs ? `?${qs}` : ""}`);
   }
 
+  // Base UI Select.Value renders the raw value (a UUID) without an items map.
+  const items = useMemo(
+    () => ({ [ALL_VALUE]: "ทุกหน่วยงาน", ...Object.fromEntries(departments.map((d) => [d.id, d.name])) }),
+    [departments],
+  );
+
   return (
-    <Select value={selected ?? ALL_VALUE} onValueChange={onChange}>
+    <Select items={items} value={selected ?? ALL_VALUE} onValueChange={onChange}>
       <SelectTrigger className="h-9 min-w-[12rem]">
         <SelectValue placeholder="ทุกหน่วยงาน" />
       </SelectTrigger>

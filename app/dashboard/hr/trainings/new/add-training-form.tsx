@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createTraining } from "@/lib/actions/training-actions";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,16 @@ export function AddTrainingForm({ employees, trainingTypes }: Props) {
     });
   }
 
+  // Base UI Select.Value needs an items map to render the chosen label.
+  const employeeItems = useMemo(
+    () => Object.fromEntries(employees.map((emp) => [emp.id, `${emp.full_name} (${emp.email})`])),
+    [employees],
+  );
+  const trainingTypeItems = useMemo(
+    () => Object.fromEntries(trainingTypes.map((tt) => [tt.value, tt.label])),
+    [trainingTypes],
+  );
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
@@ -75,7 +85,7 @@ export function AddTrainingForm({ employees, trainingTypes }: Props) {
       {/* Employee selection */}
       <div className="space-y-2">
         <Label>พนักงาน <span className="text-destructive">*</span></Label>
-        <Select value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
+        <Select items={employeeItems} value={employeeId} onValueChange={(v) => setEmployeeId(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกพนักงาน..." />
           </SelectTrigger>
@@ -104,7 +114,7 @@ export function AddTrainingForm({ employees, trainingTypes }: Props) {
       {/* Training type */}
       <div className="space-y-2">
         <Label>ประเภทการอบรม <span className="text-destructive">*</span></Label>
-        <Select value={trainingType} onValueChange={(v) => setTrainingType(v ?? "")} disabled={isPending}>
+        <Select items={trainingTypeItems} value={trainingType} onValueChange={(v) => setTrainingType(v ?? "")} disabled={isPending}>
           <SelectTrigger>
             <SelectValue placeholder="เลือกประเภท..." />
           </SelectTrigger>
