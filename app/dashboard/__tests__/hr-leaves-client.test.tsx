@@ -1,20 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import { HrLeavesClient } from "../hr/leaves/hr-leaves-client";
 
-/* ── Module mocks ─────────────────────────────────────────────────────── */
-
-const approveLeaveRequest = vi.fn().mockResolvedValue(undefined);
-const rejectLeaveRequest = vi.fn().mockResolvedValue(undefined);
-
-vi.mock("@/lib/actions/leave-actions", () => ({
-  approveLeaveRequest: (...args: unknown[]) => approveLeaveRequest(...args),
-  rejectLeaveRequest: (...args: unknown[]) => rejectLeaveRequest(...args),
-}));
-
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
+/*
+ * HrLeavesClient is a read-only table used by the approvals/leaves queue.
+ * Each row links to the leave detail page ("เดินเอกสาร"); approve/reject
+ * is performed there, not inline — so this suite only covers rendering.
+ */
 
 /* ── Fixtures ─────────────────────────────────────────────────────────── */
 
@@ -60,15 +52,6 @@ const REQUESTS = [
   },
 ];
 
-/* ── Helpers ──────────────────────────────────────────────────────────── */
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.spyOn(window, "alert").mockImplementation(() => {});
-  vi.spyOn(window, "confirm").mockReturnValue(true);
-  vi.spyOn(window, "prompt").mockReturnValue("test reason");
-});
-
 /* ── Tests ────────────────────────────────────────────────────────────── */
 
 describe("HrLeavesClient", () => {
@@ -91,78 +74,22 @@ describe("HrLeavesClient", () => {
 
   it("shows correct status badges", () => {
     render(<HrLeavesClient requests={REQUESTS} />);
-    expect(screen.getByText("รออนุมัติ", { selector: "[data-slot='badge']" })).toBeInTheDocument();
-    expect(screen.getByText("อนุมัติ", { selector: "[data-slot='badge']" })).toBeInTheDocument();
-    expect(screen.getByText("ไม่อนุมัติ", { selector: "[data-slot='badge']" })).toBeInTheDocument();
+    expect(screen.getByText("รอตรวจสอบ")).toBeInTheDocument();
+    expect(screen.getByText("อนุมัติ")).toBeInTheDocument();
+    expect(screen.getByText("ไม่อนุมัติ")).toBeInTheDocument();
   });
 
-  it("shows approve/reject buttons ONLY for pending requests", () => {
+  it("renders one 'เดินเอกสาร' action per row, regardless of status", () => {
     render(<HrLeavesClient requests={REQUESTS} />);
-    // The pending row (req-1) should have 3 action buttons: View + Approve + Reject
-    const allRows = screen.getAllByRole("row");
-    // row index: 0=header, 1=req-1(pending), 2=req-2(approved), 3=req-3(rejected)
-    const pendingRow = allRows[1];
-    const pendingButtons = within(pendingRow).getAllByRole("button");
-    expect(pendingButtons.length).toBe(3);
-  });
-
-  it("does NOT show approve/reject buttons for approved/rejected requests, but keeps view button", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    const allRows = screen.getAllByRole("row");
-    const approvedRow = allRows[2];
-    const rejectedRow = allRows[3];
-    // Only the View (Eye) button remains for non-pending rows
-    expect(within(approvedRow).queryAllByRole("button")).toHaveLength(1);
-    expect(within(rejectedRow).queryAllByRole("button")).toHaveLength(1);
+    const dataRows = screen.getAllByRole("row").slice(1); // drop header
+    for (const row of dataRows) {
+      expect(within(row).getAllByRole("button")).toHaveLength(1);
+    }
+    expect(screen.getAllByText("เดินเอกสาร")).toHaveLength(3);
   });
 
   it("shows empty message when no requests", () => {
     render(<HrLeavesClient requests={[]} />);
     expect(screen.getByText("ไม่มีคำขอลาในหมวดนี้")).toBeInTheDocument();
-  });
-
-  it("approve button calls approveLeaveRequest with correct ID", async () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    const allRows = screen.getAllByRole("row");
-    const pendingRow = allRows[1];
-    const buttons = within(pendingRow).getAllByRole("button");
-    // Button index: 0=View, 1=Approve, 2=Reject
-    fireEvent.click(buttons[1]);
-
-    // Wait for confirmation dialog to appear and click confirm
-    await vi.waitFor(() => {
-      expect(screen.getByText("ยืนยันอนุมัติการลา")).toBeInTheDocument();
-    });
-    const confirmBtn = screen.getByRole("button", { name: "อนุมัติ" });
-    fireEvent.click(confirmBtn);
-
-    await vi.waitFor(() => {
-      expect(approveLeaveRequest).toHaveBeenCalledWith("req-1");
-    });
-  });
-
-  it("reject button opens dialog then rejectLeaveRequest with ID and reason", async () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    const allRows = screen.getAllByRole("row");
-    const pendingRow = allRows[1];
-    const buttons = within(pendingRow).getAllByRole("button");
-    // Button index: 0=View, 1=Approve, 2=Reject
-    fireEvent.click(buttons[2]);
-
-    // Wait for rejection dialog
-    await vi.waitFor(() => {
-      expect(screen.getByText("ยืนยันปฏิเสธการลา")).toBeInTheDocument();
-    });
-
-    // Type reason into the input
-    const reasonInput = screen.getByPlaceholderText("ระบุเหตุผลที่ไม่อนุมัติ...");
-    fireEvent.change(reasonInput, { target: { value: "test reason" } });
-
-    const confirmBtn = screen.getByRole("button", { name: "ปฏิเสธ" });
-    fireEvent.click(confirmBtn);
-
-    await vi.waitFor(() => {
-      expect(rejectLeaveRequest).toHaveBeenCalledWith("req-1", "test reason");
-    });
   });
 });
