@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   getAllowedDomains,
   getSingleHostedDomain,
 } from "@/lib/auth/allowed-domains";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Loader2,
   Zap,
@@ -17,6 +19,11 @@ import {
   Lock,
   AlertTriangle,
 } from "lucide-react";
+
+/** Dev/staging escape hatch — enables an email+password form for test users.
+ *  Turn off in production by unsetting the env var. */
+const PASSWORD_LOGIN_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN === "true";
 
 const ERROR_MESSAGES: Record<string, string> = {
   domain:
@@ -39,9 +46,13 @@ const ERROR_MESSAGES: Record<string, string> = {
  * gated by the email-domain allowlist (NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS).
  */
 export function LoginClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pwEmail, setPwEmail] = useState("");
+  const [pwPassword, setPwPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
 
   // Surface server-side redirect errors (e.g. ?error=domain)
   useEffect(() => {
@@ -84,6 +95,30 @@ export function LoginClient() {
     } catch {
       setError("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง");
       setIsLoading(false);
+    }
+  }
+
+  async function handlePasswordSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setPwLoading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: pwEmail.trim(),
+        password: pwPassword,
+      });
+      if (signInError) {
+        setError("เข้าสู่ระบบไม่สำเร็จ — ตรวจสอบอีเมล/รหัสผ่าน");
+        setPwLoading(false);
+        return;
+      }
+      // Skip Google's /auth/callback (allowlist gate). Go straight to dashboard.
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง");
+      setPwLoading(false);
     }
   }
 
@@ -263,6 +298,56 @@ export function LoginClient() {
                 </p>
               </div>
             </div>
+
+            {/* Dev/staging password login — gated by NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN.
+                Used for test accounts before SSO rollout is complete. */}
+            {PASSWORD_LOGIN_ENABLED && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  <span className="text-xs text-slate-400">หรือทดสอบด้วยรหัสผ่าน</span>
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
+                <form onSubmit={handlePasswordSignIn} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pw-email" className="text-xs">อีเมล</Label>
+                    <Input
+                      id="pw-email"
+                      type="email"
+                      autoComplete="email"
+                      value={pwEmail}
+                      onChange={(e) => setPwEmail(e.target.value)}
+                      placeholder="test-employee@g.lpru.ac.th"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pw-password" className="text-xs">รหัสผ่าน</Label>
+                    <Input
+                      id="pw-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={pwPassword}
+                      onChange={(e) => setPwPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={pwLoading}>
+                    {pwLoading ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin mr-2" />
+                        กำลังเข้าสู่ระบบ...
+                      </>
+                    ) : (
+                      "เข้าสู่ระบบด้วยรหัสผ่าน"
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    เฉพาะบัญชีทดสอบ — ปิดได้โดย unset <code>NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN</code>
+                  </p>
+                </form>
+              </>
+            )}
           </div>
 
           <div className="mt-10 border-t border-slate-100 pt-6 flex items-center justify-center">
