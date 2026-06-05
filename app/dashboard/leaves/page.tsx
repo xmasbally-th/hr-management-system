@@ -12,10 +12,11 @@ import {
   performanceCycleRange,
   formatThai,
 } from "@/lib/date-ranges";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Info, Thermometer, Briefcase, Palmtree, Baby, CalendarDays } from "lucide-react";
+import { Plus, Info, Thermometer, Briefcase, Palmtree, Baby, CalendarDays, AlertCircle, ArrowRight } from "lucide-react";
 import { SearchInput } from "@/components/search-input";
 import { PaginationControls } from "@/components/pagination-controls";
 import { StatusFilter } from "@/components/status-filter";
@@ -61,6 +62,13 @@ export default async function LeavesPage({ searchParams }: LeavesPageProps) {
   const fy = Number(params.fy) || currentFiscalYear();
   const round = (Number(params.round) || currentCycle().half) as 1 | 2;
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+    : { data: null };
+  const isHrAdmin = profile?.role === "hr" || profile?.role === "admin";
+
   const [result, balances, counts] = await Promise.all([
     getMyLeaveRequests({ page, search, status, fy, round }),
     getMyLeaveBalances(fy),
@@ -99,6 +107,29 @@ export default async function LeavesPage({ searchParams }: LeavesPageProps) {
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         {/* Left column: summary cards + criteria */}
         <div className="space-y-4">
+          {(balances ?? []).length === 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+              <div className="flex items-center gap-2 font-semibold">
+                <AlertCircle className="h-4 w-4" />
+                ยังไม่ได้เริ่มต้นสิทธิ์วันลา
+              </div>
+              <p className="text-xs leading-relaxed">
+                ยังไม่มีข้อมูลสิทธิ์วันลาของคุณในปีงบประมาณนี้
+                {isHrAdmin
+                  ? " — ใช้หน้า “จัดการวันลา” เพื่อเริ่มต้นสิทธิ์ให้พนักงานทุกคน"
+                  : " — กรุณาติดต่อฝ่ายทรัพยากรบุคคล"}
+              </p>
+              {isHrAdmin && (
+                <Link
+                  href="/dashboard/hr/leave-balances"
+                  className="inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
+                >
+                  ไปยังหน้าจัดการวันลา
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
+          )}
           {(balances ?? []).map((b) => {
             const lt = b.leave_type as { name: string; code: string | null } | null;
             const Icon = leaveTypeIcon[lt?.code ?? ""] ?? CalendarDays;
