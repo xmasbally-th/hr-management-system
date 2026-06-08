@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ExamPeriodWarning } from "@/components/exam-period-warning";
+import type { ExamPeriodLike } from "@/lib/exam-period";
 
 type TravelType = "training" | "supervision" | "official_contact";
 type Channel = "digital" | "paper";
@@ -59,7 +61,15 @@ const BUDGET_FIELDS: Array<{ key: string; label: string }> = [
  * a summary table and submits either as digital (auto-routed) or paper
  * channel (HR receives a print preview).
  */
-export function TravelRequestForm() {
+interface TravelRequestFormProps {
+  examPeriods?: ExamPeriodLike[];
+  hasExamDuty?: boolean;
+}
+
+export function TravelRequestForm({
+  examPeriods = [],
+  hasExamDuty = false,
+}: TravelRequestFormProps = {}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<TabKey>("details");
@@ -329,6 +339,13 @@ export function TravelRequestForm() {
               ระยะเวลา {totalDays} วัน
             </div>
           )}
+
+          <ExamPeriodWarning
+            periods={examPeriods}
+            start={startDate}
+            end={endDate}
+            hasDuty={hasExamDuty}
+          />
         </div>
       )}
 

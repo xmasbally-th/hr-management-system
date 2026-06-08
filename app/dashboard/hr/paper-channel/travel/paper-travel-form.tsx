@@ -9,6 +9,8 @@ import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload } from "@/components/file-upload";
+import { ExamPeriodWarning } from "@/components/exam-period-warning";
+import { matchesExamDuty, type ExamPeriodLike } from "@/lib/exam-period";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,10 +20,12 @@ interface ExpenseRow {
 }
 
 interface Props {
-  employees: { id: string; full_name: string; email: string }[];
+  employees: { id: string; full_name: string; email: string; position_title?: string | null }[];
+  examPeriods?: ExamPeriodLike[];
+  dutyPositions?: string[];
 }
 
-export function PaperTravelForm({ employees }: Props) {
+export function PaperTravelForm({ employees, examPeriods = [], dutyPositions = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +116,11 @@ export function PaperTravelForm({ employees }: Props) {
     official_contact: "ติดต่อราชการ",
   };
 
+  const hasExamDuty = useMemo(() => {
+    const emp = employees.find((e) => e.id === employeeId);
+    return matchesExamDuty(emp?.position_title ?? null, dutyPositions);
+  }, [employees, employeeId, dutyPositions]);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
@@ -201,6 +210,13 @@ export function PaperTravelForm({ employees }: Props) {
           จำนวนวัน: <span className="font-semibold">{calculateDays()}</span> วัน
         </p>
       )}
+
+      <ExamPeriodWarning
+        periods={examPeriods}
+        start={startDate}
+        end={endDate}
+        hasDuty={hasExamDuty}
+      />
 
       {/* Expenses */}
       <div className="space-y-3">

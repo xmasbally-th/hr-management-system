@@ -237,6 +237,63 @@ export async function updateLeavePolicy(input: LeavePolicy): Promise<void> {
 }
 
 // =============================================================================
+// Exam-duty positions — ตำแหน่งที่มีภาระคุมสอบ (ใช้แสดงคำเตือนช่วงสอบปลายภาค)
+// =============================================================================
+
+const DEFAULT_EXAM_DUTY_POSITIONS = ["อาจารย์", "เจ้าหน้าที่"];
+
+/**
+ * Read the list of position titles that carry exam-proctoring duty.
+ * Any authenticated user — the leave/travel forms need it too.
+ */
+export async function getExamDutyPositions(): Promise<string[]> {
+  const supabase = await createClient();
+  await getAuthUser(supabase);
+  const { data } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("key", "exam_duty_positions")
+    .maybeSingle();
+  const v = data?.value as { positions?: string[] } | null;
+  if (!v || !Array.isArray(v.positions)) return DEFAULT_EXAM_DUTY_POSITIONS;
+  return v.positions;
+}
+
+/** HR/Admin: update the exam-duty position list. */
+export async function updateExamDutyPositions(list: string[]): Promise<void> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  await checkHrAdmin(supabase, user.id);
+
+  // sanitize: trim, drop blanks, dedupe, cap length/count
+  const positions = Array.from(
+    new Set(
+      (list ?? [])
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0 && p.length <= 100),
+    ),
+  ).slice(0, 50);
+
+  const { error } = await supabase
+    .from("system_settings")
+    .upsert(
+      {
+        key: "exam_duty_positions",
+        value: { positions } as unknown as import("@/types/supabase").Database["public"]["Tables"]["system_settings"]["Insert"]["value"],
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      },
+      { onConflict: "key" },
+    );
+  if (error) throw new Error("บันทึกรายการตำแหน่งไม่สำเร็จ");
+
+  await logAudit(supabase, user.id, "update_exam_duty_positions", "system_setting", "exam_duty_positions", { positions });
+  revalidatePath("/dashboard/hr/master-data");
+  revalidatePath("/dashboard/travel/new");
+  revalidatePath("/dashboard/leaves/new");
+}
+
+// =============================================================================
 // Departments / System stats — relaxed RBAC where appropriate
 // =============================================================================
 

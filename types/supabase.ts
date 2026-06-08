@@ -644,6 +644,44 @@ export interface Database {
         ];
       };
 
+      exam_periods: {
+        Row: {
+          id: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          fiscal_year: number;
+          created_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          start_date: string;
+          end_date: string;
+          fiscal_year: number;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          start_date?: string;
+          end_date?: string;
+          fiscal_year?: number;
+          created_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exam_periods_created_by_fkey";
+            columns: ["created_by"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       leave_types: {
         Row: {
           id: string;

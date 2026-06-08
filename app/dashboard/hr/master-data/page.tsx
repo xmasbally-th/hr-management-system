@@ -7,6 +7,8 @@ import {
 } from "@/lib/actions/master-data-actions";
 import { getLeaveTypeSettings, getLeaveOnlineEnabled, getLeavePolicy } from "@/lib/actions/settings-actions";
 import { getHolidays } from "@/lib/actions/holiday-actions";
+import { getExamPeriods } from "@/lib/actions/exam-period-actions";
+import { getExamDutyPositions } from "@/lib/actions/settings-actions";
 import { getLeaveTemplates } from "@/lib/actions/template-actions";
 import { getMyProfile } from "@/lib/actions/profile-actions";
 import { currentFiscalYear, getFiscalYearOptions } from "@/lib/date-ranges";
@@ -25,6 +27,8 @@ export default async function MasterDataPage() {
     leaveTypes,
     leaveOnlineEnabled,
     holidays,
+    examPeriods,
+    examDutyPositions,
     employeeTypes,
     educationLevels,
     decorationCatalog,
@@ -37,6 +41,8 @@ export default async function MasterDataPage() {
     getLeaveTypeSettings(),
     getLeaveOnlineEnabled(),
     getHolidays(curFy),
+    getExamPeriods(curFy),
+    getExamDutyPositions(),
     getEmployeeTypes(),
     getEducationLevels(),
     getDecorationCatalog(),
@@ -61,6 +67,8 @@ export default async function MasterDataPage() {
         leaveTypes={leaveTypes}
         leaveOnlineEnabled={leaveOnlineEnabled}
         holidays={holidays}
+        examPeriods={examPeriods}
+        examDutyPositions={examDutyPositions}
         fiscalYearOptions={getFiscalYearOptions()}
         currentFiscalYear={curFy}
         employeeTypes={employeeTypes}

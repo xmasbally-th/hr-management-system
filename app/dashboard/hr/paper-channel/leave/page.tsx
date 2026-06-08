@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getLeaveTypes, getEmployeesForSelection } from "@/lib/actions/leave-actions";
-import { getLeavePolicy, type LeavePolicy } from "@/lib/actions/settings-actions";
+import { getLeavePolicy, getExamDutyPositions, type LeavePolicy } from "@/lib/actions/settings-actions";
+import { getExamPeriods } from "@/lib/actions/exam-period-actions";
+import { currentFiscalYear } from "@/lib/date-ranges";
 import { PaperLeaveForm } from "./paper-leave-form";
 
 export const metadata: Metadata = { title: "บันทึกใบลา (กระดาษ)" };
@@ -37,14 +39,19 @@ export default async function PaperLeavePage() {
   // system_settings read can't blank the page; other failures bubble up to
   // the route's error.tsx (which exposes the digest for cross-referencing
   // with Vercel runtime logs).
-  const [leaveTypes, employees, policy] = await Promise.all([
+  const curFy = currentFiscalYear();
+  const [leaveTypes, employees, policy, examThisFy, examNextFy, dutyPositions] = await Promise.all([
     getLeaveTypes(),
     getEmployeesForSelection(),
     getLeavePolicy().catch((err) => {
       console.error("[paper-leave] getLeavePolicy failed, using defaults:", err);
       return DEFAULT_POLICY;
     }),
+    getExamPeriods(curFy).catch(() => []),
+    getExamPeriods(curFy + 1).catch(() => []),
+    getExamDutyPositions().catch(() => []),
   ]);
+  const examPeriods = [...examThisFy, ...examNextFy];
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -56,7 +63,13 @@ export default async function PaperLeavePage() {
       </div>
 
       <div className="border rounded-xl p-6 bg-card shadow-sm">
-        <PaperLeaveForm leaveTypes={leaveTypes} employees={employees} policy={policy} />
+        <PaperLeaveForm
+          leaveTypes={leaveTypes}
+          employees={employees}
+          policy={policy}
+          examPeriods={examPeriods}
+          dutyPositions={dutyPositions}
+        />
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   Award,
   Settings2,
   CalendarCheck2,
+  CalendarClock,
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import { EducationLevelsSection } from "./_sections/education-levels-section";
 import { DecorationCatalogSection } from "./_sections/decoration-catalog-section";
 import { LeaveSettingsSection } from "./_sections/leave-settings-section";
 import { HolidaysSection } from "./_sections/holidays-section";
+import { ExamPeriodsSection } from "./_sections/exam-periods-section";
 import { DocumentTemplatesSection } from "./_sections/document-templates-section";
 
 type TabKey =
@@ -31,6 +33,7 @@ type TabKey =
   | "leave-types"
   | "leave-settings"
   | "holidays"
+  | "exam-periods"
   | "employee-types"
   | "education-levels"
   | "decoration-catalog"
@@ -60,6 +63,13 @@ interface HolidayRow {
   type: string;
   note: string | null;
 }
+interface ExamPeriodRow {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  fiscal_year: number;
+}
 interface NameOrderRow {
   id: string;
   name: string;
@@ -78,6 +88,8 @@ interface Props {
   leaveTypes: LeaveTypeRow[];
   leaveOnlineEnabled: boolean;
   holidays: HolidayRow[];
+  examPeriods: ExamPeriodRow[];
+  examDutyPositions: string[];
   fiscalYearOptions: number[];
   currentFiscalYear: number;
   employeeTypes: (NameOrderRow & { vacation_accumulation_cap: number })[];
@@ -94,6 +106,8 @@ export function MasterDataClient({
   leaveTypes,
   leaveOnlineEnabled,
   holidays,
+  examPeriods,
+  examDutyPositions,
   fiscalYearOptions,
   currentFiscalYear: curFy,
   employeeTypes,
@@ -116,6 +130,7 @@ export function MasterDataClient({
     { key: "leave-types", label: "ประเภทการลา", count: leaveTypes.length, icon: CalendarDays },
     { key: "leave-settings", label: "ตั้งค่าการลา", count: null, icon: Settings2 },
     { key: "holidays", label: "วันหยุดราชการ", count: holidays.length, icon: CalendarCheck2 },
+    { key: "exam-periods", label: "ช่วงสอบปลายภาค", count: examPeriods.length, icon: CalendarClock },
     { key: "employee-types", label: "ประเภทบุคลากร", count: employeeTypes.length, icon: IdCard },
     { key: "education-levels", label: "วุฒิการศึกษา", count: educationLevels.length, icon: GraduationCap },
     { key: "decoration-catalog", label: "เครื่องราชฯ", count: decorationCatalog.length, icon: Award },
@@ -173,6 +188,14 @@ export function MasterDataClient({
             rows={holidays}
             fiscalYearOptions={fiscalYearOptions}
             currentFiscalYear={curFy}
+          />
+        )}
+        {active === "exam-periods" && (
+          <ExamPeriodsSection
+            rows={examPeriods}
+            fiscalYearOptions={fiscalYearOptions}
+            currentFiscalYear={curFy}
+            dutyPositions={examDutyPositions}
           />
         )}
         {active === "employee-types" && <EmployeeTypesSection rows={employeeTypes} />}

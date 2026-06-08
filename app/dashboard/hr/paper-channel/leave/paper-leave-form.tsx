@@ -15,6 +15,8 @@ import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload } from "@/components/file-upload";
+import { ExamPeriodWarning } from "@/components/exam-period-warning";
+import { matchesExamDuty, type ExamPeriodLike } from "@/lib/exam-period";
 import { Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { LeaveType } from "@/types/supabase";
@@ -25,6 +27,7 @@ interface PaperEmployee {
   email: string;
   gender: string | null;
   employee_type: string | null;
+  position_title?: string | null;
 }
 
 /** Per-leave-type balance for the selected employee — minimal shape. */
@@ -40,9 +43,17 @@ interface Props {
   leaveTypes: LeaveType[];
   employees: PaperEmployee[];
   policy: LeavePolicy;
+  examPeriods?: ExamPeriodLike[];
+  dutyPositions?: string[];
 }
 
-export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
+export function PaperLeaveForm({
+  leaveTypes,
+  employees,
+  policy,
+  examPeriods = [],
+  dutyPositions = [],
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +78,7 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
   const selectedEmployee = employees.find((e) => e.id === employeeId) ?? null;
   const empGender = selectedEmployee?.gender ?? null;
   const empType = selectedEmployee?.employee_type ?? null;
+  const hasExamDuty = matchesExamDuty(selectedEmployee?.position_title ?? null, dutyPositions);
   const isFemaleMaternity = empGender === "หญิง" || empGender === "female";
   const isMaleMaternity = empGender === "ชาย" || empGender === "male";
 
@@ -355,6 +367,15 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
             )
           )}
         </div>
+      )}
+
+      {isVacation && (
+        <ExamPeriodWarning
+          periods={examPeriods}
+          start={startDate}
+          end={endDate}
+          hasDuty={hasExamDuty}
+        />
       )}
 
       {/* Maternity-specific — D3: gender-aware */}

@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileUpload } from "@/components/file-upload";
+import { ExamPeriodWarning } from "@/components/exam-period-warning";
+import type { ExamPeriodLike } from "@/lib/exam-period";
 import {
   Loader2,
   CalendarDays,
@@ -54,6 +56,8 @@ interface Props {
   gender: string | null;
   employeeType: string | null;
   policy: LeavePolicy;
+  examPeriods?: ExamPeriodLike[];
+  hasExamDuty?: boolean;
 }
 
 const KIND_META: Record<
@@ -151,6 +155,8 @@ export function LeaveRequestForm({
   gender,
   employeeType,
   policy,
+  examPeriods = [],
+  hasExamDuty = false,
 }: Props) {
   const certThreshold = policy.sick_cert_threshold_working_days;
   const advanceNoticeDays = policy.personal_advance_notice_days;
@@ -682,6 +688,15 @@ export function LeaveRequestForm({
               />
             </div>
           </div>
+
+          {kind === "vacation" && (
+            <ExamPeriodWarning
+              periods={examPeriods}
+              start={startDate}
+              end={endDate}
+              hasDuty={hasExamDuty}
+            />
+          )}
 
           {/* Days summary + working days + progress */}
           {totalDays > 0 && (
