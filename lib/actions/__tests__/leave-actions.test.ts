@@ -20,6 +20,34 @@ vi.mock("@/lib/actions/notification-actions", () => ({
   createNotificationInternal: vi.fn(),
 }));
 
+// getAdminClient() in leave-actions reads env then calls @supabase/supabase-js
+// createClient. We mock both so tests that reach the success path (which
+// reserves balance + creates document_tracking via the admin client) don't
+// throw "Missing env" or hit the network.
+vi.mock("@/lib/env", () => ({
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "svc",
+  },
+}));
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => {
+    const chain: Record<string, unknown> = {};
+    for (const m of [
+      "select", "insert", "update", "upsert", "delete",
+      "eq", "in", "gte", "lte", "order", "limit",
+    ]) {
+      chain[m] = vi.fn().mockReturnValue(chain);
+    }
+    chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+    chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    (chain as Record<string, unknown>).then = (
+      resolve: (v: unknown) => void,
+    ) => resolve({ data: null, error: null });
+    return { from: vi.fn(() => chain) };
+  }),
+}));
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "@/lib/actions/notification-actions";
@@ -155,13 +183,18 @@ describe("createLeaveRequestByHr", () => {
 
   it("succeeds with valid employee when caller is HR", async () => {
     const profileChain = createMockChain({ data: profileRow("hr") });
-    // For validateEmployeeExists — select("id").eq.eq.single → needs data
+    // For validateEmployeeExists + enforceLeaveTypeRules employee-profile read.
     const employeeCheckChain = createMockChain({ data: { id: VALID_UUID } });
+    // The HR-notification list query (`.in("role", ["hr","admin"])`) is
+    // awaited without `.single()` — chain.then resolves data as an array.
+    const hrListChain = createMockChain({ data: [{ id: "hr-1" }] });
     const leaveChain = createMockChain({
       data: { id: "req-2", employee_id: VALID_UUID },
     });
 
-    // from("profiles") is called twice (getProfile + validateEmployeeExists) and once for leave_requests
+    // from("profiles") sequence: 1=getProfile(role check),
+    // 2=validateEmployeeExists, 3=enforceLeaveTypeRules emp profile,
+    // 4=HR notification list (uses .in, no .single).
     let profileCallCount = 0;
     const sb = createMockSupabase({
       authUser: { id: "hr-1" },
@@ -170,8 +203,9 @@ describe("createLeaveRequestByHr", () => {
       if (table === "leave_requests") return leaveChain;
       if (table === "profiles") {
         profileCallCount++;
-        // First call: getProfile, second call: validateEmployeeExists
-        return profileCallCount === 1 ? profileChain : employeeCheckChain;
+        if (profileCallCount === 1) return profileChain;
+        if (profileCallCount >= 4) return hrListChain;
+        return employeeCheckChain;
       }
       return createMockChain();
     });
@@ -360,9 +394,27 @@ describe("cancelLeaveRequest", () => {
   });
 
   it("self-cancels own pending request", async () => {
-    const leaveChain = createMockChain({ data: null, error: null });
+    // cancelLeaveRequest now: read profile → SELECT request → guard status →
+    // UPDATE with status guard. We share one chain for both SELECT and UPDATE
+    // on leave_requests so the row data flows through both reads.
+    const profileChain = createMockChain({ data: profileRow("employee") });
+    const leaveChain = createMockChain({
+      data: {
+        id: REQUEST_ID,
+        status: "pending",
+        employee_id: "user-1",
+        leave_type_id: "lt-1",
+        working_days: 1,
+        total_days: 1,
+      },
+    });
 
-    mockSupabase({ fromOverrides: { leave_requests: leaveChain } });
+    mockSupabase({
+      fromOverrides: {
+        profiles: profileChain,
+        leave_requests: leaveChain,
+      },
+    });
 
     await cancelLeaveRequest(REQUEST_ID);
     expect(leaveChain.update).toHaveBeenCalled();

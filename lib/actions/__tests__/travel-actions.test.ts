@@ -20,6 +20,33 @@ vi.mock("@/lib/actions/notification-actions", () => ({
   createNotificationInternal: vi.fn(),
 }));
 
+// travel-actions also uses a service-role admin client for inserts. Mock env
+// + @supabase/supabase-js so the createClient call doesn't read real env or
+// open a network connection.
+vi.mock("@/lib/env", () => ({
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "svc",
+  },
+}));
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => {
+    const chain: Record<string, unknown> = {};
+    for (const m of [
+      "select", "insert", "update", "upsert", "delete",
+      "eq", "in", "gte", "lte", "order", "limit",
+    ]) {
+      chain[m] = vi.fn().mockReturnValue(chain);
+    }
+    chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+    chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    (chain as Record<string, unknown>).then = (
+      resolve: (v: unknown) => void,
+    ) => resolve({ data: null, error: null });
+    return { from: vi.fn(() => chain) };
+  }),
+}));
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotificationInternal } from "@/lib/actions/notification-actions";

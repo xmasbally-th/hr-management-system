@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createMockSupabase, createMockChain } from "./helpers";
+import { NOTIFICATION_TYPE_META } from "@/lib/notification-types";
 
 /* ── Module mocks ─────────────────────────────────────────────────────── */
 
@@ -65,11 +66,12 @@ describe("getAllNotificationTypeSettings", () => {
     await expect(getAllNotificationTypeSettings()).rejects.toThrow(/Admin only/);
   });
 
-  it("returns all 14 types merged with defaults for admin", async () => {
+  it("returns all META types merged with defaults for admin", async () => {
     setClient("admin", []);
     const rows = await getAllNotificationTypeSettings();
-    expect(rows).toHaveLength(14);
-    // Every row carries label/description/group from META
+    // Derive expected count from META so adding a notification type doesn't
+    // require updating this assertion.
+    expect(rows).toHaveLength(NOTIFICATION_TYPE_META.length);
     for (const r of rows) {
       expect(r.label).toBeTruthy();
       expect(r.group).toBeTruthy();
