@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { getSystemStats } from "@/lib/actions/settings-actions";
 import {
   getAllowedDomains,
@@ -14,6 +16,23 @@ interface PageProps {
 }
 
 export default async function SettingsPage({ searchParams }: PageProps) {
+  // Admin-only. Without this guard a non-admin reaching the URL directly
+  // hits getSystemStats() throwing "Forbidden" → generic error boundary.
+  // Redirect cleanly instead, matching the other restricted pages.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const { data: guardProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!guardProfile || guardProfile.role !== "admin") {
+    redirect("/dashboard");
+  }
+
   const params = await searchParams;
   const [systemStats, domains, autoApprove, allSettings, notificationSettings] =
     await Promise.all([

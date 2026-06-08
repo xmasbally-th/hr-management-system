@@ -162,7 +162,7 @@ export function BalanceTableSection({ balances, fiscalYear }: Props) {
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-sky-600" />
           <h3 className="font-semibold text-base">
-            ยอดวันลาพนักงาน — ปีงบประมาณ {fiscalYear}
+            ยอดวันลาพนักงาน — ปีงบประมาณ {fiscalYear + 543}
           </h3>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -261,7 +261,7 @@ export function BalanceTableSection({ balances, fiscalYear }: Props) {
             <DialogTitle>แก้ไขยอดวันลา</DialogTitle>
             <DialogDescription>
               {editingEmp?.full_name ?? "-"} · {editingLt?.name ?? editingLt?.code ?? "-"} ·{" "}
-              ปีงบประมาณ {editing?.fiscal_year}
+              ปีงบประมาณ {editing ? editing.fiscal_year + 543 : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
