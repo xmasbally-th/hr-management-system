@@ -290,6 +290,12 @@ export function LeaveRequestForm({
       return `ระบบยังไม่ได้ตั้งค่าประเภท "${meta.label}" — กรุณาแจ้ง HR`;
     if (!startDate || !endDate) return "กรุณาเลือกช่วงวันที่";
     if (totalDays <= 0) return "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม";
+    // Block ranges with no working days (entirely weekend/holiday) — these
+    // deduct 0 quota. Female maternity counts calendar days, so it is exempt.
+    // Only enforced once the working-days preview has loaded (else the server
+    // guard in enforceLeaveTypeRules catches it on submit).
+    if (!isFemaleMaternity && workingDays !== null && workingDays <= 0)
+      return "ช่วงวันที่ที่เลือกไม่มีวันทำการ (เสาร์–อาทิตย์/วันหยุดราชการ) — กรุณาเลือกช่วงที่มีวันทำการ";
 
     if (kind === "sick") {
       if (!symptoms.trim()) return "กรุณาระบุอาการเจ็บป่วย";

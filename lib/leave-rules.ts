@@ -224,6 +224,19 @@ export async function enforceLeaveTypeRules(
   // 3. Calculate working days
   const workingDays = await calculateWorkingDays(supabase, startDate, endDate);
 
+  // 3a. Reject ranges that fall entirely on non-working days (weekends /
+  //     public holidays). Such a request consumes 0 quota and is almost
+  //     always a date-picking mistake. Female maternity is exempt because it
+  //     counts calendar days, not working days (handled in the MATERNITY case).
+  const isFemaleMaternity =
+    code === "MATERNITY" &&
+    (emp?.gender === "หญิง" || emp?.gender === "female");
+  if (!isFemaleMaternity && workingDays <= 0) {
+    throw new Error(
+      "ช่วงวันที่ที่เลือกไม่มีวันทำการ (ตรงกับวันหยุดราชการหรือเสาร์–อาทิตย์) — กรุณาเลือกช่วงที่มีวันทำการ",
+    );
+  }
+
   // 4. Current balance — the authoritative usage source (W0; fixes the
   //    dual-source bug where opening-balance imports have no request rows).
   //    balance.used_days includes imported opening balances + every reserved

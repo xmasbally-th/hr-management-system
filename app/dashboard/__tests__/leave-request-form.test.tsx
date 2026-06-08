@@ -80,6 +80,8 @@ const EMPLOYEES = [
 beforeEach(() => {
   mockPush.mockClear();
   mockCreateLeaveRequest.mockReset();
+  // Restore the default working-days preview (a test may override it).
+  mockPreviewWorkingDays.mockResolvedValue({ workingDays: 5, calendarDays: 7 });
   localStorage.clear();
 });
 
@@ -147,6 +149,30 @@ describe("LeaveRequestForm (4-in-1 redesign)", () => {
     fireEvent.click(screen.getByRole("button", { name: /ส่งคำขอลา/ }));
 
     // Validation should prevent submit
+    expect(mockCreateLeaveRequest).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit when the selected range has 0 working days", async () => {
+    // Range falls entirely on a weekend/holiday → preview returns 0 working days.
+    mockPreviewWorkingDays.mockResolvedValue({ workingDays: 0, calendarDays: 1 });
+    renderForm();
+
+    // Switch to sick (no substitute requirement, counts working days)
+    const sickTexts = screen.getAllByText("ลาป่วย");
+    fireEvent.click(sickTexts[sickTexts.length - 1].closest("button")!);
+
+    const dateInputs = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: "2026-06-20" } }); // Sat
+    fireEvent.change(dateInputs[1], { target: { value: "2026-06-20" } });
+
+    // Wait until the working-days preview (0) has been applied to state.
+    await waitFor(() => expect(mockPreviewWorkingDays).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: /ส่งคำขอลา/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/ไม่มีวันทำการ/)).toBeTruthy(),
+    );
     expect(mockCreateLeaveRequest).not.toHaveBeenCalled();
   });
 });
