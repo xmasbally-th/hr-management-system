@@ -1021,6 +1021,8 @@ export interface Database {
           sent_to_president_date: string | null;
           president_signed_date: string | null;
           president_document_url: string | null;
+          sent_to_chair_date: string | null;
+          chair_signed_date: string | null;
           deleted_at: string | null;
         };
         Insert: {
@@ -1044,6 +1046,8 @@ export interface Database {
           sent_to_president_date?: string | null;
           president_signed_date?: string | null;
           president_document_url?: string | null;
+          sent_to_chair_date?: string | null;
+          chair_signed_date?: string | null;
           deleted_at?: string | null;
         };
         Update: {
@@ -1067,7 +1071,68 @@ export interface Database {
           sent_to_president_date?: string | null;
           president_signed_date?: string | null;
           president_document_url?: string | null;
+          sent_to_chair_date?: string | null;
+          chair_signed_date?: string | null;
           deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      workflow_approvers: {
+        Row: {
+          id: string;
+          user_id: string;
+          approver_role: string;
+          department_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          approver_role: string;
+          department_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          approver_role?: string;
+          department_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      acting_delegations: {
+        Row: {
+          id: string;
+          delegate_user_id: string;
+          approver_role: string;
+          start_date: string;
+          end_date: string;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          delegate_user_id: string;
+          approver_role?: string;
+          start_date: string;
+          end_date: string;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          delegate_user_id?: string;
+          approver_role?: string;
+          start_date?: string;
+          end_date?: string;
+          note?: string | null;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -1287,6 +1352,7 @@ export interface Database {
         | "awaiting_correction";
       request_status:
         | "pending"
+        | "awaiting_chair"
         | "awaiting_director"
         | "awaiting_dean"
         | "approved"
