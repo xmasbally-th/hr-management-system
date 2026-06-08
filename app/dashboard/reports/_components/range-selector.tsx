@@ -10,7 +10,7 @@ import {
   currentFiscalYear,
 } from "@/lib/date-ranges";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -160,19 +160,17 @@ export function RangeSelector({ current, initialPreset, initialYear }: Props) {
           <>
             <div className="space-y-1.5">
               <Label className="text-xs">เริ่ม</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={customStart}
-                onChange={(e) => setCustomStart(e.target.value)}
+                onChange={setCustomStart}
                 disabled={isPending}
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">สิ้นสุด</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
+                onChange={setCustomEnd}
                 disabled={isPending}
               />
             </div>

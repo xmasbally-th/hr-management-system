@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions/audit-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -240,20 +241,18 @@ export function AuditLogSection() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">ตั้งแต่</Label>
-            <Input
-              type="date"
+            <ThaiDatePicker
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={setStartDate}
               disabled={isPending}
             />
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs">ถึง</Label>
-            <Input
-              type="date"
+            <ThaiDatePicker
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={setEndDate}
               disabled={isPending}
             />
           </div>

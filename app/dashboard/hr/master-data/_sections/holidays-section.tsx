@@ -16,6 +16,7 @@ import {
 } from "@/lib/date-ranges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -403,13 +404,11 @@ export function HolidaysSection({
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="holDate" className="text-xs">วันที่ *</Label>
-              <Input
+              <ThaiDatePicker
                 id="holDate"
-                type="date"
                 value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                onChange={(v) => setForm((f) => ({ ...f, date: v }))}
                 disabled={submitting}
-                required
               />
             </div>
             <div className="space-y-1.5">

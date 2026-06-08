@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createTraining } from "@/lib/actions/training-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
@@ -142,21 +143,19 @@ export function AddTrainingForm({ employees, trainingTypes }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="startDate">วันที่เริ่มต้น <span className="text-destructive">*</span></Label>
-          <Input
+          <ThaiDatePicker
             id="startDate"
-            type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={setStartDate}
             disabled={isPending}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="endDate">วันที่สิ้นสุด <span className="text-destructive">*</span></Label>
-          <Input
+          <ThaiDatePicker
             id="endDate"
-            type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={setEndDate}
             disabled={isPending}
           />
         </div>

@@ -11,6 +11,7 @@ import type { LeavePolicy } from "@/lib/actions/settings-actions";
 import { vacationCapLabel } from "@/lib/leave-rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileUpload } from "@/components/file-upload";
@@ -294,21 +295,19 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="startDate">วันที่เริ่มต้น <span className="text-destructive">*</span></Label>
-          <Input
+          <ThaiDatePicker
             id="startDate"
-            type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={setStartDate}
             disabled={isPending}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="endDate">วันที่สิ้นสุด <span className="text-destructive">*</span></Label>
-          <Input
+          <ThaiDatePicker
             id="endDate"
-            type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={setEndDate}
             disabled={isPending}
           />
         </div>
@@ -371,11 +370,10 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
         <div className="space-y-2 p-4 border rounded-lg bg-pink-50/50">
           <p className="text-sm font-medium">ลาคลอด (หญิง) — ≤ 90 วันปฏิทิน</p>
           <Label htmlFor="deliveryDate">วันที่คาดว่าจะคลอด</Label>
-          <Input
+          <ThaiDatePicker
             id="deliveryDate"
-            type="date"
             value={expectedDeliveryDate}
-            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+            onChange={setExpectedDeliveryDate}
             disabled={isPending}
           />
         </div>
@@ -384,11 +382,10 @@ export function PaperLeaveForm({ leaveTypes, employees, policy }: Props) {
         <div className="space-y-2 p-4 border rounded-lg bg-sky-50">
           <p className="text-sm font-medium">ลาดูแลภรรยาคลอด (ชาย) — ≤ 15 วันทำการ</p>
           <Label htmlFor="deliveryDate">วันที่คาดว่าจะคลอด (ถ้าทราบ)</Label>
-          <Input
+          <ThaiDatePicker
             id="deliveryDate"
-            type="date"
             value={expectedDeliveryDate}
-            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+            onChange={setExpectedDeliveryDate}
             disabled={isPending}
           />
         </div>

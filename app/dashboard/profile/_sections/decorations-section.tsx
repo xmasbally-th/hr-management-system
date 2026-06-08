@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -225,10 +226,9 @@ export function DecorationsSection({
             </div>
             <div className="col-span-12 sm:col-span-6 space-y-1">
               <Label className="text-xs">อนุมัติเมื่อ</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={form.approved_date ?? ""}
-                onChange={(e) => setForm({ ...form, approved_date: e.target.value })}
+                onChange={(v) => setForm({ ...form, approved_date: v })}
                 disabled={isPending}
               />
             </div>

@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -193,19 +194,17 @@ export function AdminPositionsSection({
             </div>
             <div className="col-span-12 sm:col-span-6 space-y-1">
               <Label className="text-xs">เริ่มปฏิบัติงาน *</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={form.start_date}
-                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                onChange={(v) => setForm({ ...form, start_date: v })}
                 disabled={isPending}
               />
             </div>
             <div className="col-span-12 sm:col-span-6 space-y-1">
               <Label className="text-xs">สิ้นสุดการปฏิบัติงาน (ว่าง = ปัจจุบัน)</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={form.end_date ?? ""}
-                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                onChange={(v) => setForm({ ...form, end_date: v })}
                 disabled={isPending}
               />
             </div>

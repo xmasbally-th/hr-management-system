@@ -9,6 +9,7 @@ import {
 import { updateProfileAsHr } from "@/lib/actions/hr-profile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -258,10 +259,9 @@ export function IdentitySection({
           </div>
           <div className="col-span-12 sm:col-span-4 space-y-1">
             <Label className="text-xs">วันเดือนปีเกิด</Label>
-            <Input
-              type="date"
+            <ThaiDatePicker
               value={form.birth_date ?? ""}
-              onChange={(e) => set("birth_date", e.target.value)}
+              onChange={(v) => set("birth_date", v)}
               disabled={isPending}
             />
           </div>
@@ -337,10 +337,9 @@ export function IdentitySection({
           </div>
           <div className="col-span-12 sm:col-span-6 space-y-1">
             <Label className="text-xs">วันที่เริ่มทำงาน</Label>
-            <Input
-              type="date"
+            <ThaiDatePicker
               value={form.hire_date ?? ""}
-              onChange={(e) => set("hire_date", e.target.value)}
+              onChange={(v) => set("hire_date", v)}
               disabled={isPending}
             />
           </div>

@@ -10,6 +10,7 @@ import {
 import type { LeavePolicy } from "@/lib/actions/settings-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThaiDatePicker } from "@/components/ui/thai-date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -564,10 +565,9 @@ export function LeaveRequestForm({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">วันกำหนดคลอด (EDD) *</Label>
-                  <Input
-                    type="date"
+                  <ThaiDatePicker
                     value={expectedDeliveryDate}
-                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                    onChange={setExpectedDeliveryDate}
                     disabled={isPending}
                   />
                 </div>
@@ -613,10 +613,9 @@ export function LeaveRequestForm({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">วันกำหนดคลอด (ถ้าทราบ)</Label>
-                  <Input
-                    type="date"
+                  <ThaiDatePicker
                     value={expectedDeliveryDate}
-                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                    onChange={setExpectedDeliveryDate}
                     disabled={isPending}
                   />
                 </div>
@@ -662,22 +661,18 @@ export function LeaveRequestForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>วันที่เริ่ม *</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 disabled={isPending || isFemaleMaternity}
-                required
               />
             </div>
             <div className="space-y-1.5">
               <Label>วันที่สิ้นสุด *</Label>
-              <Input
-                type="date"
+              <ThaiDatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 disabled={isPending || isFemaleMaternity}
-                required
               />
             </div>
           </div>

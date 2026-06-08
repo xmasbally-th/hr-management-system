@@ -19,6 +19,20 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+// Mock ThaiDatePicker as a native <input type="date"> — its public contract is
+// ISO YYYY-MM-DD in/out, so tests drive it like a native date input.
+vi.mock("@/components/ui/thai-date-picker", () => ({
+  ThaiDatePicker: ({ value, onChange, disabled, id }: any) => (
+    <input
+      type="date"
+      id={id}
+      value={value}
+      disabled={disabled}
+      onChange={(e: any) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 beforeEach(() => {
   mockPush.mockClear();
   mockCreateTravelRequest.mockReset();
