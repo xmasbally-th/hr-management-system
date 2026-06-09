@@ -26,6 +26,7 @@ export const metadata = { title: "การลางาน" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
+  awaiting_chair: { label: "รอประธานสาขา", variant: "secondary" },
   awaiting_director: { label: "รอผอ.ลงนาม", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติ", variant: "default" },

@@ -1094,6 +1094,12 @@ interface StageConfig {
    * also allowed.
    */
   signerRole?: "chair" | "director" | "dean";
+  /**
+   * If set, after advancing the stage, notify the designated approver(s) for
+   * this role that a request now awaits their signature (incl. dean acting
+   * delegates). Used by the routing steps.
+   */
+  notifyApproverRole?: "chair" | "director" | "dean";
 }
 
 /**
@@ -1226,6 +1232,23 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
     );
   }
 
+  // Notify the approver(s) who now need to sign (chair/director/dean + acting).
+  if (cfg.notifyApproverRole) {
+    try {
+      const { allowed } = await resolveStageSigners(db, cfg.notifyApproverRole, row.employee_id, actorId);
+      const { data: lt2 } = await db
+        .from("leave_types").select("name").eq("id", row.leave_type_id).single();
+      const ltName = lt2?.name ?? "ลา";
+      await Promise.all(
+        allowed.map((uid) =>
+          createNotificationInternal(db, uid, "leave_status_update", `มีคำขอ${ltName}รอการลงนามของคุณ`),
+        ),
+      );
+    } catch (e) {
+      console.error("[leave-actions] approver notify failed:", e);
+    }
+  }
+
   revalidatePath("/dashboard/leaves");
   revalidatePath(`/dashboard/leaves/${requestId}`);
   revalidatePath("/dashboard/documents");
@@ -1244,6 +1267,7 @@ export async function routeToChair(requestId: string) {
     audit: "route_to_chair",
     notifyType: "leave_status_update",
     notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ประธานสาขาวิชาให้ความเห็น`,
+    notifyApproverRole: "chair",
   });
 }
 
@@ -1284,6 +1308,7 @@ export async function routeToDirector(requestId: string) {
     audit: "route_to_director",
     notifyType: "leave_status_update",
     notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ผู้อำนวยการลงนามแล้ว`,
+    notifyApproverRole: "director",
   });
 }
 
@@ -1308,6 +1333,7 @@ export async function routeToDean(requestId: string) {
     audit: "route_to_dean",
     notifyType: "leave_status_update",
     notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้คณบดีลงนามแล้ว`,
+    notifyApproverRole: "dean",
   });
 }
 

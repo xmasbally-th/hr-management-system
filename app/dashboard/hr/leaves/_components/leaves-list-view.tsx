@@ -12,6 +12,7 @@ import type { LeaveRequestRow } from "../leaves-dashboard-client";
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รออนุมัติ", variant: "secondary" },
+  awaiting_chair: { label: "รอประธานสาขา", variant: "secondary" },
   awaiting_director: { label: "รอผอ.ลงนาม", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติแล้ว", variant: "default" },
