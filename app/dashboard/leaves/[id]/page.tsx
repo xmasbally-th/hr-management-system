@@ -183,9 +183,11 @@ export default async function LeaveDetailPage({ params }: PageProps) {
               </ol>
             </div>
             {vacationDetails.branch_head_opinion && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">ความเห็นหัวหน้าสาขา</p>
-                <p className="whitespace-pre-wrap">{vacationDetails.branch_head_opinion}</p>
+              <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                  ความเห็นประธานสาขาวิชา
+                </p>
+                <p className="whitespace-pre-wrap text-sm">{vacationDetails.branch_head_opinion}</p>
               </div>
             )}
           </div>
