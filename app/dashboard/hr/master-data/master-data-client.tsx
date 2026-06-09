@@ -26,12 +26,16 @@ import { LeaveSettingsSection } from "./_sections/leave-settings-section";
 import { HolidaysSection } from "./_sections/holidays-section";
 import { ExamPeriodsSection } from "./_sections/exam-periods-section";
 import { DocumentTemplatesSection } from "./_sections/document-templates-section";
+import { ApproversSection } from "./_sections/approvers-section";
+import type { ApproverAssignment, ActingDelegation } from "@/lib/actions/approver-actions";
+import { UserCheck } from "lucide-react";
 
 type TabKey =
   | "departments"
   | "positions"
   | "leave-types"
   | "leave-settings"
+  | "approvers"
   | "holidays"
   | "exam-periods"
   | "employee-types"
@@ -98,6 +102,9 @@ interface Props {
   documentTemplates: LeaveTemplate[];
   canManageTemplates: boolean;
   leavePolicy: LeavePolicy;
+  approverData: { approvers: ApproverAssignment[]; delegations: ActingDelegation[] } | null;
+  employees: { id: string; full_name: string; email: string }[];
+  canManageApprovers: boolean;
 }
 
 export function MasterDataClient({
@@ -116,6 +123,9 @@ export function MasterDataClient({
   documentTemplates,
   canManageTemplates,
   leavePolicy,
+  approverData,
+  employees,
+  canManageApprovers,
 }: Props) {
   const [active, setActive] = useState<TabKey>("departments");
 
@@ -129,6 +139,9 @@ export function MasterDataClient({
     { key: "positions", label: "ตำแหน่ง", count: positions.length, icon: Briefcase },
     { key: "leave-types", label: "ประเภทการลา", count: leaveTypes.length, icon: CalendarDays },
     { key: "leave-settings", label: "ตั้งค่าการลา", count: null, icon: Settings2 },
+    ...(canManageApprovers
+      ? [{ key: "approvers" as const, label: "ผู้อนุมัติการลา", count: null, icon: UserCheck }]
+      : []),
     { key: "holidays", label: "วันหยุดราชการ", count: holidays.length, icon: CalendarCheck2 },
     { key: "exam-periods", label: "ช่วงสอบปลายภาค", count: examPeriods.length, icon: CalendarClock },
     { key: "employee-types", label: "ประเภทบุคลากร", count: employeeTypes.length, icon: IdCard },
@@ -182,6 +195,14 @@ export function MasterDataClient({
         {active === "leave-types" && <LeaveTypesSection rows={leaveTypes} />}
         {active === "leave-settings" && (
           <LeaveSettingsSection enabled={leaveOnlineEnabled} policy={leavePolicy} />
+        )}
+        {active === "approvers" && approverData && (
+          <ApproversSection
+            approvers={approverData.approvers}
+            delegations={approverData.delegations}
+            employees={employees}
+            departments={departments}
+          />
         )}
         {active === "holidays" && (
           <HolidaysSection

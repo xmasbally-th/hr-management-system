@@ -6,6 +6,8 @@ import {
   getDecorationCatalog,
 } from "@/lib/actions/master-data-actions";
 import { getLeaveTypeSettings, getLeaveOnlineEnabled, getLeavePolicy } from "@/lib/actions/settings-actions";
+import { getApproverSettings } from "@/lib/actions/approver-actions";
+import { getEmployeesForSelection } from "@/lib/actions/leave-actions";
 import { getHolidays } from "@/lib/actions/holiday-actions";
 import { getExamPeriods } from "@/lib/actions/exam-period-actions";
 import { getExamDutyPositions } from "@/lib/actions/settings-actions";
@@ -35,6 +37,8 @@ export default async function MasterDataPage() {
     documentTemplates,
     profile,
     leavePolicy,
+    approverData,
+    employees,
   ] = await Promise.all([
     getDepartments(),
     getPositions(),
@@ -49,6 +53,9 @@ export default async function MasterDataPage() {
     getLeaveTemplates(),
     getMyProfile(),
     getLeavePolicy(),
+    // Admin-only — HR gets null and the tab is hidden.
+    getApproverSettings().catch(() => null),
+    getEmployeesForSelection().catch(() => []),
   ]);
 
   return (
@@ -77,6 +84,9 @@ export default async function MasterDataPage() {
         documentTemplates={documentTemplates}
         canManageTemplates={profile.role === "admin"}
         leavePolicy={leavePolicy}
+        approverData={approverData}
+        employees={employees ?? []}
+        canManageApprovers={profile.role === "admin"}
       />
     </div>
   );
