@@ -565,7 +565,7 @@ export async function getLeaveRequestById(requestId: string) {
     .select(`
       *,
       leave_type:leave_types(id, name, max_days_per_year),
-      employee:profiles!leave_requests_employee_id_fkey(id, full_name, email, position_title, department_id),
+      employee:profiles!leave_requests_employee_id_fkey(id, full_name, email, position_title, department_id, employee_type),
       approver:profiles!leave_requests_approver_id_fkey(id, full_name, email),
       vacation_details:leave_vacation_details(
         accumulated_days, annual_days, branch_head_opinion,
@@ -1184,12 +1184,17 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
   }
   const actorId = user.id;
 
+  // Mutations run with the admin client: a designated approver (e.g. a
+  // manager who is the director) passes the app-level authorization above
+  // but has no RLS write access to leave_requests / document_tracking.
+  const db = getAdminClient();
+
   let row: { employee_id: string; leave_type_id: string } = {
     employee_id: cur.employee_id,
     leave_type_id: cur.leave_type_id,
   };
   if (cfg.to) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("leave_requests")
       .update({ status: cfg.to })
       .eq("id", requestId)
@@ -1204,20 +1209,20 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
     const now = new Date().toISOString();
     const tpatch: Record<string, unknown> = { ...(cfg.trackingExtra ?? {}) };
     for (const c of cfg.trackingDates ?? []) tpatch[c] = now;
-    const { error: terr } = await supabase
+    const { error: terr } = await db
       .from("document_tracking")
       .update(tpatch as Database["public"]["Tables"]["document_tracking"]["Update"])
       .eq("reference_id", requestId);
     if (terr) console.error("[leave-actions] tracking update failed:", terr.message);
   }
 
-  await logAudit(supabase, actorId, cfg.audit, "leave_request", requestId);
+  await logAudit(db, actorId, cfg.audit, "leave_request", requestId);
 
   if (cfg.notifyType && cfg.notifyMsg) {
-    const { data: lt } = await supabase
+    const { data: lt } = await db
       .from("leave_types").select("name").eq("id", row.leave_type_id).single();
     await createNotificationInternal(
-      supabase, row.employee_id, cfg.notifyType, cfg.notifyMsg(lt?.name ?? "ลา"),
+      db, row.employee_id, cfg.notifyType, cfg.notifyMsg(lt?.name ?? "ลา"),
     );
   }
 
@@ -1373,12 +1378,12 @@ export async function completeLeaveAtFaculty(requestId: string) {
 /** Reject at any stage (HR validation / ผอ. / คณบดี). Releases reserved balance. */
 export async function rejectLeaveAtStage(
   requestId: string,
-  level: "hr" | "director" | "dean" | "president",
+  level: "hr" | "chair" | "director" | "dean" | "president",
   reason: string,
 ) {
   if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
   const sanitizedReason = validateTextField(reason, "เหตุผล", 500);
-  if (!["hr", "director", "dean", "president"].includes(level)) {
+  if (!["hr", "chair", "director", "dean", "president"].includes(level)) {
     throw new Error("ระดับการปฏิเสธไม่ถูกต้อง");
   }
 
@@ -1393,7 +1398,7 @@ export async function rejectLeaveAtStage(
       ...(sanitizedReason ? { reason: sanitizedReason } : {}),
     })
     .eq("id", requestId)
-    .in("status", ["pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"])
+    .in("status", ["pending", "awaiting_chair", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"])
     .select("employee_id, leave_type_id, working_days, total_days")
     .single();
 

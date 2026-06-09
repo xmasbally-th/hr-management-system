@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  routeToChair,
+  markChairSigned,
   routeToDirector,
   markDirectorSigned,
   routeToDean,
@@ -26,16 +28,28 @@ interface Tracking {
   sent_to_president_date: string | null;
   president_signed_date: string | null;
   scanned_upload_date: string | null;
+  chair_signed_date?: string | null;
 }
 
 interface Props {
   requestId: string;
   status: string;
   tracking: Tracking | null;
+  /** HR/Admin can drive every step (routing + signing). */
+  isHrAdmin: boolean;
+  /** Viewer is the designated chair/director/dean for this request and may
+   *  perform their own signature step. */
+  canChair: boolean;
+  canDirector: boolean;
+  canDean: boolean;
+  /** This leave routes through ประธานสาขา (ลาพักผ่อน + สายวิชาการ). */
+  needsChair: boolean;
+  existingOpinion: string | null;
 }
 
 const STAGE: Record<string, { label: string; step: number }> = {
   pending: { label: "รอตรวจสอบ / เริ่มเดินเอกสาร", step: 0 },
+  awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", step: 0 },
   awaiting_director: { label: "รอผู้อำนวยการลงนาม", step: 1 },
   awaiting_dean: { label: "รอคณบดีลงนาม", step: 2 },
   approved: { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 3 },
@@ -45,17 +59,29 @@ const STAGE: Record<string, { label: string; step: number }> = {
   cancelled: { label: "ยกเลิก", step: -1 },
 };
 
-type RejectLevel = "hr" | "director" | "dean" | "president";
+type RejectLevel = "hr" | "chair" | "director" | "dean" | "president";
 
-export function LeaveWorkflowPanel({ requestId, status, tracking }: Props) {
+export function LeaveWorkflowPanel({
+  requestId,
+  status,
+  tracking,
+  isHrAdmin,
+  canChair,
+  canDirector,
+  canDean,
+  needsChair,
+  existingOpinion,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [rejectLevel, setRejectLevel] = useState<RejectLevel | null>(null);
   const [showScanUpload, setShowScanUpload] = useState(false);
   const [showReceiveUpload, setShowReceiveUpload] = useState(false);
+  const [opinion, setOpinion] = useState(existingOpinion ?? "");
 
   const stage = STAGE[status] ?? { label: status, step: 0 };
   const directorSigned = !!tracking?.director_signed_date;
+  const chairSigned = !!tracking?.chair_signed_date;
 
   function run(fn: () => Promise<unknown>, okMsg: string) {
     startTransition(async () => {
@@ -90,46 +116,91 @@ export function LeaveWorkflowPanel({ requestId, status, tracking }: Props) {
       <StageHeader stage={stage} />
 
       <div className="flex flex-wrap gap-2">
-        {status === "pending" && (
+        {status === "pending" && isHrAdmin && (
           <>
-            <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
-              <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
-            </Button>
+            {needsChair ? (
+              <Button onClick={() => run(() => routeToChair(requestId), "ส่งให้ประธานสาขาแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ประธานสาขาวิชา
+              </Button>
+            ) : (
+              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
+              </Button>
+            )}
             <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("hr")} disabled={isPending}>
               <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (HR)
             </Button>
           </>
         )}
 
-        {status === "awaiting_director" && (
+        {status === "awaiting_chair" && (
           <>
-            {!directorSigned ? (
-              <Button onClick={() => run(() => markDirectorSigned(requestId), "บันทึกผู้อำนวยการลงนามแล้ว")} disabled={isPending}>
-                <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนามแล้ว
-              </Button>
-            ) : (
-              <Button onClick={() => run(() => routeToDean(requestId), "ส่งให้คณบดีแล้ว")} disabled={isPending}>
-                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้คณบดีลงนาม
+            {(canChair || isHrAdmin) && !chairSigned && (
+              <div className="w-full space-y-2">
+                <label className="text-xs text-muted-foreground">ความเห็นประธานสาขาวิชา (ถ้ามี)</label>
+                <textarea
+                  value={opinion}
+                  onChange={(e) => setOpinion(e.target.value)}
+                  disabled={isPending}
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="เช่น เห็นควรอนุมัติ · ผู้ปฏิบัติงานแทนเหมาะสม"
+                />
+                <Button onClick={() => run(() => markChairSigned(requestId, opinion), "ประธานสาขาลงนามแล้ว")} disabled={isPending}>
+                  <PenLine className="h-4 w-4 mr-2" /> บันทึก: ประธานสาขาลงนาม
+                </Button>
+              </div>
+            )}
+            {isHrAdmin && chairSigned && (
+              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
               </Button>
             )}
-            <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
-              <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
-            </Button>
+            {isHrAdmin && (
+              <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("chair")} disabled={isPending}>
+                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ประธานสาขา)
+              </Button>
+            )}
+          </>
+        )}
+
+        {status === "awaiting_director" && (
+          <>
+            {!directorSigned
+              ? (canDirector || isHrAdmin) && (
+                  <Button onClick={() => run(() => markDirectorSigned(requestId), "บันทึกผู้อำนวยการลงนามแล้ว")} disabled={isPending}>
+                    <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนามแล้ว
+                  </Button>
+                )
+              : isHrAdmin && (
+                  <Button onClick={() => run(() => routeToDean(requestId), "ส่งให้คณบดีแล้ว")} disabled={isPending}>
+                    <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้คณบดีลงนาม
+                  </Button>
+                )}
+            {isHrAdmin && (
+              <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
+                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
+              </Button>
+            )}
           </>
         )}
 
         {status === "awaiting_dean" && (
           <>
-            <Button onClick={() => run(() => markDeanSigned(requestId), "คณบดีลงนาม — อนุมัติแล้ว")} disabled={isPending}>
-              <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: คณบดีลงนาม (อนุมัติ)
-            </Button>
-            <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("dean")} disabled={isPending}>
-              <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (คณบดี)
-            </Button>
+            {(canDean || isHrAdmin) && (
+              <Button onClick={() => run(() => markDeanSigned(requestId), "คณบดีลงนาม — อนุมัติแล้ว")} disabled={isPending}>
+                <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: คณบดีลงนาม (อนุมัติ)
+              </Button>
+            )}
+            {isHrAdmin && (
+              <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("dean")} disabled={isPending}>
+                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (คณบดี)
+              </Button>
+            )}
           </>
         )}
 
-        {status === "approved" && (
+        {status === "approved" && isHrAdmin && (
           <>
             <Button variant="outline" onClick={() => setShowScanUpload((v) => !v)} disabled={isPending}>
               <ScanLine className="h-4 w-4 mr-2" /> สแกน+อัปโหลดเอกสาร (คณะ)
@@ -143,7 +214,7 @@ export function LeaveWorkflowPanel({ requestId, status, tracking }: Props) {
           </>
         )}
 
-        {status === "awaiting_university" && (
+        {status === "awaiting_university" && isHrAdmin && (
           <>
             <Button variant="outline" onClick={() => setShowReceiveUpload((v) => !v)} disabled={isPending}>
               <ScanLine className="h-4 w-4 mr-2" /> รับเอกสารคืน + อัปโหลด (เสร็จสิ้น)

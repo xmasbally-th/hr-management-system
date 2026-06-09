@@ -220,7 +220,6 @@ export function LeaveRequestForm({
   const [substitute1Id, setSubstitute1Id] = useState("");
   const [substitute2Id, setSubstitute2Id] = useState("");
   const [substitute3Id, setSubstitute3Id] = useState("");
-  const [branchHeadOpinion, setBranchHeadOpinion] = useState("");
 
   // Maternity (female): auto-fill date range from EDD (start = EDD - 30, end = +89 → 90 days total)
   // Maternity (male): manual date selection — no auto-fill
@@ -385,7 +384,7 @@ export function LeaveRequestForm({
         substitute_1_id: substitute1Id || null,
         substitute_2_id: substitute2Id || null,
         substitute_3_id: substitute3Id || null,
-        branch_head_opinion: branchHeadOpinion || null,
+        branch_head_opinion: null,
       };
     }
 
@@ -547,7 +546,7 @@ export function LeaveRequestForm({
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <div>
             {kind === "vacation" &&
-              "ลาพักผ่อน — เลือกผู้ปฏิบัติแทนคนที่ 1 บังคับ (สูงสุด 3 คน) และระบุความเห็นหัวหน้าสาขา (ถ้ามี)"}
+              "ลาพักผ่อน — เลือกผู้ปฏิบัติแทนคนที่ 1 บังคับ (สูงสุด 3 คน)"}
             {kind === "sick" &&
               `ลาป่วย — ลาเกิน ${certThreshold} วันทำการ ต้องแนบใบรับรองแพทย์ · สูงสุด 30 วันทำการ/ปีงบประมาณ`}
             {kind === "personal" &&
@@ -928,14 +927,9 @@ export function LeaveRequestForm({
                 </div>
               ))}
 
-              <div className="space-y-1.5">
-                <Label>ความเห็นหัวหน้าสาขา (ถ้ามี)</Label>
-                <Input
-                  value={branchHeadOpinion}
-                  onChange={(e) => setBranchHeadOpinion(e.target.value)}
-                  disabled={isPending}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                ความเห็นหัวหน้าสาขา/ประธานสาขาวิชาจะถูกบันทึกในขั้นตอนการเดินเอกสาร (ไม่ต้องกรอกที่นี่)
+              </p>
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLeaveRequestById } from "@/lib/actions/leave-actions";
+import { getChairUserId, getSingletonApproverUserId, getEffectiveDeanSignerIds } from "@/lib/actions/approver-actions";
 import { getDocumentsByReference } from "@/lib/actions/document-actions";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ export const metadata = { title: "รายละเอียดคำขอล�
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
+  awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", variant: "secondary" },
   awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติ (คณบดีลงนาม)", variant: "default" },
@@ -50,6 +52,25 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   const isOwner = leave.employee_id === user!.id;
   const isHrAdmin = !!profile && ["hr", "admin"].includes(profile.role);
   const status = statusMap[leave.status] ?? { label: leave.status, variant: "outline" as const };
+
+  // ── Designated-approver resolution (so ผอ./คณบดี/ประธานสาขา can act on
+  //    their own stage, not only HR) ──
+  const emp = leave.employee as { department_id?: string | null; employee_type?: string | null } | null;
+  const isAcademic = !!emp?.employee_type?.includes("สายวิชาการ");
+  const leaveTypeNameForChair = (leave.leave_type as { name?: string } | null)?.name ?? "";
+  const isVacationLeave = /พักผ่อน|vacation/i.test(leaveTypeNameForChair);
+  const needsChair = isVacationLeave && isAcademic;
+
+  const viewerId = user!.id;
+  const [chairId, directorId, deanSigners] = await Promise.all([
+    needsChair ? getChairUserId(emp?.department_id ?? null) : Promise.resolve(null),
+    getSingletonApproverUserId("director"),
+    getEffectiveDeanSignerIds(new Date().toISOString().slice(0, 10)),
+  ]);
+  const canChair = needsChair && chairId === viewerId;
+  const canDirector = directorId === viewerId;
+  const canDean = deanSigners.includes(viewerId);
+  const canActOnWorkflow = isHrAdmin || canChair || canDirector || canDean;
 
   // Document-tracking row (timeline shown to ALL viewers — owner/manager/HR)
   let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
@@ -179,11 +200,17 @@ export default async function LeaveDetailPage({ params }: PageProps) {
       </div>
 
       {/* HR/Admin signature workflow panel (ผอ. → คณบดี → อธิการบดี) */}
-      {isHrAdmin && (
+      {canActOnWorkflow && (
         <LeaveWorkflowPanel
           requestId={leave.id}
           status={leave.status}
           tracking={tracking}
+          isHrAdmin={isHrAdmin}
+          canChair={canChair}
+          canDirector={canDirector}
+          canDean={canDean}
+          needsChair={needsChair}
+          existingOpinion={vacationDetails?.branch_head_opinion ?? null}
         />
       )}
 
