@@ -63,6 +63,8 @@ import {
   getAllLeaveRequests,
   getLeaveTypes,
   getEmployeesForSelection,
+  markDirectorSigned,
+  markDeanSigned,
   type CreateLeaveRequestInput,
 } from "../leave-actions";
 
@@ -583,5 +585,84 @@ describe("getEmployeesForSelection", () => {
     vi.mocked(createClient).mockResolvedValue(sb as never);
 
     await expect(getEmployeesForSelection()).rejects.toThrow("ไม่สามารถดึงรายชื่อพนักงานได้");
+  });
+});
+
+/* ── workflow stage authorization (runLeaveStage) ─────────────────────── */
+
+describe("workflow stage authorization", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mockStage(opts: {
+    actorId: string;
+    role: string;
+    status: string;
+    approverUserId?: string; // workflow_approvers.user_id for the stage
+    actingDelegates?: string[]; // acting_delegations delegate ids
+    employeeDeptId?: string | null;
+  }) {
+    const sb = createMockSupabase({
+      authUser: { id: opts.actorId },
+      fromOverrides: {
+        profiles: createMockChain({
+          data: { role: opts.role, department_id: opts.employeeDeptId ?? null },
+        }),
+        leave_requests: createMockChain({
+          data: { employee_id: "emp-1", leave_type_id: VALID_UUID, status: opts.status },
+        }),
+        workflow_approvers: createMockChain({
+          data: opts.approverUserId ? { user_id: opts.approverUserId } : null,
+        }),
+        acting_delegations: createMockChain({
+          data: (opts.actingDelegates ?? []).map((id) => ({ delegate_user_id: id })),
+        }),
+      },
+    });
+    vi.mocked(createClient).mockResolvedValue(sb as never);
+    return sb;
+  }
+
+  // director stage — markDirectorSigned has no status change, so the mutation
+  // path is a clean no-op under the admin mock (isolates the authz check).
+
+  it("HR may sign the director stage", async () => {
+    mockStage({ actorId: "hr-1", role: "hr", status: "awaiting_director" });
+    await expect(markDirectorSigned(REQUEST_ID)).resolves.toBeUndefined();
+  });
+
+  it("the designated director (a non-HR manager) may sign their own stage", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_director", approverUserId: "mgr-1" });
+    await expect(markDirectorSigned(REQUEST_ID)).resolves.toBeUndefined();
+  });
+
+  it("a non-HR user who is not the designated approver is forbidden", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_director", approverUserId: "someone-else" });
+    await expect(markDirectorSigned(REQUEST_ID)).rejects.toThrow(/Forbidden/);
+  });
+
+  it("a non-HR user with no approver assigned for the role is forbidden", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_director" });
+    await expect(markDirectorSigned(REQUEST_ID)).rejects.toThrow(/Forbidden/);
+  });
+
+  it("rejects when the request is not at the expected stage", async () => {
+    mockStage({ actorId: "hr-1", role: "hr", status: "pending" });
+    await expect(markDirectorSigned(REQUEST_ID)).rejects.toThrow(/สถานะไม่ถูกต้อง/);
+  });
+
+  // dean stage — รักษาราชการแทน (acting delegation)
+
+  it("an active acting-delegate passes dean authorization (reaches the mutation)", async () => {
+    // dean is dean-x; mgr-1 is an active delegate → authz passes, then the
+    // status mutation (admin mock no-op) fails — proving authz succeeded.
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_dean", approverUserId: "dean-x", actingDelegates: ["mgr-1"] });
+    await expect(markDeanSigned(REQUEST_ID)).rejects.toThrow(/ไม่สามารถดำเนินการได้/);
+  });
+
+  it("a non-delegate non-dean is forbidden at the dean stage", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_dean", approverUserId: "dean-x", actingDelegates: [] });
+    await expect(markDeanSigned(REQUEST_ID)).rejects.toThrow(/Forbidden/);
   });
 });
