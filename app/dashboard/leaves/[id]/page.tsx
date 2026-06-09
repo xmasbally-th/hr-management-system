@@ -72,6 +72,19 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   const canDean = deanSigners.includes(viewerId);
   const canActOnWorkflow = isHrAdmin || canChair || canDirector || canDean;
 
+  // Roles in this leave's signing path that have nobody assigned — surfaced
+  // so HR knows the request would otherwise stall at that step.
+  const roleLabel: Record<string, string> = {
+    chair: "ประธานสาขาวิชา", director: "ผู้อำนวยการ", dean: "คณบดี",
+  };
+  const pathRoles = needsChair ? ["chair", "director", "dean"] : ["director", "dean"];
+  const assigned: Record<string, boolean> = {
+    chair: needsChair ? !!chairId : true,
+    director: !!directorId,
+    dean: deanSigners.length > 0,
+  };
+  const unassignedApprovers = pathRoles.filter((r) => !assigned[r]).map((r) => roleLabel[r]);
+
   // Document-tracking row (timeline shown to ALL viewers — owner/manager/HR)
   let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
   let cancellation: { id: string; status: string; reason: string } | null = null;
@@ -213,6 +226,7 @@ export default async function LeaveDetailPage({ params }: PageProps) {
           canDean={canDean}
           needsChair={needsChair}
           existingOpinion={vacationDetails?.branch_head_opinion ?? null}
+          unassignedApprovers={unassignedApprovers}
         />
       )}
 

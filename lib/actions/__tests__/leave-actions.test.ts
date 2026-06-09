@@ -65,6 +65,7 @@ import {
   getEmployeesForSelection,
   markDirectorSigned,
   markDeanSigned,
+  rejectLeaveAtStage,
   type CreateLeaveRequestInput,
 } from "../leave-actions";
 
@@ -664,5 +665,27 @@ describe("workflow stage authorization", () => {
   it("a non-delegate non-dean is forbidden at the dean stage", async () => {
     mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_dean", approverUserId: "dean-x", actingDelegates: [] });
     await expect(markDeanSigned(REQUEST_ID)).rejects.toThrow(/Forbidden/);
+  });
+
+  // reject at stage — designated approver may reject their own stage
+
+  it("the designated director may reject at their stage (reaches the mutation)", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_director", approverUserId: "mgr-1" });
+    await expect(rejectLeaveAtStage(REQUEST_ID, "director", "ไม่เหมาะสม")).rejects.toThrow(/ไม่สามารถปฏิเสธ/);
+  });
+
+  it("a non-approver may not reject a stage", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_director", approverUserId: "someone-else" });
+    await expect(rejectLeaveAtStage(REQUEST_ID, "director", "x")).rejects.toThrow(/Forbidden/);
+  });
+
+  it("an approver may not reject a stage the request is not at", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "awaiting_dean", approverUserId: "mgr-1" });
+    await expect(rejectLeaveAtStage(REQUEST_ID, "director", "x")).rejects.toThrow(/สถานะไม่ถูกต้อง/);
+  });
+
+  it("a non-HR user may not reject at the HR level", async () => {
+    mockStage({ actorId: "mgr-1", role: "manager", status: "pending" });
+    await expect(rejectLeaveAtStage(REQUEST_ID, "hr", "x")).rejects.toThrow(/Forbidden/);
   });
 });

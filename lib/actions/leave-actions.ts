@@ -1414,9 +1414,40 @@ export async function rejectLeaveAtStage(
   }
 
   const supabase = await createClient();
-  const actorId = await requireHrAdmin(supabase);
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  const isHrAdmin = !!profile && (profile.role === "hr" || profile.role === "admin");
 
-  const { data: updated, error } = await supabase
+  // Authorize: HR/Admin may reject at any level. A designated approver may
+  // reject their own stage (chair/director/dean) when the request sits there.
+  const { data: cur, error: curErr } = await supabase
+    .from("leave_requests").select("employee_id, status").eq("id", requestId).single();
+  if (curErr || !cur) throw new Error("ไม่พบคำขอลา");
+
+  if (!isHrAdmin) {
+    const STAGE_FOR_LEVEL: Record<string, string> = {
+      chair: "awaiting_chair", director: "awaiting_director", dean: "awaiting_dean",
+    };
+    const reqStage = STAGE_FOR_LEVEL[level];
+    if (!reqStage) throw new Error("Forbidden: HR/Admin only");
+    if (cur.status !== reqStage) {
+      throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง กรุณารีเฟรช)");
+    }
+    const { allowed } = await resolveStageSigners(
+      supabase, level as "chair" | "director" | "dean", cur.employee_id, user.id,
+    );
+    if (!allowed.includes(user.id)) {
+      throw new Error("Forbidden: คุณไม่มีสิทธิ์ปฏิเสธขั้นตอนนี้");
+    }
+  }
+  const actorId = user.id;
+
+  // Writes via admin client — a non-HR approver passes the app-level check
+  // above but has no RLS write access (same as runLeaveStage).
+  const db = getAdminClient();
+
+  const { data: updated, error } = await db
     .from("leave_requests")
     .update({
       status: "rejected" as const,
@@ -1434,7 +1465,7 @@ export async function rejectLeaveAtStage(
 
   // Release the balance reserved at submission (W0)
   await releaseLeaveBalance(
-    getAdminClient(),
+    db,
     updated.employee_id,
     updated.leave_type_id,
     updated.working_days ?? updated.total_days,
@@ -1442,7 +1473,7 @@ export async function rejectLeaveAtStage(
   );
 
   // Record the rejection on the document tracking row
-  await supabase
+  await db
     .from("document_tracking")
     .update({
       rejected_at: new Date().toISOString(),
@@ -1452,11 +1483,12 @@ export async function rejectLeaveAtStage(
     })
     .eq("reference_id", requestId);
 
-  const { data: lt } = await supabase
+  const { data: lt } = await db
     .from("leave_types").select("name").eq("id", updated.leave_type_id).single();
   const ltName = lt?.name ?? "ลา";
   const levelLabel =
-    level === "director" ? "ผู้อำนวยการ"
+    level === "chair" ? "ประธานสาขาวิชา"
+    : level === "director" ? "ผู้อำนวยการ"
     : level === "dean" ? "คณบดี"
     : level === "president" ? "อธิการบดี"
     : "HR";
@@ -1464,11 +1496,11 @@ export async function rejectLeaveAtStage(
     ? `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel}) เหตุผล: ${sanitizedReason}`
     : `คำขอ${ltName}ของคุณไม่ผ่านการพิจารณา (${levelLabel})`;
 
-  await logAudit(supabase, actorId, "reject_leave_at_stage", "leave_request", requestId, {
+  await logAudit(db, actorId, "reject_leave_at_stage", "leave_request", requestId, {
     level,
     reason: sanitizedReason,
   });
-  await createNotificationInternal(supabase, updated.employee_id, "leave_rejected", msg);
+  await createNotificationInternal(db, updated.employee_id, "leave_rejected", msg);
 
   revalidatePath("/dashboard/leaves");
   revalidatePath(`/dashboard/leaves/${requestId}`);

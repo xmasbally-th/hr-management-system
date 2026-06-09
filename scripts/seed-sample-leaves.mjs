@@ -62,7 +62,7 @@ async function main() {
   for (const s of samples) {
     const ltId = byCode[s.code];
     if (!ltId) { console.warn(`skip ${s.code}: leave_type not found`); continue; }
-    const { error } = await supabase.from("leave_requests").insert({
+    const { data: inserted, error } = await supabase.from("leave_requests").insert({
       employee_id: emp.id,
       leave_type_id: ltId,
       start_date: s.start,
@@ -73,9 +73,17 @@ async function main() {
       contact_number: s.contact,
       submission_channel: "digital",
       status: s.status,
-    });
-    if (error) console.error(`insert ${s.code} FAILED:`, error.message);
-    else console.log(`• inserted ${s.code} (${s.status}) ${s.start}→${s.end} ${s.days}d`);
+    }).select("id").single();
+    if (error) { console.error(`insert ${s.code} FAILED:`, error.message); continue; }
+
+    // Document-tracking row so the request can be driven through the
+    // signature workflow (createLeaveRequest makes this for real submissions).
+    const { error: dtErr } = await supabase
+      .from("document_tracking")
+      .insert({ reference_id: inserted.id, document_type: "leave" });
+    if (dtErr) console.warn(`  tracking insert ${s.code}:`, dtErr.message);
+
+    console.log(`• inserted ${s.code} (${s.status}) ${s.start}→${s.end} ${s.days}d`);
   }
 
   // 3. recompute used_days / remaining_days for affected types

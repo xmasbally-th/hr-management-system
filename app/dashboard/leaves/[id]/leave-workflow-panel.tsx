@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/file-upload";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Loader2, ArrowRight, PenLine, ScanLine, Building2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, ArrowRight, PenLine, ScanLine, Building2, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Tracking {
@@ -45,6 +45,8 @@ interface Props {
   /** This leave routes through ประธานสาขา (ลาพักผ่อน + สายวิชาการ). */
   needsChair: boolean;
   existingOpinion: string | null;
+  /** Approver roles in this leave's path that have nobody assigned yet. */
+  unassignedApprovers: string[];
 }
 
 const STAGE: Record<string, { label: string; step: number }> = {
@@ -71,6 +73,7 @@ export function LeaveWorkflowPanel({
   canDean,
   needsChair,
   existingOpinion,
+  unassignedApprovers,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -115,6 +118,18 @@ export function LeaveWorkflowPanel({
     <div className="border rounded-lg p-4 bg-card space-y-4">
       <StageHeader stage={stage} />
 
+      {isHrAdmin &&
+        unassignedApprovers.length > 0 &&
+        ["pending", "awaiting_chair", "awaiting_director", "awaiting_dean"].includes(status) && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              ยังไม่ได้กำหนดผู้ลงนามระดับ <b>{unassignedApprovers.join(" · ")}</b> —
+              คำขอจะค้างที่ขั้นนั้นจนกว่าจะกำหนด (ที่ &quot;ข้อมูลหลัก → ผู้อนุมัติการลา&quot;) หรือ HR ลงนามแทน
+            </span>
+          </div>
+        )}
+
       <div className="flex flex-wrap gap-2">
         {status === "pending" && isHrAdmin && (
           <>
@@ -156,7 +171,7 @@ export function LeaveWorkflowPanel({
                 <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
               </Button>
             )}
-            {isHrAdmin && (
+            {(canChair || isHrAdmin) && (
               <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("chair")} disabled={isPending}>
                 <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ประธานสาขา)
               </Button>
@@ -177,7 +192,7 @@ export function LeaveWorkflowPanel({
                     <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้คณบดีลงนาม
                   </Button>
                 )}
-            {isHrAdmin && (
+            {(canDirector || isHrAdmin) && (
               <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
                 <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
               </Button>
@@ -192,7 +207,7 @@ export function LeaveWorkflowPanel({
                 <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: คณบดีลงนาม (อนุมัติ)
               </Button>
             )}
-            {isHrAdmin && (
+            {(canDean || isHrAdmin) && (
               <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("dean")} disabled={isPending}>
                 <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (คณบดี)
               </Button>
