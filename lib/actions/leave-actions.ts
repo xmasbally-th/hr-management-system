@@ -1087,6 +1087,66 @@ interface StageConfig {
   audit: string;
   notifyType?: string;
   notifyMsg?: (ltName: string) => string;
+  /**
+   * If set, this is a *signature* step that the designated approver for the
+   * role may perform (in addition to HR/Admin). Unset = routing/admin step,
+   * HR/Admin only. For "dean", an active acting-delegate (รักษาราชการแทน) is
+   * also allowed.
+   */
+  signerRole?: "chair" | "director" | "dean";
+}
+
+/**
+ * Resolve which user ids may sign a given stage for a given request, plus
+ * whether the acting user is doing so via รักษาราชการแทน (dean only).
+ */
+async function resolveStageSigners(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  role: "chair" | "director" | "dean",
+  employeeId: string,
+  userId: string,
+): Promise<{ allowed: string[]; viaActing: boolean }> {
+  if (role === "chair") {
+    const { data: emp } = await supabase
+      .from("profiles").select("department_id").eq("id", employeeId).single();
+    if (!emp?.department_id) return { allowed: [], viaActing: false };
+    const { data } = await supabase
+      .from("workflow_approvers")
+      .select("user_id")
+      .eq("approver_role", "chair")
+      .eq("department_id", emp.department_id)
+      .maybeSingle();
+    return { allowed: data?.user_id ? [data.user_id] : [], viaActing: false };
+  }
+  if (role === "director") {
+    const { data } = await supabase
+      .from("workflow_approvers")
+      .select("user_id")
+      .eq("approver_role", "director")
+      .is("department_id", null)
+      .maybeSingle();
+    return { allowed: data?.user_id ? [data.user_id] : [], viaActing: false };
+  }
+  // dean — include any active acting-delegate (รักษาราชการแทน)
+  const today = new Date().toISOString().slice(0, 10);
+  const ids = new Set<string>();
+  const { data: deanRow } = await supabase
+    .from("workflow_approvers")
+    .select("user_id")
+    .eq("approver_role", "dean")
+    .is("department_id", null)
+    .maybeSingle();
+  const deanId = deanRow?.user_id ?? null;
+  if (deanId) ids.add(deanId);
+  const { data: acts } = await supabase
+    .from("acting_delegations")
+    .select("delegate_user_id")
+    .eq("approver_role", "dean")
+    .lte("start_date", today)
+    .gte("end_date", today);
+  for (const a of acts ?? []) ids.add(a.delegate_user_id);
+  const viaActing = userId !== deanId && (acts ?? []).some((a) => a.delegate_user_id === userId);
+  return { allowed: [...ids], viaActing };
 }
 
 /** Shared HR/Admin workflow step: guard status, advance, stamp tracking,
@@ -1094,9 +1154,40 @@ interface StageConfig {
 async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void> {
   if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
   const supabase = await createClient();
-  const actorId = await requireHrAdmin(supabase);
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  const isHrAdmin = !!profile && (profile.role === "hr" || profile.role === "admin");
 
-  let row: { employee_id: string; leave_type_id: string };
+  // Fetch first so we can authorize signature steps against the designated
+  // approver before mutating. The guarded UPDATE below still protects races.
+  const { data: cur, error: curErr } = await supabase
+    .from("leave_requests")
+    .select("employee_id, leave_type_id, status")
+    .eq("id", requestId)
+    .single();
+  if (curErr || !cur) throw new Error("ไม่พบคำขอลา");
+  if (!cfg.from.includes(cur.status)) {
+    throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง กรุณารีเฟรช)");
+  }
+
+  // Authorize: HR/Admin may do any step. A designated approver may do their
+  // own signature step (cfg.signerRole). Routing/admin steps are HR/Admin only.
+  if (!isHrAdmin) {
+    if (!cfg.signerRole) throw new Error("Forbidden: HR/Admin only");
+    const { allowed } = await resolveStageSigners(
+      supabase, cfg.signerRole, cur.employee_id, user.id,
+    );
+    if (!allowed.includes(user.id)) {
+      throw new Error("Forbidden: คุณไม่มีสิทธิ์ลงนามขั้นตอนนี้");
+    }
+  }
+  const actorId = user.id;
+
+  let row: { employee_id: string; leave_type_id: string } = {
+    employee_id: cur.employee_id,
+    leave_type_id: cur.leave_type_id,
+  };
   if (cfg.to) {
     const { data, error } = await supabase
       .from("leave_requests")
@@ -1106,16 +1197,6 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
       .select("employee_id, leave_type_id")
       .single();
     if (error || !data) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว กรุณารีเฟรช)");
-    row = data;
-  } else {
-    const { data, error } = await supabase
-      .from("leave_requests")
-      .select("employee_id, leave_type_id, status")
-      .eq("id", requestId)
-      .single();
-    if (error || !data || !cfg.from.includes(data.status)) {
-      throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง)");
-    }
     row = data;
   }
 
@@ -1149,10 +1230,50 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
   revalidatePath("/dashboard/approvals/documents");
 }
 
-/** Step 1: HR ส่งใบลาให้ผู้อำนวยการลงนาม */
-export async function routeToDirector(requestId: string) {
+/** Step 0a (vacation + academic staff only): HR ส่งให้ประธานสาขาวิชาให้ความเห็น */
+export async function routeToChair(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["pending"],
+    to: "awaiting_chair",
+    trackingDates: ["sent_to_chair_date"],
+    audit: "route_to_chair",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ประธานสาขาวิชาให้ความเห็น`,
+  });
+}
+
+/** Step 0b: ประธานสาขาวิชาให้ความเห็น + ลงนาม (signable by the chair or HR/Admin) */
+export async function markChairSigned(requestId: string, opinion?: string) {
+  const cleaned =
+    opinion && opinion.trim()
+      ? validateTextField(opinion, "ความเห็นประธานสาขา", 500)
+      : null;
+
+  await runLeaveStage(requestId, {
+    from: ["awaiting_chair"],
+    trackingDates: ["chair_signed_date"],
+    signerRole: "chair",
+    audit: "chair_signed",
+    notifyType: "leave_status_update",
+    notifyMsg: (lt) => `ประธานสาขาวิชาให้ความเห็น/ลงนามคำขอ${lt}แล้ว`,
+  });
+
+  // Persist the chair's opinion onto the vacation detail (admin client — the
+  // chair is already authorized by runLeaveStage above).
+  if (cleaned !== null) {
+    const admin = getAdminClient();
+    const { error } = await admin
+      .from("leave_vacation_details")
+      .update({ branch_head_opinion: cleaned })
+      .eq("request_id", requestId);
+    if (error) console.error("[leave-actions] chair opinion save failed:", error.message);
+  }
+}
+
+/** Step 1: HR ส่งใบลาให้ผู้อำนวยการลงนาม (จาก pending หรือหลังประธานสาขาลงนาม) */
+export async function routeToDirector(requestId: string) {
+  return runLeaveStage(requestId, {
+    from: ["pending", "awaiting_chair"],
     to: "awaiting_director",
     trackingDates: ["sent_to_director_date"],
     audit: "route_to_director",
@@ -1161,11 +1282,12 @@ export async function routeToDirector(requestId: string) {
   });
 }
 
-/** Step 2: ผู้อำนวยการลงนาม (status คงที่ awaiting_director จนกว่าจะส่งคณบดี) */
+/** Step 2: ผู้อำนวยการลงนาม (signable by the director or HR/Admin) */
 export async function markDirectorSigned(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["awaiting_director"],
     trackingDates: ["director_signed_date"],
+    signerRole: "director",
     audit: "director_signed",
     notifyType: "leave_status_update",
     notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอ${lt}ของคุณแล้ว`,
@@ -1184,12 +1306,14 @@ export async function routeToDean(requestId: string) {
   });
 }
 
-/** Step 4: คณบดีลงนาม → อนุมัติ (balance ถูกจองตั้งแต่ยื่นแล้ว ไม่แตะซ้ำ) */
+/** Step 4: คณบดีลงนาม → อนุมัติ (signable by the dean, an active acting-delegate,
+ *  or HR/Admin; balance ถูกจองตั้งแต่ยื่นแล้ว ไม่แตะซ้ำ) */
 export async function markDeanSigned(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["awaiting_dean"],
     to: "approved",
     trackingDates: ["dean_signed_date"],
+    signerRole: "dean",
     audit: "dean_signed",
     notifyType: "leave_approved",
     notifyMsg: (lt) => `คำขอ${lt}ของคุณได้รับการอนุมัติแล้ว (คณบดีลงนามครบ)`,

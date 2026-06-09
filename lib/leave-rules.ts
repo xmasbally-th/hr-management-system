@@ -41,6 +41,8 @@ export function getLeaveStage(status: string): { label: string; step: number } {
   switch (status) {
     case "pending":
       return { label: "รอตรวจสอบ", step: 0 };
+    case "awaiting_chair":
+      return { label: "รอประธานสาขาให้ความเห็น", step: 0 };
     case "awaiting_director":
       return { label: "รอผู้อำนวยการเซ็น", step: 1 };
     case "awaiting_dean":
