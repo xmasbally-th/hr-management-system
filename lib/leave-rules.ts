@@ -42,17 +42,17 @@ export function getLeaveStage(status: string): { label: string; step: number } {
     case "pending":
       return { label: "รอตรวจสอบ", step: 0 };
     case "awaiting_chair":
-      return { label: "รอประธานสาขาให้ความเห็น", step: 0 };
+      return { label: "รอประธานสาขาให้ความเห็น", step: 1 };
     case "awaiting_director":
-      return { label: "รอผู้อำนวยการเซ็น", step: 1 };
+      return { label: "รอผู้อำนวยการเซ็น", step: 2 };
     case "awaiting_dean":
-      return { label: "รอคณบดีเซ็น", step: 2 };
+      return { label: "รอคณบดีเซ็น", step: 3 };
     case "approved":
-      return { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 3 };
+      return { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 4 };
     case "awaiting_university":
-      return { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 4 };
+      return { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 5 };
     case "completed":
-      return { label: "เสร็จสิ้น", step: 5 };
+      return { label: "เสร็จสิ้น", step: 6 };
     case "rejected":
       return { label: "ไม่อนุมัติ", step: -1 };
     case "cancelled":

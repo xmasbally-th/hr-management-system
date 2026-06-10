@@ -51,12 +51,12 @@ interface Props {
 
 const STAGE: Record<string, { label: string; step: number }> = {
   pending: { label: "รอตรวจสอบ / เริ่มเดินเอกสาร", step: 0 },
-  awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", step: 0 },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", step: 1 },
-  awaiting_dean: { label: "รอคณบดีลงนาม", step: 2 },
-  approved: { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 3 },
-  awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 4 },
-  completed: { label: "เสร็จสิ้น", step: 5 },
+  awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", step: 1 },
+  awaiting_director: { label: "รอผู้อำนวยการลงนาม", step: 2 },
+  awaiting_dean: { label: "รอคณบดีลงนาม", step: 3 },
+  approved: { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 4 },
+  awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 5 },
+  completed: { label: "เสร็จสิ้น", step: 6 },
   rejected: { label: "ไม่อนุมัติ", step: -1 },
   cancelled: { label: "ยกเลิก", step: -1 },
 };
@@ -288,7 +288,7 @@ function StageHeader({ stage }: { stage: { label: string; step: number } }) {
         <p className="font-semibold">{stage.label}</p>
       </div>
       {stage.step >= 0 && (
-        <Badge variant="secondary" className="font-mono">ขั้น {stage.step}/5</Badge>
+        <Badge variant="secondary" className="font-mono">ขั้น {stage.step}/6</Badge>
       )}
     </div>
   );
