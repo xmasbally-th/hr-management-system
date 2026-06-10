@@ -22,6 +22,7 @@ import {
   BarChart3,
   Settings,
   CalendarCog,
+  CalendarHeart,
   ChevronLeft,
   HelpCircle,
   type LucideIcon,
@@ -50,6 +51,7 @@ const iconMap: Record<string, LucideIcon> = {
   BarChart3,
   Settings,
   CalendarCog,
+  CalendarHeart,
 };
 
 interface SidebarProps {

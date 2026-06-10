@@ -21,6 +21,7 @@ import {
   Building,
   BarChart3,
   Settings,
+  CalendarHeart,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ const iconMap: Record<string, LucideIcon> = {
   Building,
   BarChart3,
   Settings,
+  CalendarHeart,
 };
 
 interface MobileSidebarProps {

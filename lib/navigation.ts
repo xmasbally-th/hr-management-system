@@ -45,6 +45,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
+        title: "ปฏิทินงานบุคคล",
+        href: "/dashboard/personnel-calendar",
+        icon: "CalendarHeart",
+        roles: ["admin", "hr", "manager", "employee"],
+      },
+      {
         title: "ประวัติการเดินทาง",
         href: "/dashboard/travel",
         icon: "Plane",
