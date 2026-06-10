@@ -24,6 +24,7 @@ export interface EventDetail {
   dateLabel: string;
   days?: number;
   statusLabel?: string;
+  note?: string;
 }
 
 interface EventChipProps {
@@ -58,7 +59,11 @@ export function EventChip({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title={`${detail.employeeName ?? ""} — ${detail.heading}`.trim()}
+        title={
+          detail.employeeName
+            ? `${detail.employeeName} — ${detail.heading}`
+            : detail.heading
+        }
         className={cn(
           "block w-full text-left px-1 py-0.5 rounded border text-[0.65rem] truncate hover:opacity-80 cursor-pointer",
           colorClass,
@@ -112,6 +117,12 @@ export function EventChip({
               <>
                 <dt className="text-muted-foreground">สถานะ</dt>
                 <dd>{detail.statusLabel}</dd>
+              </>
+            )}
+            {detail.note && (
+              <>
+                <dt className="text-muted-foreground">หมายเหตุ</dt>
+                <dd className="whitespace-pre-wrap">{detail.note}</dd>
               </>
             )}
           </dl>

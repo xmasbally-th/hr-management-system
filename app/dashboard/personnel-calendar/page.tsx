@@ -178,7 +178,7 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
       getDepartmentList(),
       supabase
         .from("holidays")
-        .select("date, name")
+        .select("date, name, type, note")
         .gte("date", monthStartIso)
         .lte("date", monthEndIso),
       supabase
@@ -239,9 +239,25 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
       ? await Promise.all([getMyLeaveBalances(fy), getMyLeaveCountsByType(fy)])
       : [null, {} as Record<string, number>];
 
+  // Same labels as the master-data holidays tab (TYPE_META).
+  const holidayTypeLabel: Record<string, string> = {
+    general: "ทั่วไป",
+    own_closure: "มหาวิทยาลัยหยุดเอง",
+    special: "พิเศษ",
+  };
+  interface HolidayInfo {
+    name: string;
+    type: string;
+    note: string | null;
+  }
   const holidays = activeCats.has("holiday")
-    ? new Map<string, string>((holidaysRes.data ?? []).map((h) => [h.date, h.name]))
-    : new Map<string, string>();
+    ? new Map<string, HolidayInfo>(
+        (holidaysRes.data ?? []).map((h) => [
+          h.date,
+          { name: h.name, type: h.type ?? "general", note: h.note ?? null },
+        ]),
+      )
+    : new Map<string, HolidayInfo>();
 
   // ── Build day → entries[] index ──
   const byDay = new Map<string, CalendarEntry[]>();
@@ -450,7 +466,7 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
             const inMonth = d.getMonth() === monthStart.getMonth();
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
             const isToday = iso === todayIso;
-            const holidayName = holidays.get(iso);
+            const holiday = holidays.get(iso);
             const entries = byDay.get(iso) ?? [];
             return (
               <div
@@ -471,7 +487,7 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
                   >
                     {d.getDate()}
                   </span>
-                  {holidayName && (
+                  {holiday && (
                     <Badge
                       variant="outline"
                       className="text-[0.65rem] px-1 py-0 border-rose-300 text-rose-700 bg-rose-50"
@@ -480,10 +496,18 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
                     </Badge>
                   )}
                 </div>
-                {holidayName && (
-                  <div className="text-[0.65rem] text-rose-700 truncate" title={holidayName}>
-                    {holidayName}
-                  </div>
+                {holiday && (
+                  <EventChip
+                    label={holiday.name}
+                    colorClass={CATEGORY_COLORS.holiday}
+                    categoryLabel={CATEGORY_LABELS.holiday}
+                    detail={{
+                      heading: holiday.name,
+                      typeName: holidayTypeLabel[holiday.type] ?? holiday.type,
+                      dateLabel: formatThai(iso),
+                      note: holiday.note ?? undefined,
+                    }}
+                  />
                 )}
                 <div className="space-y-0.5">
                   {entries.slice(0, 4).map((e, i) =>
