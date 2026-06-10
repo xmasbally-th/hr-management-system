@@ -8,8 +8,8 @@ const CATEGORIES = [
   { key: "holiday", label: "วันหยุด", color: "bg-rose-100 text-rose-800 border-rose-300" },
   { key: "exam", label: "วันสอบ", color: "bg-violet-100 text-violet-800 border-violet-300" },
   { key: "leave", label: "การลา", color: "bg-sky-100 text-sky-800 border-sky-300" },
-  { key: "travel", label: "เดินทางราชการ", color: "bg-amber-100 text-amber-800 border-amber-300" },
-  { key: "training", label: "อบรม/สัมมนา", color: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  { key: "travel", label: "เดินทางราชการ", color: "bg-indigo-100 text-indigo-800 border-indigo-300" },
+  { key: "training", label: "อบรม/สัมมนา", color: "bg-lime-100 text-lime-800 border-lime-300" },
 ] as const;
 
 const ALL_KEYS = CATEGORIES.map((c) => c.key);

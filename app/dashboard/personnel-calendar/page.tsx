@@ -21,7 +21,9 @@ import {
   getMyLeaveBalances,
   getMyLeaveCountsByType,
 } from "@/lib/actions/leave-actions";
+import { getTrainingTypeLabel } from "@/lib/training-types";
 import { EventChip, type EventDetail } from "./event-chip";
+import { DayDialog, type DayItem } from "./day-dialog";
 import { CategoryFilter } from "./category-filter";
 import { DepartmentFilter } from "./department-filter";
 
@@ -69,6 +71,10 @@ interface CalendarEntry {
   title?: string;
   /** Rich summary used by the click-through popup. */
   detail?: EventDetail;
+  /** Chip colour override (e.g. per-leave-type); falls back to category colour. */
+  colorClass?: string;
+  /** Request not yet dean-approved — rendered dashed/faded. */
+  pending?: boolean;
 }
 
 /** Loosely-typed row shape — Supabase nested selects return the related
@@ -107,9 +113,35 @@ const CATEGORY_COLORS: Record<EventCategory, string> = {
   holiday: "bg-rose-100 text-rose-800 border-rose-300",
   exam: "bg-violet-100 text-violet-800 border-violet-300",
   leave: "bg-sky-100 text-sky-800 border-sky-300",
-  travel: "bg-amber-100 text-amber-800 border-amber-300",
-  training: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  travel: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  training: "bg-lime-100 text-lime-800 border-lime-300",
 };
+
+/** Per-leave-type chip colours — same palette as the old leave calendar
+ *  (TYPE_COLORS in app/dashboard/leaves/calendar), except maternity which
+ *  moved rose → fuchsia so it can't be confused with holiday chips. */
+const LEAVE_TYPE_COLORS: Record<string, string> = {
+  SICK: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  PERSONAL: "bg-amber-100 text-amber-800 border-amber-300",
+  VACATION: "bg-sky-100 text-sky-800 border-sky-300",
+  MATERNITY: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300",
+};
+
+const LEAVE_TYPE_LEGEND: { code: string; label: string }[] = [
+  { code: "SICK", label: "ป่วย" },
+  { code: "PERSONAL", label: "กิจ" },
+  { code: "VACATION", label: "พักผ่อน" },
+  { code: "MATERNITY", label: "คลอด" },
+];
+
+/** Stages before the dean has signed — rendered dashed/faded so approvers
+ *  can tell in-flight requests from approved ones at a glance. */
+const PENDING_STAGES = new Set([
+  "pending",
+  "awaiting_chair",
+  "awaiting_director",
+  "awaiting_dean",
+]);
 
 const CATEGORY_LABELS: Record<EventCategory, string> = {
   holiday: "วันหยุด",
@@ -117,6 +149,27 @@ const CATEGORY_LABELS: Record<EventCategory, string> = {
   leave: "การลา",
   travel: "เดินทางราชการ",
   training: "อบรม/สัมมนา",
+};
+
+/** Thai labels per travel_type code — same wording as hr-travel-client. */
+const TRAVEL_TYPE_LABELS: Record<string, string> = {
+  training: "อบรม/สัมมนา",
+  supervision: "นิเทศ",
+  official_contact: "ติดต่อราชการ",
+};
+
+/** Travel status labels — short wording used by the travel pages
+ *  (hr-travel-client statusMap), not the leave-specific getLeaveStage. */
+const TRAVEL_STATUS_LABELS: Record<string, string> = {
+  pending: "รอตรวจสอบ",
+  awaiting_chair: "รอประธานสาขา",
+  awaiting_director: "รอผอ.",
+  awaiting_dean: "รอคณบดี",
+  approved: "อนุมัติ",
+  awaiting_university: "รออธิการบดี",
+  completed: "เสร็จสิ้น",
+  rejected: "ไม่อนุมัติ",
+  cancelled: "ยกเลิก",
 };
 
 /** Icon per leave-type code — matches the summary cards on the leaves page. */
@@ -287,6 +340,10 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
         category: "exam",
         label: ex.name,
         title: `วันสอบ: ${ex.name}`,
+        detail: {
+          heading: ex.name,
+          dateLabel: `${formatThai(ex.start_date)} – ${formatThai(ex.end_date)}`,
+        },
       });
     }
   }
@@ -303,6 +360,8 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
       label: name,
       href: `/dashboard/leaves/${row.id}`,
       title: `${name} — ${typeName}`,
+      colorClass: LEAVE_TYPE_COLORS[lt?.code ?? ""],
+      pending: PENDING_STAGES.has(row.status ?? ""),
       detail: {
         heading: typeName,
         typeName,
@@ -324,14 +383,15 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
       label: name,
       href: `/dashboard/travel/${row.id}`,
       title: `${name} — ${row.title ?? "เดินทางราชการ"}`,
+      pending: PENDING_STAGES.has(row.status ?? ""),
       detail: {
         heading: row.title ?? "เดินทางราชการ",
-        typeName: row.travel_type,
+        typeName: TRAVEL_TYPE_LABELS[row.travel_type ?? ""] ?? row.travel_type,
         employeeName: name,
         location: row.location ?? undefined,
         dateLabel: `${formatThai(row.start_date)} – ${formatThai(row.end_date)}`,
         days: row.total_days,
-        statusLabel: getLeaveStage(row.status ?? "").label,
+        statusLabel: TRAVEL_STATUS_LABELS[row.status ?? ""] ?? row.status,
       },
     });
   }
@@ -348,7 +408,7 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
       title: `${name} — ${row.course_name ?? "อบรม/สัมมนา"}`,
       detail: {
         heading: row.course_name ?? "อบรม/สัมมนา",
-        typeName: row.training_type,
+        typeName: getTrainingTypeLabel(row.training_type ?? ""),
         employeeName: name,
         location: row.location ?? undefined,
         dateLabel: `${formatThai(row.start_date)} – ${formatThai(row.end_date)}`,
@@ -452,7 +512,26 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
 
       <CategoryFilter active={[...activeCats]} />
 
+      {activeCats.has("leave") && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>สีการลา:</span>
+          {LEAVE_TYPE_LEGEND.map((t) => (
+            <span
+              key={t.code}
+              className={cn("px-2 py-0.5 rounded border", LEAVE_TYPE_COLORS[t.code])}
+            >
+              {t.label}
+            </span>
+          ))}
+          <span className="px-2 py-0.5 rounded border border-dashed bg-muted/40">
+            กรอบเส้นประ = รออนุมัติ
+          </span>
+        </div>
+      )}
+
       <div className="border rounded-lg bg-card overflow-hidden">
+        {/* min-w + overflow-x: keep 7 columns readable on narrow screens */}
+        <div className="overflow-x-auto"><div className="min-w-[640px]">
         <div className="grid grid-cols-7 bg-muted/50 text-xs font-semibold text-muted-foreground">
           {TH_WEEKDAY_SHORT.map((w) => (
             <div key={w} className="p-2 text-center border-b">
@@ -468,13 +547,47 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
             const isToday = iso === todayIso;
             const holiday = holidays.get(iso);
             const entries = byDay.get(iso) ?? [];
+
+            // Aggregate: for elevated roles, a day with >4 people on leave
+            // collapses into a single "ลา N คน" chip (opens the day dialog).
+            const leaveCount = entries.filter((e) => e.category === "leave").length;
+            const collapseLeaves = isElevated && leaveCount > 4;
+            const display = collapseLeaves
+              ? entries.filter((e) => e.category !== "leave")
+              : entries;
+            const visible = display.slice(0, collapseLeaves ? 3 : 4);
+            const hiddenCount = display.length - visible.length;
+            // Full-day list for the dialog (holiday + every entry of the day)
+            const dayItems: DayItem[] = [
+              ...(holiday
+                ? [
+                    {
+                      categoryLabel: CATEGORY_LABELS.holiday,
+                      colorClass: CATEGORY_COLORS.holiday,
+                      label: holiday.name,
+                      heading: holidayTypeLabel[holiday.type] ?? holiday.type,
+                    },
+                  ]
+                : []),
+              ...entries.map((e) => ({
+                categoryLabel: CATEGORY_LABELS[e.category],
+                colorClass: e.colorClass ?? CATEGORY_COLORS[e.category],
+                label: e.label,
+                heading:
+                  e.detail && e.detail.heading !== e.label ? e.detail.heading : undefined,
+                statusLabel: e.detail?.statusLabel,
+                href: e.href,
+                pending: e.pending,
+              })),
+            ];
             return (
               <div
                 key={iso}
                 className={cn(
                   "border-b border-r p-1.5 min-h-[110px] text-xs space-y-1",
                   !inMonth && "bg-muted/30 text-muted-foreground",
-                  isToday && "bg-indigo-50",
+                  // ring (not a solid bg) so today can't blend with indigo travel chips
+                  isToday && "ring-2 ring-inset ring-indigo-500/70 bg-indigo-50/40",
                 )}
               >
                 <div className="flex items-center justify-between">
@@ -510,22 +623,34 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
                   />
                 )}
                 <div className="space-y-0.5">
-                  {entries.slice(0, 4).map((e, i) =>
+                  {collapseLeaves && (
+                    <DayDialog
+                      dateLabel={formatThai(iso)}
+                      items={dayItems}
+                      triggerLabel={`ลา ${leaveCount} คน`}
+                      triggerClassName={cn(
+                        "block w-full text-left px-1 py-0.5 rounded border text-[0.65rem] font-semibold cursor-pointer hover:opacity-80",
+                        CATEGORY_COLORS.leave,
+                      )}
+                    />
+                  )}
+                  {visible.map((e, i) =>
                     e.detail ? (
                       <EventChip
                         key={`${e.category}-${i}`}
                         label={e.label}
-                        colorClass={CATEGORY_COLORS[e.category]}
+                        colorClass={e.colorClass ?? CATEGORY_COLORS[e.category]}
                         categoryLabel={CATEGORY_LABELS[e.category]}
                         detail={e.detail}
                         href={e.href}
+                        pending={e.pending}
                       />
                     ) : (
                       <div
                         key={`${e.category}-${i}`}
                         className={cn(
                           "block px-1 py-0.5 rounded border text-[0.65rem] truncate",
-                          CATEGORY_COLORS[e.category],
+                          e.colorClass ?? CATEGORY_COLORS[e.category],
                         )}
                         title={e.title ?? e.label}
                       >
@@ -533,16 +658,20 @@ export default async function PersonnelCalendarPage({ searchParams }: PageProps)
                       </div>
                     ),
                   )}
-                  {entries.length > 4 && (
-                    <div className="text-[0.65rem] text-muted-foreground px-1">
-                      +{entries.length - 4} อื่น ๆ
-                    </div>
+                  {hiddenCount > 0 && (
+                    <DayDialog
+                      dateLabel={formatThai(iso)}
+                      items={dayItems}
+                      triggerLabel={`+${hiddenCount} อื่น ๆ`}
+                      triggerClassName="block w-full text-left text-[0.65rem] text-muted-foreground px-1 cursor-pointer hover:underline"
+                    />
                   )}
                 </div>
               </div>
             );
           })}
         </div>
+        </div></div>
       </div>
     </div>
   );

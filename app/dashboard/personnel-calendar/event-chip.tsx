@@ -37,6 +37,8 @@ interface EventChipProps {
   detail: EventDetail;
   /** Deep-link to the full detail page. */
   href?: string;
+  /** Request not yet dean-approved — chip renders dashed and faded. */
+  pending?: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export function EventChip({
   categoryLabel,
   detail,
   href,
+  pending,
 }: EventChipProps) {
   const [open, setOpen] = useState(false);
 
@@ -67,6 +70,7 @@ export function EventChip({
         className={cn(
           "block w-full text-left px-1 py-0.5 rounded border text-[0.65rem] truncate hover:opacity-80 cursor-pointer",
           colorClass,
+          pending && "border-dashed opacity-70",
         )}
       >
         {label}
