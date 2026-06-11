@@ -1179,6 +1179,9 @@ export interface Database {
           reason: string;
           status: "pending" | "awaiting_chair" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id: string | null;
+          cancel_start_date: string | null;
+          cancel_end_date: string | null;
+          cancel_working_days: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -1189,6 +1192,9 @@ export interface Database {
           reason: string;
           status?: "pending" | "awaiting_chair" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
+          cancel_start_date?: string | null;
+          cancel_end_date?: string | null;
+          cancel_working_days?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -1199,6 +1205,9 @@ export interface Database {
           reason?: string;
           status?: "pending" | "awaiting_chair" | "awaiting_director" | "awaiting_dean" | "approved" | "awaiting_university" | "completed" | "rejected" | "cancelled";
           approver_id?: string | null;
+          cancel_start_date?: string | null;
+          cancel_end_date?: string | null;
+          cancel_working_days?: number | null;
           created_at?: string;
           updated_at?: string;
         };

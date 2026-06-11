@@ -87,7 +87,14 @@ export default async function LeaveDetailPage({ params }: PageProps) {
 
   // Document-tracking row (timeline shown to ALL viewers — owner/manager/HR)
   let tracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
-  let cancellation: { id: string; status: string; reason: string } | null = null;
+  let cancellation: {
+    id: string;
+    status: string;
+    reason: string;
+    cancel_start_date: string | null;
+    cancel_end_date: string | null;
+    cancel_working_days: number | null;
+  } | null = null;
   let cancellationTracking: Awaited<ReturnType<typeof getDocumentsByReference>>[number] | null = null;
   try {
     const docs = await getDocumentsByReference(id);
@@ -102,7 +109,7 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   if (canSeeCancellation) {
     const { data: cancel } = await supabase
       .from("leave_cancellation_requests")
-      .select("id, status, reason")
+      .select("id, status, reason, cancel_start_date, cancel_end_date, cancel_working_days")
       .eq("leave_request_id", id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -241,6 +248,15 @@ export default async function LeaveDetailPage({ params }: PageProps) {
           isHrAdmin={isHrAdmin}
           canDirector={canDirector}
           canDean={canDean}
+          cancelRange={
+            cancellation.cancel_start_date && cancellation.cancel_end_date
+              ? {
+                  start: cancellation.cancel_start_date,
+                  end: cancellation.cancel_end_date,
+                  workingDays: cancellation.cancel_working_days ?? 0,
+                }
+              : null
+          }
         />
       )}
 
@@ -269,6 +285,8 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         isSick={isSick}
         existingMedicalCert={leave.medical_cert_url ?? null}
         canDownloadDoc={isHrAdmin}
+        leaveStartDate={leave.start_date}
+        leaveEndDate={leave.end_date}
       />
     </div>
   );

@@ -985,12 +985,15 @@ export async function cancelLeaveRequest(requestId: string) {
   const { data: req } = await reqQuery.single();
 
   if (!req) throw new Error("ไม่พบคำขอลานี้");
-  // Cancellable while still in process (incl. sent to university awaiting
-  // return). `completed` is terminal — it requires the separate completed-
-  // cancellation flow (cancellation request routed through ผอ./คณบดี).
-  const CANCELLABLE = ["pending", "awaiting_director", "awaiting_dean", "approved", "awaiting_university"];
+  // Direct cancellation is allowed only BEFORE the leave has been sent to
+  // the university. Once sent (awaiting_university) or completed, the
+  // formal "ใบขอยกเลิกวันลา" flow (cancellation request routed through
+  // ผอ./คณบดี/อธิการบดี) is required.
+  const CANCELLABLE = ["pending", "awaiting_chair", "awaiting_director", "awaiting_dean", "approved"];
   if (!CANCELLABLE.includes(req.status)) {
-    throw new Error("ยกเลิกได้เฉพาะคำขอที่ยังอยู่ในกระบวนการ — ใบที่เสร็จสิ้นแล้วต้องยื่นคำขอยกเลิกแยก");
+    throw new Error(
+      "ใบลานี้ถูกส่งให้มหาวิทยาลัยแล้ว — ต้องยื่น \"ใบขอยกเลิกวันลา\" ผ่านการเดินเอกสารแทน",
+    );
   }
   const cancelledByHr = isHrAdmin && req.employee_id !== user.id;
 
@@ -1960,10 +1963,13 @@ export async function importLeaveBalances(
 //  ส่งอธิการบดี(รับทราบ, ไม่มีเอกสารกลับ) → คืน balance + ใบเดิม=cancelled
 // ═══════════════════════════════════════════════════════════
 
-/** พนักงาน(เจ้าของ)/HR ยื่นคำขอยกเลิกใบลาที่เสร็จสิ้นแล้ว */
+/** พนักงาน(เจ้าของ)/HR ยื่นคำขอยกเลิกใบลาที่ส่งมหาวิทยาลัย/เสร็จสิ้นแล้ว
+ *  `partial` = ยกเลิกบางช่วง (ช่วงต่อเนื่องเดียวภายในใบ) — ตามแบบฟอร์ม
+ *  ราชการ "ขอยกเลิกวันลา ตั้งแต่…ถึง…รวม…วัน" · ไม่ส่ง = ยกเลิกทั้งใบ */
 export async function createLeaveCancellationRequest(
   leaveRequestId: string,
   reason: string,
+  partial?: { startDate: string; endDate: string },
 ) {
   if (!UUID_RE.test(leaveRequestId)) throw new Error("รหัสคำขอลาไม่ถูกต้อง");
   const sanitizedReason = validateTextField(reason, "เหตุผลการยกเลิก", 1000);
@@ -1977,15 +1983,40 @@ export async function createLeaveCancellationRequest(
 
   const { data: leave } = await supabase
     .from("leave_requests")
-    .select("id, employee_id, status, leave_type_id")
+    .select("id, employee_id, status, leave_type_id, start_date, end_date, working_days, total_days")
     .eq("id", leaveRequestId)
     .single();
   if (!leave) throw new Error("ไม่พบใบลานี้");
-  if (leave.status !== "completed") {
-    throw new Error("flow นี้ใช้ยกเลิกได้เฉพาะใบลาที่เสร็จสิ้นแล้ว (completed)");
+  if (leave.status !== "completed" && leave.status !== "awaiting_university") {
+    throw new Error(
+      "flow นี้ใช้กับใบลาที่ส่งมหาวิทยาลัยหรือเสร็จสิ้นแล้ว — ใบที่ยังอยู่ระดับคณะใช้ปุ่มยกเลิกคำขอได้โดยตรง",
+    );
   }
   if (!isHr && leave.employee_id !== user.id) {
     throw new Error("Forbidden: ยื่นยกเลิกได้เฉพาะใบลาของตัวเอง");
+  }
+
+  // ── Partial-range validation + working-day computation ──
+  let cancelWd: number | null = null;
+  if (partial) {
+    const { startDate, endDate } = partial;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      throw new Error("รูปแบบวันที่ไม่ถูกต้อง");
+    }
+    if (endDate < startDate) throw new Error("วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
+    if (startDate < leave.start_date || endDate > leave.end_date) {
+      throw new Error("ช่วงที่ขอยกเลิกต้องอยู่ภายในช่วงวันลาเดิม");
+    }
+    cancelWd = await calculateWorkingDays(supabase, startDate, endDate);
+    if (cancelWd <= 0) {
+      throw new Error("ช่วงที่ขอยกเลิกไม่มีวันทำการ — ไม่มีสิทธิ์ที่จะคืน");
+    }
+    const leaveWd = Number(leave.working_days ?? leave.total_days ?? 0);
+    if (cancelWd >= leaveWd) {
+      // ครอบทั้งใบ → ปฏิบัติเหมือนยกเลิกทั้งใบ
+      partial = undefined;
+      cancelWd = null;
+    }
   }
 
   // กันยื่นซ้ำ (มีคำขอยกเลิกที่ยังไม่จบและไม่ถูกปฏิเสธ)
@@ -2004,6 +2035,9 @@ export async function createLeaveCancellationRequest(
       requested_by: user.id,
       reason: sanitizedReason,
       status: "pending",
+      cancel_start_date: partial?.startDate ?? null,
+      cancel_end_date: partial?.endDate ?? null,
+      cancel_working_days: cancelWd,
     })
     .select("id")
     .single();
@@ -2179,7 +2213,9 @@ export async function sendCancellationToPresident(id: string) {
   });
 }
 
-/** ขั้นสุดท้าย: อธิการบดีรับทราบ → คืน balance + ตั้งใบลาเดิม = cancelled */
+/** ขั้นสุดท้าย: อธิการบดีรับทราบ → คืน balance + อัปเดตใบลาเดิม
+ *  (ยกเลิกทั้งใบ → cancelled · ยกเลิกบางช่วง → ลด working_days ใบเดิม
+ *  คงวันที่ไว้เป็นประวัติ ตามแบบฟอร์มราชการ) */
 export async function completeCancellation(cancellationId: string) {
   if (!UUID_RE.test(cancellationId)) throw new Error("รหัสคำขอยกเลิกไม่ถูกต้อง");
   const supabase = await createClient();
@@ -2190,7 +2226,7 @@ export async function completeCancellation(cancellationId: string) {
     .update({ status: "completed", approver_id: actorId, updated_at: new Date().toISOString() })
     .eq("id", cancellationId)
     .in("status", ["awaiting_university"])
-    .select("leave_request_id")
+    .select("leave_request_id, cancel_start_date, cancel_end_date, cancel_working_days")
     .single();
   if (error || !cancel) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว)");
 
@@ -2200,20 +2236,36 @@ export async function completeCancellation(cancellationId: string) {
     .eq("id", cancel.leave_request_id)
     .single();
 
-  if (leave && leave.status === "completed") {
+  // ใบลาที่ยกเลิกได้ผ่าน flow นี้: completed หรือ awaiting_university
+  if (leave && (leave.status === "completed" || leave.status === "awaiting_university")) {
     const fy = currentFiscalYear(new Date(leave.start_date));
+    const fullWd = Number(leave.working_days ?? leave.total_days ?? 0);
+    const isPartial = cancel.cancel_start_date != null && cancel.cancel_working_days != null;
+    const releaseWd = isPartial
+      ? Math.min(Number(cancel.cancel_working_days), fullWd)
+      : fullWd;
+
     await releaseLeaveBalance(
       getAdminClient(),
       leave.employee_id,
       leave.leave_type_id,
-      leave.working_days ?? leave.total_days,
+      releaseWd,
       fy,
     );
-    await supabase
-      .from("leave_requests")
-      .update({ status: "cancelled" })
-      .eq("id", leave.id)
-      .eq("status", "completed");
+
+    if (isPartial) {
+      // คงใบเดิมไว้ (วันที่เดิมเป็นประวัติ) แต่ลดวันทำการที่นับใช้สิทธิ์
+      await getAdminClient()
+        .from("leave_requests")
+        .update({ working_days: fullWd - releaseWd })
+        .eq("id", leave.id);
+    } else {
+      await supabase
+        .from("leave_requests")
+        .update({ status: "cancelled" })
+        .eq("id", leave.id)
+        .eq("status", leave.status);
+    }
   }
 
   await supabase

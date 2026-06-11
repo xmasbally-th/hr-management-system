@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Loader2, ArrowRight, PenLine, CheckCircle2, XCircle, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
+import { formatThai as fmtThai } from "@/lib/date-ranges";
 
 interface Tracking {
   director_signed_date: string | null;
@@ -34,6 +35,8 @@ interface Props {
   isHrAdmin: boolean;
   canDirector: boolean;
   canDean: boolean;
+  /** ช่วงที่ขอยกเลิก (null = ยกเลิกทั้งใบ) */
+  cancelRange: { start: string; end: string; workingDays: number } | null;
 }
 
 const STAGE: Record<string, { label: string }> = {
@@ -57,6 +60,7 @@ export function CancellationWorkflowPanel({
   isHrAdmin,
   canDirector,
   canDean,
+  cancelRange,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -129,6 +133,15 @@ export function CancellationWorkflowPanel({
           <span className="text-muted-foreground">เหตุผลการยกเลิก: </span>{reason}
         </div>
       )}
+
+      <div className="text-xs bg-white/60 rounded p-2 border border-amber-200">
+        <span className="text-muted-foreground">ขอบเขต: </span>
+        {cancelRange ? (
+          <>ยกเลิกบางช่วง {fmtThai(cancelRange.start)} – {fmtThai(cancelRange.end)} ({cancelRange.workingDays} วันทำการ) — ใบลาเดิมคงไว้ ปรับลดวันใช้สิทธิ์</>
+        ) : (
+          <>ยกเลิกทั้งใบ — เมื่อครบขั้นตอน ใบลาเดิมจะเปลี่ยนเป็น &quot;ยกเลิก&quot; และคืนสิทธิ์เต็มจำนวน</>
+        )}
+      </div>
 
       {/* Paper channel: HR prints the official cancellation form */}
       {isHrAdmin && (
