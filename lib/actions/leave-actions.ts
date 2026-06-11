@@ -2047,17 +2047,55 @@ interface CancelStageConfig {
   trackingDates?: string[];
   audit: string;
   notifyMsg: (ltName: string) => string;
+  /** Signature step the designated approver may perform (in addition to
+   *  HR/Admin) — mirrors runLeaveStage. Dean includes acting delegates. */
+  signerRole?: "director" | "dean";
 }
 
-/** Shared HR/Admin step for the cancellation workflow. */
+/** Shared step for the cancellation workflow — HR/Admin any step; the
+ *  designated director/dean may perform their own signature step. */
 async function runCancellationStage(cancellationId: string, cfg: CancelStageConfig): Promise<void> {
   if (!UUID_RE.test(cancellationId)) throw new Error("รหัสคำขอยกเลิกไม่ถูกต้อง");
   const supabase = await createClient();
-  const actorId = await requireHrAdmin(supabase);
+  const user = await getAuthUser(supabase);
+  checkRateLimit(user.id);
+  const profile = await getProfile(supabase, user.id);
+  const isHrAdmin = !!profile && (profile.role === "hr" || profile.role === "admin");
 
-  let row: { leave_request_id: string };
+  // Fetch first so signature steps can be authorized before mutating.
+  const { data: cur, error: curErr } = await supabase
+    .from("leave_cancellation_requests")
+    .select("leave_request_id, status")
+    .eq("id", cancellationId)
+    .single();
+  if (curErr || !cur) throw new Error("ไม่พบคำขอยกเลิก");
+  if (!cfg.from.includes(cur.status)) {
+    throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง กรุณารีเฟรช)");
+  }
+
+  if (!isHrAdmin) {
+    if (!cfg.signerRole) throw new Error("Forbidden: HR/Admin only");
+    const { data: leaveRow } = await supabase
+      .from("leave_requests")
+      .select("employee_id")
+      .eq("id", cur.leave_request_id)
+      .single();
+    const { allowed } = await resolveStageSigners(
+      supabase, cfg.signerRole, leaveRow?.employee_id ?? "", user.id,
+    );
+    if (!allowed.includes(user.id)) {
+      throw new Error("Forbidden: คุณไม่มีสิทธิ์ลงนามขั้นตอนนี้");
+    }
+  }
+  const actorId = user.id;
+
+  // Writes via admin client — a non-HR approver has no RLS write access
+  // (same reason as runLeaveStage).
+  const db = getAdminClient();
+
+  const row: { leave_request_id: string } = { leave_request_id: cur.leave_request_id };
   if (cfg.to) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("leave_cancellation_requests")
       .update({ status: cfg.to, updated_at: new Date().toISOString() })
       .eq("id", cancellationId)
@@ -2065,41 +2103,31 @@ async function runCancellationStage(cancellationId: string, cfg: CancelStageConf
       .select("leave_request_id")
       .single();
     if (error || !data) throw new Error("ไม่สามารถดำเนินการได้ (สถานะอาจเปลี่ยนไปแล้ว)");
-    row = data;
-  } else {
-    const { data, error } = await supabase
-      .from("leave_cancellation_requests")
-      .select("leave_request_id, status")
-      .eq("id", cancellationId)
-      .single();
-    if (error || !data || !cfg.from.includes(data.status)) {
-      throw new Error("ไม่สามารถดำเนินการได้ (สถานะไม่ถูกต้อง)");
-    }
-    row = data;
+    row.leave_request_id = data.leave_request_id;
   }
 
   if (cfg.trackingDates?.length) {
     const now = new Date().toISOString();
     const tpatch: Record<string, unknown> = {};
     for (const c of cfg.trackingDates) tpatch[c] = now;
-    await supabase
+    await db
       .from("document_tracking")
       .update(tpatch as Database["public"]["Tables"]["document_tracking"]["Update"])
       .eq("reference_id", cancellationId);
   }
 
-  await logAudit(supabase, actorId, cfg.audit, "leave_cancellation_request", cancellationId);
+  await logAudit(db, actorId, cfg.audit, "leave_cancellation_request", cancellationId);
 
-  const { data: leave } = await supabase
+  const { data: leave } = await db
     .from("leave_requests")
     .select("employee_id, leave_type_id")
     .eq("id", row.leave_request_id)
     .single();
   if (leave) {
-    const { data: lt } = await supabase
+    const { data: lt } = await db
       .from("leave_types").select("name").eq("id", leave.leave_type_id).single();
     await createNotificationInternal(
-      supabase, leave.employee_id, "leave_status_update", cfg.notifyMsg(lt?.name ?? "ลา"),
+      db, leave.employee_id, "leave_status_update", cfg.notifyMsg(lt?.name ?? "ลา"),
     );
   }
 
@@ -2120,6 +2148,7 @@ export async function markCancellationDirectorSigned(id: string) {
   return runCancellationStage(id, {
     from: ["awaiting_director"],
     trackingDates: ["director_signed_date"],
+    signerRole: "director",
     audit: "cancel_director_signed",
     notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
   });
@@ -2136,6 +2165,7 @@ export async function markCancellationDeanSigned(id: string) {
   return runCancellationStage(id, {
     from: ["awaiting_dean"], to: "approved",
     trackingDates: ["dean_signed_date"],
+    signerRole: "dean",
     audit: "cancel_dean_signed",
     notifyMsg: (lt) => `คณบดีลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
   });

@@ -230,13 +230,17 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         />
       )}
 
-      {/* Cancellation request workflow (only for HR/Admin when one exists) */}
-      {isHrAdmin && cancellation && (
+      {/* Cancellation request workflow — HR/Admin or the designated
+          ผอ./คณบดี (who can sign their own stage) */}
+      {(isHrAdmin || canDirector || canDean) && cancellation && (
         <CancellationWorkflowPanel
           cancellationId={cancellation.id}
           status={cancellation.status}
           reason={cancellation.reason}
           tracking={cancellationTracking}
+          isHrAdmin={isHrAdmin}
+          canDirector={canDirector}
+          canDean={canDean}
         />
       )}
 

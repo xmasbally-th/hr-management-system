@@ -29,6 +29,11 @@ interface Props {
   status: string;
   reason: string;
   tracking: Tracking | null;
+  /** HR/Admin drive routing + any step; a designated ผอ./คณบดี (incl. dean
+   *  acting-delegate) may sign/reject their own stage. */
+  isHrAdmin: boolean;
+  canDirector: boolean;
+  canDean: boolean;
 }
 
 const STAGE: Record<string, { label: string }> = {
@@ -44,7 +49,15 @@ const STAGE: Record<string, { label: string }> = {
 
 type RejectLevel = "hr" | "director" | "dean" | "president";
 
-export function CancellationWorkflowPanel({ cancellationId, status, reason, tracking }: Props) {
+export function CancellationWorkflowPanel({
+  cancellationId,
+  status,
+  reason,
+  tracking,
+  isHrAdmin,
+  canDirector,
+  canDean,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [rejectLevel, setRejectLevel] = useState<RejectLevel | null>(null);
@@ -94,7 +107,7 @@ export function CancellationWorkflowPanel({ cancellationId, status, reason, trac
 
       {!isTerminal && (
         <div className="flex flex-wrap gap-2">
-          {status === "pending" && (
+          {status === "pending" && isHrAdmin && (
             <>
               <Button onClick={() => run(() => routeCancellationToDirector(cancellationId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
                 <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
@@ -107,39 +120,47 @@ export function CancellationWorkflowPanel({ cancellationId, status, reason, trac
 
           {status === "awaiting_director" && (
             <>
-              {!directorSigned ? (
-                <Button onClick={() => run(() => markCancellationDirectorSigned(cancellationId), "บันทึกผอ.เซ็นแล้ว")} disabled={isPending}>
-                  <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนาม
-                </Button>
-              ) : (
-                <Button onClick={() => run(() => routeCancellationToDean(cancellationId), "ส่งให้คณบดีแล้ว")} disabled={isPending}>
-                  <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้คณบดีลงนาม
+              {!directorSigned
+                ? (canDirector || isHrAdmin) && (
+                    <Button onClick={() => run(() => markCancellationDirectorSigned(cancellationId), "บันทึกผอ.เซ็นแล้ว")} disabled={isPending}>
+                      <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนาม
+                    </Button>
+                  )
+                : isHrAdmin && (
+                    <Button onClick={() => run(() => routeCancellationToDean(cancellationId), "ส่งให้คณบดีแล้ว")} disabled={isPending}>
+                      <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้คณบดีลงนาม
+                    </Button>
+                  )}
+              {isHrAdmin && (
+                <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
+                  <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
                 </Button>
               )}
-              <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
-                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
-              </Button>
             </>
           )}
 
           {status === "awaiting_dean" && (
             <>
-              <Button onClick={() => run(() => markCancellationDeanSigned(cancellationId), "คณบดีลงนามแล้ว")} disabled={isPending}>
-                <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: คณบดีลงนาม
-              </Button>
-              <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("dean")} disabled={isPending}>
-                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (คณบดี)
-              </Button>
+              {(canDean || isHrAdmin) && (
+                <Button onClick={() => run(() => markCancellationDeanSigned(cancellationId), "คณบดีลงนามแล้ว")} disabled={isPending}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: คณบดีลงนาม
+                </Button>
+              )}
+              {isHrAdmin && (
+                <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("dean")} disabled={isPending}>
+                  <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (คณบดี)
+                </Button>
+              )}
             </>
           )}
 
-          {status === "approved" && (
+          {status === "approved" && isHrAdmin && (
             <Button onClick={() => run(() => sendCancellationToPresident(cancellationId), "ส่งอธิการบดีแล้ว")} disabled={isPending}>
               <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้อธิการบดี
             </Button>
           )}
 
-          {status === "awaiting_university" && (
+          {status === "awaiting_university" && isHrAdmin && (
             <>
               <Button onClick={() => run(() => completeCancellation(cancellationId), "ยกเลิกใบลา + คืนสิทธิ์แล้ว")} disabled={isPending}>
                 <CheckCircle2 className="h-4 w-4 mr-2" /> บันทึก: อธิการบดีรับทราบ (ยกเลิก + คืนสิทธิ์)
