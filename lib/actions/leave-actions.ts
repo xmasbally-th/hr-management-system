@@ -1202,7 +1202,9 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
   if (cfg.to) {
     const { data, error } = await db
       .from("leave_requests")
-      .update({ status: cfg.to })
+      // Record who performed the approving step — the detail page's
+      // "ผู้อนุมัติ" field was blank when approval came via this workflow.
+      .update(cfg.to === "approved" ? { status: cfg.to, approver_id: actorId } : { status: cfg.to })
       .eq("id", requestId)
       .in("status", cfg.from)
       .select("employee_id, leave_type_id")

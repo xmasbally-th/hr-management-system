@@ -58,8 +58,19 @@ export async function uploadDocument(formData: FormData): Promise<{ path: string
   await checkHrAdmin(supabase, user.id);
 
   // Generate unique filename: prefix/timestamp-originalname
+  // Supabase storage rejects non-ASCII keys ("Invalid key", 400 — verified
+  // with Thai filenames), so the name must be ASCII-safe. A Thai-only name
+  // like "ลาพักผ่อน.pdf" would sanitize to "_________.pdf"; fall back to a
+  // readable date-stamped name instead so HR can still tell files apart.
   const timestamp = Date.now();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  let safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const stem = safeName.replace(/\.[^.]*$/, "");
+  if (!/[a-zA-Z0-9]/.test(stem)) {
+    const ext = (safeName.match(/\.[^.]*$/) ?? [".pdf"])[0];
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    safeName = `doc-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${ext}`;
+  }
   const storagePath = `${pathPrefix}/${timestamp}-${safeName}`;
 
   const { error } = await supabase.storage

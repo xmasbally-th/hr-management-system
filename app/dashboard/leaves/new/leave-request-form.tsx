@@ -313,7 +313,10 @@ export function LeaveRequestForm({
       if (personalPlan === "planned") {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const start = new Date(startDate);
+        // Parse as local midnight — `new Date("YYYY-MM-DD")` is UTC midnight,
+        // which shifts a day for timezones ahead of UTC (e.g. ICT).
+        const [sy, sm, sd] = startDate.split("-").map(Number);
+        const start = new Date(sy, sm - 1, sd);
         const daysUntil = Math.floor((start.getTime() - today.getTime()) / 86400000);
         if (daysUntil < advanceNoticeDays)
           return `ลากิจแบบวางแผน ต้องยื่นล่วงหน้าอย่างน้อย ${advanceNoticeDays} วัน`;
