@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Loader2, ArrowRight, PenLine, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
+import { Loader2, ArrowRight, PenLine, CheckCircle2, XCircle, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface Tracking {
@@ -61,9 +61,34 @@ export function CancellationWorkflowPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [rejectLevel, setRejectLevel] = useState<RejectLevel | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const stage = STAGE[status] ?? { label: status };
   const directorSigned = !!tracking?.director_signed_date;
+
+  async function handleDownloadDoc() {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/documents/leave-cancellation-form/${cancellationId}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "ดาวน์โหลดไม่สำเร็จ");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename\*=UTF-8''(.+)$/);
+      a.download = m ? decodeURIComponent(m[1]) : `leave-cancellation-${cancellationId}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ดาวน์โหลดไม่สำเร็จ");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function run(fn: () => Promise<unknown>, okMsg: string) {
     startTransition(async () => {
@@ -103,6 +128,14 @@ export function CancellationWorkflowPanel({
         <div className="text-xs bg-white/60 rounded p-2 border border-amber-200">
           <span className="text-muted-foreground">เหตุผลการยกเลิก: </span>{reason}
         </div>
+      )}
+
+      {/* Paper channel: HR prints the official cancellation form */}
+      {isHrAdmin && (
+        <Button variant="outline" size="sm" onClick={handleDownloadDoc} disabled={downloading}>
+          {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          ดาวน์โหลดใบขอยกเลิก (.docx)
+        </Button>
       )}
 
       {!isTerminal && (

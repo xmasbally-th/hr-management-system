@@ -134,3 +134,87 @@ export async function generateLeaveDocx(
   const safeName = (l.employee?.full_name ?? "leave").replace(/[^a-zA-Z0-9ก-๙]/g, "_");
   return { buffer, filename: `ใบลา-${safeName}-${leaveRequestId.slice(0, 8)}.docx` };
 }
+
+/**
+ * แบบใบขอยกเลิกวันลา (.docx) — fills the admin-uploaded template with
+ * leave_type_code = 'CANCELLATION' using data from the cancellation request
+ * plus its original leave. Extra placeholders: {cancel_reason}
+ * {cancel_request_date}; the leave placeholders ({full_name}, {leave_type},
+ * {start_date} …) refer to the original leave being cancelled.
+ */
+export async function generateLeaveCancellationDocx(
+  cancellationId: string,
+): Promise<{ buffer: Buffer; filename: string }> {
+  const supa = admin();
+
+  const { data: cancel, error: cErr } = await supa
+    .from("leave_cancellation_requests")
+    .select("id, leave_request_id, reason, created_at")
+    .eq("id", cancellationId)
+    .single();
+  if (cErr || !cancel) throw new Error("ไม่พบคำขอยกเลิกนี้");
+
+  const { data: leave, error: lErr } = await supa
+    .from("leave_requests")
+    .select(
+      `*,
+       leave_type:leave_types(name, code),
+       employee:profiles!leave_requests_employee_id_fkey(title_th, full_name, position_title, department:departments(name))`,
+    )
+    .eq("id", cancel.leave_request_id)
+    .single();
+  if (lErr || !leave) throw new Error("ไม่พบใบลาต้นทาง");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const l = leave as any;
+
+  const { data: tpl } = await supa
+    .from("document_templates")
+    .select("storage_path, name")
+    .eq("doc_type", "leave")
+    .eq("is_active", true)
+    .eq("leave_type_code", "CANCELLATION")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!tpl) {
+    throw new Error(
+      "ยังไม่ได้อัปโหลดเทมเพลต \"ใบขอยกเลิกวันลา\" — อัปโหลดที่ ข้อมูลหลัก → เทมเพลตเอกสาร (ประเภท CANCELLATION)",
+    );
+  }
+
+  const { data: file, error: dErr } = await supa.storage.from("templates").download(tpl.storage_path);
+  if (dErr || !file) throw new Error("โหลดไฟล์เทมเพลตไม่สำเร็จ");
+
+  const data: Record<string, string | number> = {
+    title_th: l.employee?.title_th ?? "",
+    full_name: l.employee?.full_name ?? "",
+    position: l.employee?.position_title ?? "",
+    department: l.employee?.department?.name ?? "",
+    leave_type: l.leave_type?.name ?? "",
+    start_date: fmt(l.start_date),
+    end_date: fmt(l.end_date),
+    total_days: l.total_days ?? "",
+    working_days: l.working_days ?? l.total_days ?? "",
+    cancel_reason: cancel.reason ?? "",
+    cancel_request_date: fmt((cancel.created_at ?? "").slice(0, 10)),
+    today_thai: fmt(new Date().toISOString().slice(0, 10)),
+  };
+
+  let buffer: Buffer;
+  try {
+    const zip = new PizZip(Buffer.from(await file.arrayBuffer()));
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      nullGetter: () => "",
+    });
+    doc.render(data);
+    buffer = doc.getZip().generate({ type: "nodebuffer" });
+  } catch (err) {
+    console.error("[leave-merge] cancellation render failed:", err);
+    throw new Error("สร้างเอกสารจากเทมเพลตไม่สำเร็จ — ตรวจสอบ placeholder ในเทมเพลต");
+  }
+
+  const safeName = (l.employee?.full_name ?? "leave").replace(/[^a-zA-Z0-9ก-๙]/g, "_");
+  return { buffer, filename: `ใบขอยกเลิกวันลา-${safeName}-${cancellationId.slice(0, 8)}.docx` };
+}

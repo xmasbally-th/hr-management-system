@@ -24,6 +24,7 @@ const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PERSONAL", label: "ลากิจ (PERSONAL)" },
   { value: "VACATION", label: "ลาพักผ่อน (VACATION)" },
   { value: "MATERNITY", label: "ลาคลอด (MATERNITY)" },
+  { value: "CANCELLATION", label: "ใบขอยกเลิกวันลา (CANCELLATION)" },
 ];
 
 const PLACEHOLDERS = [
@@ -32,6 +33,8 @@ const PLACEHOLDERS = [
   "reason", "contact", "edd",
   "accumulated_days", "annual_days", "substitute_1", "substitute_2",
   "substitute_3", "branch_head_opinion", "today_thai",
+  // ใบขอยกเลิกวันลา (CANCELLATION) เพิ่ม:
+  "cancel_reason", "cancel_request_date",
 ];
 
 function typeLabel(code: string | null): string {
