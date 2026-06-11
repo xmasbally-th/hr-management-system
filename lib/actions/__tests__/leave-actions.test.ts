@@ -396,35 +396,46 @@ describe("cancelLeaveRequest", () => {
     vi.clearAllMocks();
   });
 
-  it("self-cancels own pending request", async () => {
-    // cancelLeaveRequest now: read profile → SELECT request → guard status →
-    // UPDATE with status guard. We share one chain for both SELECT and UPDATE
-    // on leave_requests so the row data flows through both reads.
-    const profileChain = createMockChain({ data: profileRow("employee") });
+  function mockCancel(role: string, status = "pending") {
+    const profileChain = createMockChain({ data: profileRow(role) });
     const leaveChain = createMockChain({
       data: {
         id: REQUEST_ID,
-        status: "pending",
-        employee_id: "user-1",
+        status,
+        employee_id: "emp-1",
         leave_type_id: "lt-1",
         working_days: 1,
         total_days: 1,
       },
     });
-
     mockSupabase({
-      fromOverrides: {
-        profiles: profileChain,
-        leave_requests: leaveChain,
-      },
+      fromOverrides: { profiles: profileChain, leave_requests: leaveChain },
     });
+    return leaveChain;
+  }
 
-    await cancelLeaveRequest(REQUEST_ID);
+  it("HR cancels a faculty-level (pending) request with a reason", async () => {
+    const leaveChain = mockCancel("hr");
+    await cancelLeaveRequest(REQUEST_ID, "พนักงานแจ้งของดลา");
     expect(leaveChain.update).toHaveBeenCalled();
     expect(leaveChain.eq).toHaveBeenCalledWith("id", REQUEST_ID);
-    expect(leaveChain.eq).toHaveBeenCalledWith("employee_id", "user-1");
     expect(leaveChain.eq).toHaveBeenCalledWith("status", "pending");
     expect(revalidatePath).toHaveBeenCalled();
+  });
+
+  it("rejects when the caller is not HR/Admin (even the owner)", async () => {
+    mockCancel("employee");
+    await expect(cancelLeaveRequest(REQUEST_ID, "เหตุผล")).rejects.toThrow(/Forbidden/);
+  });
+
+  it("rejects when no reason is given", async () => {
+    mockCancel("hr");
+    await expect(cancelLeaveRequest(REQUEST_ID, "   ")).rejects.toThrow(/กรุณาระบุเหตุผล/);
+  });
+
+  it("rejects once the leave has been sent to the university", async () => {
+    mockCancel("hr", "awaiting_university");
+    await expect(cancelLeaveRequest(REQUEST_ID, "เหตุผล")).rejects.toThrow(/ส่งให้มหาวิทยาลัยแล้ว/);
   });
 });
 

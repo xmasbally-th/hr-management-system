@@ -966,23 +966,33 @@ export async function rejectLeaveRequest(requestId: string, reason?: string) {
   revalidatePath("/dashboard/approvals/leaves");
 }
 
-export async function cancelLeaveRequest(requestId: string) {
+/**
+ * ยกเลิกใบลาระดับคณะ (ก่อนส่งมหาวิทยาลัย) — HR/Admin เท่านั้น
+ * พนักงานที่ต้องการยกเลิกต้องแจ้ง HR ให้ดำเนินการแทน · บังคับระบุเหตุผล
+ * และบันทึกประวัติการยกเลิกลง leave_cancellation_requests ไว้ดูย้อนหลัง
+ * (record สถานะ completed — ไม่ต้องเดินเอกสาร เพราะยังไม่พ้นระดับคณะ)
+ */
+export async function cancelLeaveRequest(requestId: string, reason: string) {
+  if (!UUID_RE.test(requestId)) throw new Error("รหัสคำขอไม่ถูกต้อง");
+  const sanitizedReason = validateTextField(reason, "เหตุผลการยกเลิก", 1000);
+  if (!sanitizedReason) throw new Error("กรุณาระบุเหตุผลการยกเลิก");
+
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   checkRateLimit(user.id);
 
-  // C2: HR/admin may cancel on behalf of any employee — fetch role first
-  // so we know whether to require ownership.
   const profile = await getProfile(supabase, user.id);
   const isHrAdmin = profile?.role === "hr" || profile?.role === "admin";
+  if (!isHrAdmin) {
+    throw new Error("Forbidden: การยกเลิกใบลาระดับคณะดำเนินการโดย HR/Admin — กรุณาติดต่อฝ่ายบุคคล");
+  }
 
   // Read current status so we know whether to restore balance
-  let reqQuery = supabase
+  const { data: req } = await supabase
     .from("leave_requests")
     .select("id, status, employee_id, leave_type_id, working_days, total_days")
-    .eq("id", requestId);
-  if (!isHrAdmin) reqQuery = reqQuery.eq("employee_id", user.id);
-  const { data: req } = await reqQuery.single();
+    .eq("id", requestId)
+    .single();
 
   if (!req) throw new Error("ไม่พบคำขอลานี้");
   // Direct cancellation is allowed only BEFORE the leave has been sent to
@@ -995,16 +1005,16 @@ export async function cancelLeaveRequest(requestId: string) {
       "ใบลานี้ถูกส่งให้มหาวิทยาลัยแล้ว — ต้องยื่น \"ใบขอยกเลิกวันลา\" ผ่านการเดินเอกสารแทน",
     );
   }
-  const cancelledByHr = isHrAdmin && req.employee_id !== user.id;
+  const cancelledForOther = req.employee_id !== user.id;
 
   // Atomic: only cancel if status hasn't changed since our read
-  let updateQuery = supabase
+  const { data: cancelled, error } = await supabase
     .from("leave_requests")
     .update({ status: "cancelled" })
     .eq("id", requestId)
-    .eq("status", req.status); // ← guard against race condition
-  if (!isHrAdmin) updateQuery = updateQuery.eq("employee_id", user.id);
-  const { data: cancelled, error } = await updateQuery.select("id").single();
+    .eq("status", req.status) // ← guard against race condition
+    .select("id")
+    .single();
 
   if (error || !cancelled) {
     throw new Error("ไม่สามารถยกเลิกคำขอลาได้ (สถานะอาจเปลี่ยนไปแล้ว กรุณารีเฟรชหน้า)");
@@ -1019,13 +1029,25 @@ export async function cancelLeaveRequest(requestId: string) {
     currentFiscalYear(),
   );
 
+  // ── ประวัติการยกเลิก — record ปิดแล้ว (ไม่ต้องเดินเอกสารระดับคณะ) ──
+  const { error: histErr } = await getAdminClient()
+    .from("leave_cancellation_requests")
+    .insert({
+      leave_request_id: requestId,
+      requested_by: user.id,
+      reason: sanitizedReason,
+      status: "completed",
+      approver_id: user.id,
+    });
+  if (histErr) console.error("[leave-actions] cancel history insert failed:", histErr.message);
+
   await logAudit(supabase, user.id, "cancel_leave", "leave_request", requestId, {
     prev_status: req.status,
-    cancelled_by_hr: cancelledByHr,
+    reason: sanitizedReason,
     employee_id: req.employee_id,
   });
 
-  // ── Notify HR/Admin (always) + the owner if cancelled by HR (C2) ──
+  // ── Notify HR/Admin (always) + the owner when cancelled on their behalf ──
   try {
     const [{ data: empProfile }, { data: ltInfo }] = await Promise.all([
       supabase.from("profiles").select("full_name").eq("id", req.employee_id).single(),
@@ -1034,9 +1056,7 @@ export async function cancelLeaveRequest(requestId: string) {
     const empName = empProfile?.full_name ?? "พนักงาน";
     const ltName = ltInfo?.name ?? "ลา";
     const daysLabel = req.working_days ?? req.total_days;
-    const cancelMsg = cancelledByHr
-      ? `HR ยกเลิกคำขอ${ltName} (${daysLabel} วัน) ของ ${empName} — วันลาถูกคืนกลับ`
-      : `${empName} ยกเลิกคำขอ${ltName} (${daysLabel} วัน) — วันลาถูกคืนกลับ`;
+    const cancelMsg = `HR ยกเลิกคำขอ${ltName} (${daysLabel} วัน) ของ ${empName} — วันลาถูกคืนกลับ · เหตุผล: ${sanitizedReason}`;
 
     const { data: hrUsers } = await supabase
       .from("profiles")
@@ -1044,7 +1064,7 @@ export async function cancelLeaveRequest(requestId: string) {
       .in("role", ["hr", "admin"]);
 
     const notifyTargets: string[] = (hrUsers ?? []).map((hr) => hr.id);
-    if (cancelledByHr) notifyTargets.push(req.employee_id);
+    if (cancelledForOther) notifyTargets.push(req.employee_id);
 
     await Promise.all(
       notifyTargets.map((uid) =>
@@ -1057,6 +1077,7 @@ export async function cancelLeaveRequest(requestId: string) {
   }
 
   revalidatePath("/dashboard/leaves");
+  revalidatePath(`/dashboard/leaves/${requestId}`);
   revalidatePath("/dashboard/hr/leaves");
   revalidatePath("/dashboard/approvals/leaves");
 }

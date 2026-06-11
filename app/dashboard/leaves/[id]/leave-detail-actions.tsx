@@ -71,9 +71,12 @@ export function LeaveDetailActions({
     }
   }, [existingMedicalCert]);
 
+  // canDownloadDoc is passed as isHrAdmin from the detail page
+  const isHrAdmin = canDownloadDoc;
+
   const showMedicalCertUpload = isOwner && isSick && status === "pending";
-  // เจ้าของยกเลิกระหว่างกระบวนการ (ก่อนส่งมหาวิทยาลัย)
-  const showInProcessCancel = isOwner && CANCELLABLE_INPROCESS.includes(status);
+  // ยกเลิกระดับคณะ (ก่อนส่งมหาวิทยาลัย) — HR/Admin ดำเนินการแทนเท่านั้น
+  const showInProcessCancel = isHrAdmin && CANCELLABLE_INPROCESS.includes(status);
   // ยื่นใบขอยกเลิก — ใบที่ส่งมหาวิทยาลัย/เสร็จสิ้นแล้ว (เจ้าของ หรือ HR/Admin)
   const showRequestCancel =
     (status === "completed" || status === "awaiting_university") &&
@@ -103,14 +106,18 @@ export function LeaveDetailActions({
     }
   }
 
-  function handleConfirm() {
+  function handleConfirm(reason?: string) {
     const action = confirmAction;
     setConfirmAction(null);
     if (!action) return;
+    if (!reason || !reason.trim()) {
+      toast.error("กรุณาระบุเหตุผลการยกเลิก");
+      return;
+    }
     startTransition(async () => {
       try {
-        await cancelLeaveRequest(requestId);
-        toast.success("ยกเลิกคำขอลาแล้ว");
+        await cancelLeaveRequest(requestId, reason);
+        toast.success("ยกเลิกคำขอลาแล้ว — บันทึกเหตุผลไว้ในประวัติ");
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "ดำเนินการไม่สำเร็จ");
@@ -217,11 +224,13 @@ export function LeaveDetailActions({
       <ConfirmDialog
         open={confirmAction === "cancel"}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title="ยืนยันการยกเลิก"
-        description="ยกเลิกคำขอลานี้ใช่หรือไม่? ระบบจะคืนสิทธิ์วันลา"
+        title="ยืนยันการยกเลิก (โดย HR/Admin)"
+        description="ยกเลิกคำขอลานี้ใช่หรือไม่? ระบบจะคืนสิทธิ์วันลา และบันทึกเหตุผลไว้ในประวัติการยกเลิก"
         confirmLabel="ยกเลิกคำขอ"
         variant="destructive"
-        onConfirm={() => handleConfirm()}
+        withInput
+        inputLabel="เหตุผลการยกเลิก *"
+        onConfirm={handleConfirm}
       />
 
       {/* ใบขอยกเลิกวันลา — ทั้งใบ หรือบางช่วง (ตามแบบฟอร์มราชการ) */}
