@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ClientSearchInput } from "@/components/search-input";
 import { COMMITTED_LEAVE_STATUSES } from "@/lib/leave-rules";
 import { cn } from "@/lib/utils";
-import type { LeaveRequestRow, LeaveTypeOption, PersonnelRow } from "../leaves-dashboard-client";
+import type { LeaveTypeOption, PersonnelRow } from "../leaves-dashboard-client";
+import type { LeaveRequestRow } from "@/components/leave-request-table";
 
 interface Props {
   personnel: PersonnelRow[];

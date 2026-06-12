@@ -89,7 +89,10 @@ async function checkHrAdmin(supabase: Awaited<ReturnType<typeof createClient>>, 
   }
 }
 
-export async function getAllDocumentTracking() {
+/** Leave-family document types — used to split leave vs travel tracking. */
+const LEAVE_DOC_TYPES = ["leave", "leave_request", "leave_cancellation"];
+
+export async function getAllDocumentTracking(params?: { family?: "leave" | "travel" }) {
   const supabase = await createClient();
   const user = await getAuthUser(supabase);
   // Manager may read the org-wide queue (merged from /approvals/documents);
@@ -103,11 +106,22 @@ export async function getAllDocumentTracking() {
     throw new Error("Forbidden: Insufficient permissions");
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("document_tracking")
     .select("*")
-    .is("deleted_at", null)
-    .order("sent_for_signature_date", { ascending: false, nullsFirst: false });
+    .is("deleted_at", null);
+
+  // Leave hub shows only leave docs; the travel tracking page shows the rest.
+  if (params?.family === "leave") {
+    query = query.in("document_type", LEAVE_DOC_TYPES);
+  } else if (params?.family === "travel") {
+    query = query.not("document_type", "in", `(${LEAVE_DOC_TYPES.join(",")})`);
+  }
+
+  const { data, error } = await query.order("sent_for_signature_date", {
+    ascending: false,
+    nullsFirst: false,
+  });
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลเอกสารได้");
   return data;

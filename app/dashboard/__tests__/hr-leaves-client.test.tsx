@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
-import { HrLeavesClient } from "../hr/leaves/hr-leaves-client";
+import { render, screen } from "@testing-library/react";
+import { LeaveRequestTable } from "@/components/leave-request-table";
 
 /*
- * HrLeavesClient is a read-only table used by the approvals/leaves queue.
- * Each row links to the leave detail page ("เดินเอกสาร"); approve/reject
- * is performed there, not inline — so this suite only covers rendering.
+ * LeaveRequestTable is the unified read-only leave list used across the
+ * leave hub (รอดำเนินการ / คำขอทั้งหมด tabs). Each row links to the leave
+ * detail page ("เดินเอกสาร"); approve/reject happens there, not inline —
+ * so this suite only covers rendering.
  */
 
 /* ── Fixtures ─────────────────────────────────────────────────────────── */
@@ -17,12 +18,13 @@ const REQUESTS = [
     start_date: "2026-05-01",
     end_date: "2026-05-03",
     total_days: 3,
-    reason: "ป่วย",
+    working_days: 3,
     status: "pending",
     submission_channel: "digital",
-    created_at: "2026-04-28",
-    leave_type: { name: "ลาป่วย" },
-    employee: { full_name: "สมชาย ใจดี", email: "somchai@test.com", department_id: null },
+    medical_cert_url: null,
+    leave_type_id: "lt-1",
+    leave_type: { name: "ลาป่วย", code: "SICK" },
+    employee: { full_name: "สมชาย ใจดี", email: "somchai@test.com", position_title: "อาจารย์" },
   },
   {
     id: "req-2",
@@ -30,12 +32,13 @@ const REQUESTS = [
     start_date: "2026-05-10",
     end_date: "2026-05-12",
     total_days: 3,
-    reason: null,
+    working_days: 3,
     status: "approved",
     submission_channel: "paper",
-    created_at: "2026-05-01",
-    leave_type: { name: "ลาพักผ่อน" },
-    employee: { full_name: "สมหญิง รักดี", email: "somying@test.com", department_id: null },
+    medical_cert_url: null,
+    leave_type_id: "lt-2",
+    leave_type: { name: "ลาพักผ่อน", code: "VACATION" },
+    employee: { full_name: "สมหญิง รักดี", email: "somying@test.com", position_title: "เจ้าหน้าที่" },
   },
   {
     id: "req-3",
@@ -43,27 +46,28 @@ const REQUESTS = [
     start_date: "2026-05-15",
     end_date: "2026-05-15",
     total_days: 1,
-    reason: "ธุระ",
+    working_days: 1,
     status: "rejected",
     submission_channel: "digital",
-    created_at: "2026-05-05",
-    leave_type: { name: "ลากิจ" },
-    employee: { full_name: "สมศรี ดีใจ", email: "somsri@test.com", department_id: null },
+    medical_cert_url: null,
+    leave_type_id: "lt-3",
+    leave_type: { name: "ลากิจ", code: "PERSONAL" },
+    employee: { full_name: "สมศรี ดีใจ", email: "somsri@test.com", position_title: "อาจารย์" },
   },
 ];
 
 /* ── Tests ────────────────────────────────────────────────────────────── */
 
-describe("HrLeavesClient", () => {
-  it("renders table with all requests", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
+describe("LeaveRequestTable", () => {
+  it("renders one row per request", () => {
+    render(<LeaveRequestTable requests={REQUESTS} />);
     const rows = screen.getAllByRole("row");
     // 1 header row + 3 data rows
     expect(rows.length).toBe(4);
   });
 
-  it("shows employee name and leave type in table", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
+  it("shows employee name and leave type", () => {
+    render(<LeaveRequestTable requests={REQUESTS} />);
     expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
     expect(screen.getByText("สมหญิง รักดี")).toBeInTheDocument();
     expect(screen.getByText("สมศรี ดีใจ")).toBeInTheDocument();
@@ -73,23 +77,19 @@ describe("HrLeavesClient", () => {
   });
 
   it("shows correct status badges", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    expect(screen.getByText("รอตรวจสอบ")).toBeInTheDocument();
-    expect(screen.getByText("อนุมัติ")).toBeInTheDocument();
+    render(<LeaveRequestTable requests={REQUESTS} />);
+    expect(screen.getByText("รอ HR ตรวจสอบ/ส่งลงนาม")).toBeInTheDocument();
+    expect(screen.getByText("คณบดีลงนามแล้ว — รอ HR ส่งมหาวิทยาลัย")).toBeInTheDocument();
     expect(screen.getByText("ไม่อนุมัติ")).toBeInTheDocument();
   });
 
-  it("renders one 'เดินเอกสาร' action per row, regardless of status", () => {
-    render(<HrLeavesClient requests={REQUESTS} />);
-    const dataRows = screen.getAllByRole("row").slice(1); // drop header
-    for (const row of dataRows) {
-      expect(within(row).getAllByRole("button")).toHaveLength(1);
-    }
-    expect(screen.getAllByText("เดินเอกสาร")).toHaveLength(3);
+  it("renders one 'ดูรายละเอียด' action per row, regardless of status", () => {
+    render(<LeaveRequestTable requests={REQUESTS} />);
+    expect(screen.getAllByText("ดูรายละเอียด")).toHaveLength(3);
   });
 
-  it("shows empty message when no requests", () => {
-    render(<HrLeavesClient requests={[]} />);
-    expect(screen.getByText("ไม่มีคำขอลาในหมวดนี้")).toBeInTheDocument();
+  it("shows the empty message when no requests", () => {
+    render(<LeaveRequestTable requests={[]} emptyText="ไม่มีคำขอลาในรอบนี้" />);
+    expect(screen.getByText("ไม่มีคำขอลาในรอบนี้")).toBeInTheDocument();
   });
 });

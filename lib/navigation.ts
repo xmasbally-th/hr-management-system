@@ -74,21 +74,16 @@ export const navigationGroups: NavGroup[] = [
     label: "การอนุมัติ",
     items: [
       {
-        title: "อนุมัติการลา",
-        href: "/dashboard/approvals/leaves",
-        icon: "ClipboardCheck",
-        roles: ["admin", "hr", "manager"],
-      },
-      {
         title: "อนุมัติการเดินทาง",
         href: "/dashboard/approvals/travel",
         icon: "ClipboardList",
         roles: ["admin", "hr", "manager"],
       },
       {
-        // Merged page — hr/admin reach it from the "การจัดการบุคลากร" group
-        // instead, so only manager sees this entry (avoids duplicate menus).
-        title: "ติดตามเอกสาร",
+        // Travel doc tracking — hr/admin reach it from the "การจัดการบุคลากร"
+        // group instead, so only manager sees this entry (no duplicate menus).
+        // Leave docs live in the leave hub's ติดตามเอกสาร tab.
+        title: "ติดตามเอกสารเดินทาง",
         href: "/dashboard/hr/documents",
         icon: "FolderSearch",
         roles: ["manager"],
@@ -111,10 +106,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
-        title: "จัดการการลา",
+        // Unified leave hub — queue / all requests / overview / doc-tracking.
+        // Manager sees it here too (this group surfaces just this item for them).
+        title: "จัดการใบลา",
         href: "/dashboard/hr/leaves",
         icon: "CalendarRange",
-        roles: ["admin", "hr"],
+        roles: ["admin", "hr", "manager"],
       },
       {
         title: "จัดการเดินทางราชการ",
@@ -135,7 +132,7 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr"],
       },
       {
-        title: "ติดตามเอกสาร",
+        title: "ติดตามเอกสารเดินทาง",
         href: "/dashboard/hr/documents",
         icon: "FolderSearch",
         roles: ["admin", "hr"],
