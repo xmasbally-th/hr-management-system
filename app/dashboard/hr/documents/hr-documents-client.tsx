@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
+import { Fragment, useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   updateSentForSignature,
   updateReturnedDate,
@@ -12,6 +14,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -20,6 +40,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DocumentWorkflowTimeline } from "@/components/document-workflow-timeline";
+import { ClientPaginationControls } from "@/components/pagination-controls";
 import {
   Send,
   RotateCcw,
@@ -31,17 +53,35 @@ import {
   MessageSquare,
   X,
   Check,
+  ChevronDown,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 
 interface DocumentRecord {
   id: string;
   reference_id: string;
   document_type: string;
+  // legacy paper-channel columns (stamped manually on this page)
   sent_for_signature_date: string | null;
   returned_date: string | null;
   scanned_upload_date: string | null;
   sent_to_agency_date: string | null;
   notes: string | null;
+  // signature-workflow columns (stamped by runLeaveStage / travel stages)
+  sent_to_chair_date: string | null;
+  chair_signed_date: string | null;
+  sent_to_director_date: string | null;
+  director_signed_date: string | null;
+  sent_to_dean_date: string | null;
+  dean_signed_date: string | null;
+  scanned_document_url: string | null;
+  sent_to_president_date: string | null;
+  president_signed_date: string | null;
+  president_document_url: string | null;
+  rejected_at: string | null;
+  reject_reason: string | null;
+  reject_level: string | null;
 }
 
 export interface DocRefInfo {
@@ -57,15 +97,93 @@ const docTypeLabels: Record<string, string> = {
   leave_cancellation: "คำขอยกเลิกใบลา",
   travel_order: "คำสั่งเดินทาง",
   travel_claim: "เบิกค่าเดินทาง",
+  travel_cancellation: "ยกเลิกคำสั่งเดินทาง",
   other: "อื่นๆ",
 };
 
-function getStatus(doc: DocumentRecord) {
-  if (doc.sent_to_agency_date) return { label: "ส่งหน่วยงานแล้ว", variant: "default" as const, step: 4 };
-  if (doc.scanned_upload_date) return { label: "สแกนแล้ว", variant: "secondary" as const, step: 3 };
-  if (doc.returned_date) return { label: "รับคืนแล้ว", variant: "secondary" as const, step: 2 };
-  if (doc.sent_for_signature_date) return { label: "รอลงนาม", variant: "outline" as const, step: 1 };
-  return { label: "รอดำเนินการ", variant: "outline" as const, step: 0 };
+/** Badge tint per document family — leave / cancellation / travel / other. */
+function docTypeBadgeClass(docType: string): string {
+  if (docType === "leave_cancellation" || docType === "travel_cancellation") {
+    return "border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400";
+  }
+  if (docType === "travel_order" || docType === "travel_claim") {
+    return "border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-950/30 dark:text-sky-400";
+  }
+  return "border-violet-300 text-violet-700 bg-violet-50 dark:bg-violet-950/30 dark:text-violet-400";
+}
+
+/** Type-filter options shown in the dropdown (value → label). */
+const typeFilterOptions: [string, string][] = [
+  ["all", "ทุกประเภท"],
+  ["leave", "ใบลา"],
+  ["leave_cancellation", "คำขอยกเลิกใบลา"],
+  ["travel_order", "คำสั่งเดินทาง"],
+  ["travel_claim", "เบิกค่าเดินทาง"],
+  ["other", "อื่นๆ"],
+];
+
+/** Map a row's document_type onto a coarse filter bucket. */
+function typeBucket(docType: string): string {
+  if (docType === "leave" || docType === "leave_request") return "leave";
+  if (docType === "leave_cancellation") return "leave_cancellation";
+  if (docType === "travel_order") return "travel_order";
+  if (docType === "travel_claim" || docType === "travel_cancellation") return "travel_claim";
+  return "other";
+}
+
+/** Types that have an automated signature workflow → expandable timeline. */
+const workflowDocTypes = new Set([
+  "leave",
+  "leave_request",
+  "leave_cancellation",
+  "travel_order",
+  "travel_claim",
+  "travel_cancellation",
+]);
+
+function detailHref(docType: string, refId: string): string | null {
+  if (docType === "leave" || docType === "leave_request") return `/dashboard/leaves/${refId}`;
+  if (docType === "travel_order" || docType === "travel_claim") return `/dashboard/travel/${refId}`;
+  return null;
+}
+
+/**
+ * Status derived from the real signature-workflow columns first, falling
+ * back to the legacy manual paper-channel columns for rows that have no
+ * automated workflow (e.g. document_type = other). `tone` drives the
+ * coloured dot so the queue is scannable at a glance.
+ */
+function getStatus(doc: DocumentRecord): {
+  label: string;
+  variant: "default" | "secondary" | "outline" | "destructive";
+  tone: "green" | "red" | "amber" | "gray";
+} {
+  if (doc.rejected_at) return { label: "ตีกลับ/ปฏิเสธ", variant: "destructive", tone: "red" };
+  if (doc.president_signed_date) return { label: "เสร็จสิ้น", variant: "default", tone: "green" };
+  if (doc.sent_to_agency_date) return { label: "ส่งหน่วยงานแล้ว", variant: "default", tone: "green" };
+  if (doc.sent_to_president_date) return { label: "รออธิการบดี", variant: "secondary", tone: "amber" };
+  if (doc.dean_signed_date) return { label: "คณบดีลงนามแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.sent_to_dean_date) return { label: "รอคณบดีลงนาม", variant: "secondary", tone: "amber" };
+  if (doc.director_signed_date) return { label: "ผู้อำนวยการลงนามแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.sent_to_director_date) return { label: "รอผู้อำนวยการลงนาม", variant: "secondary", tone: "amber" };
+  if (doc.chair_signed_date) return { label: "ประธานสาขาให้ความเห็นแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.sent_to_chair_date) return { label: "รอประธานสาขา", variant: "outline", tone: "amber" };
+  if (doc.scanned_upload_date) return { label: "สแกนแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.returned_date) return { label: "รับคืนแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.sent_for_signature_date) return { label: "รอลงนาม", variant: "outline", tone: "amber" };
+  return { label: "รอดำเนินการ", variant: "outline", tone: "gray" };
+}
+
+const toneDotClass: Record<string, string> = {
+  green: "bg-emerald-500",
+  red: "bg-destructive",
+  amber: "bg-amber-500",
+  gray: "bg-muted-foreground/40",
+};
+
+/** Terminal states: completed the workflow, sent to agency, or rejected. */
+function isCompleted(doc: DocumentRecord) {
+  return !!(doc.president_signed_date || doc.sent_to_agency_date || doc.rejected_at);
 }
 
 function formatDate(dateStr: string | null) {
@@ -77,24 +195,63 @@ function formatDate(dateStr: string | null) {
   });
 }
 
+/** Initials for the avatar fallback — first two name tokens. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts.slice(0, 2).map((p) => p.charAt(0)).join("").toUpperCase();
+}
+
+const PAGE_SIZE = 15;
+
 export function HrDocumentsClient({
   documents: initialDocs,
   refInfo = {},
+  readOnly = false,
 }: {
   documents: DocumentRecord[];
   refInfo?: Record<string, DocRefInfo>;
+  readOnly?: boolean;
 }) {
   const [documents, setDocuments] = useState(initialDocs);
   const [isPending, startTransition] = useTransition();
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [deletingDoc, setDeletingDoc] = useState<DocumentRecord | null>(null);
+  const [page, setPage] = useState(1);
 
-  const filtered = documents.filter((doc) => {
-    if (filter === "pending") return !doc.sent_to_agency_date;
-    if (filter === "completed") return !!doc.sent_to_agency_date;
+  const colCount = readOnly ? 9 : 10;
+
+  // Search + type filters apply first; the status tabs then narrow further
+  // and their counts reflect the already-filtered set.
+  const searched = documents.filter((doc) => {
+    if (typeFilter !== "all" && typeBucket(doc.document_type) !== typeFilter) return false;
+    if (search.trim()) {
+      const name = refInfo[doc.reference_id]?.employeeName ?? "";
+      if (!name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    }
     return true;
   });
+
+  const filtered = searched.filter((doc) => {
+    if (filter === "pending") return !isCompleted(doc);
+    if (filter === "completed") return isCompleted(doc);
+    return true;
+  });
+
+  // Reset to page 1 whenever the active filter set changes, so the user
+  // never lands on an out-of-range page after narrowing results.
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter, filter]);
+
+  const totalCount = filtered.length;
+  const safePage = Math.min(page, Math.max(1, Math.ceil(totalCount / PAGE_SIZE)));
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function handleAction(docId: string, action: () => Promise<void>, field: keyof DocumentRecord) {
     startTransition(async () => {
@@ -105,7 +262,10 @@ export function HrDocumentsClient({
             d.id === docId ? { ...d, [field]: new Date().toISOString() } : d
           )
         );
-      } catch { /* ignore */ }
+        toast.success("บันทึกแล้ว");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "ดำเนินการไม่สำเร็จ");
+      }
     });
   }
 
@@ -114,7 +274,11 @@ export function HrDocumentsClient({
       try {
         await deleteDocumentTracking(docId);
         setDocuments((prev) => prev.filter((d) => d.id !== docId));
-      } catch { /* ignore */ }
+        setDeletingDoc(null);
+        toast.success("ลบรายการแล้ว");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "ลบรายการไม่สำเร็จ");
+      }
     });
   }
 
@@ -126,12 +290,40 @@ export function HrDocumentsClient({
           prev.map((d) => (d.id === docId ? { ...d, notes: noteText } : d))
         );
         setEditingNoteId(null);
-      } catch { /* ignore */ }
+        toast.success("บันทึกหมายเหตุแล้ว");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "บันทึกหมายเหตุไม่สำเร็จ");
+      }
     });
   }
 
   return (
     <div className="space-y-4">
+      {/* Search + type filter */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อผู้ขอ..."
+            className="pl-9"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
+          <SelectTrigger className="h-9 w-full sm:w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {typeFilterOptions.map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Filter tabs */}
       <div className="flex gap-2">
         {([
@@ -148,10 +340,10 @@ export function HrDocumentsClient({
             {label}
             <Badge variant="secondary" className="ml-2 text-xs">
               {key === "all"
-                ? documents.length
+                ? searched.length
                 : key === "pending"
-                  ? documents.filter((d) => !d.sent_to_agency_date).length
-                  : documents.filter((d) => !!d.sent_to_agency_date).length}
+                  ? searched.filter((d) => !isCompleted(d)).length
+                  : searched.filter((d) => isCompleted(d)).length}
             </Badge>
           </Button>
         ))}
@@ -162,63 +354,90 @@ export function HrDocumentsClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[140px]">ประเภท</TableHead>
+              <TableHead className="w-[32px]"></TableHead>
+              <TableHead className="min-w-[200px]">ผู้ขอ</TableHead>
+              <TableHead className="w-[150px]">ประเภท</TableHead>
               <TableHead>สถานะ</TableHead>
               <TableHead className="text-center">ส่งลงนาม</TableHead>
               <TableHead className="text-center">รับคืน</TableHead>
               <TableHead className="text-center">สแกน</TableHead>
               <TableHead className="text-center">ส่งหน่วยงาน</TableHead>
               <TableHead>หมายเหตุ</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
+              {!readOnly && <TableHead className="w-[60px]"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 && (
+            {totalCount === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={colCount} className="text-center py-8 text-muted-foreground">
                   ไม่มีรายการเอกสาร
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((doc) => {
+            {paged.map((doc) => {
               const status = getStatus(doc);
+              const expanded = expandedId === doc.id;
+              const href = detailHref(doc.document_type, doc.reference_id);
+              const info = refInfo[doc.reference_id];
               return (
-                <TableRow key={doc.id}>
+                <Fragment key={doc.id}>
+                <TableRow className="hover:bg-muted/50">
+                  <TableCell className="pr-0">
+                    <button
+                      onClick={() => setExpandedId(expanded ? null : doc.id)}
+                      className="p-1 text-muted-foreground hover:text-foreground rounded"
+                      title={expanded ? "ย่อเส้นทางเอกสาร" : "ดูเส้นทางเอกสาร"}
+                    >
+                      {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                  </TableCell>
+
+                  {/* Requester — prominent name + avatar */}
                   <TableCell>
-                    <div>
-                      <span className="font-medium text-sm">
-                        {docTypeLabels[doc.document_type] ?? doc.document_type}
-                      </span>
-                      {(() => {
-                        const info = refInfo[doc.reference_id];
-                        if (!info) {
-                          return (
-                            <p
-                              className="text-xs text-muted-foreground truncate max-w-[140px]"
-                              title={doc.reference_id}
-                            >
-                              {doc.reference_id.substring(0, 8)}...
-                            </p>
-                          );
-                        }
-                        return (
-                          <div className="text-xs text-muted-foreground space-y-0.5">
-                            <p className="truncate max-w-[200px]">
-                              {info.employeeName || "—"}
-                              {info.typeName ? ` · ${info.typeName}` : ""}
-                            </p>
-                            {info.startDate && info.endDate && (
-                              <p>
-                                {info.startDate} ~ {info.endDate}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
+                    <div className="flex items-center gap-2.5">
+                      <Avatar size="sm">
+                        <AvatarFallback>
+                          {info?.employeeName ? initialsOf(info.employeeName) : "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        {info?.employeeName ? (
+                          <p className="font-medium text-sm truncate">{info.employeeName}</p>
+                        ) : (
+                          <p
+                            className="text-sm text-muted-foreground italic"
+                            title={doc.reference_id}
+                          >
+                            ไม่ทราบชื่อ
+                          </p>
+                        )}
+                        {info?.startDate && info?.endDate && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(info.startDate)} ~ {formatDate(info.endDate)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
+
+                  {/* Type */}
                   <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Badge variant="outline" className={docTypeBadgeClass(doc.document_type)}>
+                      {docTypeLabels[doc.document_type] ?? doc.document_type}
+                    </Badge>
+                    {info?.typeName && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-[140px]">
+                        {info.typeName}
+                      </p>
+                    )}
+                  </TableCell>
+
+                  {/* Status */}
+                  <TableCell>
+                    <Badge variant={status.variant} className="gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${toneDotClass[status.tone]}`} />
+                      {status.label}
+                    </Badge>
                   </TableCell>
 
                   {/* Sent for signature */}
@@ -228,6 +447,8 @@ export function HrDocumentsClient({
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-xs text-muted-foreground">{formatDate(doc.sent_for_signature_date)}</span>
                       </div>
+                    ) : readOnly ? (
+                      <Clock className="h-4 w-4 text-muted-foreground mx-auto" />
                     ) : (
                       <Button
                         variant="outline"
@@ -248,7 +469,7 @@ export function HrDocumentsClient({
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-xs text-muted-foreground">{formatDate(doc.returned_date)}</span>
                       </div>
-                    ) : doc.sent_for_signature_date ? (
+                    ) : !readOnly && doc.sent_for_signature_date ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -270,7 +491,7 @@ export function HrDocumentsClient({
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-xs text-muted-foreground">{formatDate(doc.scanned_upload_date)}</span>
                       </div>
-                    ) : doc.returned_date ? (
+                    ) : !readOnly && doc.returned_date ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -292,7 +513,7 @@ export function HrDocumentsClient({
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <span className="text-xs text-muted-foreground">{formatDate(doc.sent_to_agency_date)}</span>
                       </div>
-                    ) : doc.scanned_upload_date ? (
+                    ) : !readOnly && doc.scanned_upload_date ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -309,7 +530,7 @@ export function HrDocumentsClient({
 
                   {/* Notes */}
                   <TableCell>
-                    {editingNoteId === doc.id ? (
+                    {!readOnly && editingNoteId === doc.id ? (
                       <div className="flex items-center gap-1">
                         <Input
                           value={noteText}
@@ -324,6 +545,10 @@ export function HrDocumentsClient({
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                    ) : readOnly ? (
+                      <span className="text-xs text-muted-foreground truncate max-w-[100px] inline-block" title={doc.notes ?? undefined}>
+                        {doc.notes || "—"}
+                      </span>
                     ) : (
                       <button
                         onClick={() => { setEditingNoteId(doc.id); setNoteText(doc.notes ?? ""); }}
@@ -337,23 +562,99 @@ export function HrDocumentsClient({
                   </TableCell>
 
                   {/* Delete */}
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDelete(doc.id)}
-                      disabled={isPending}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
+                  {!readOnly && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeletingDoc(doc)}
+                        disabled={isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
+
+                {/* Expanded: signature-workflow timeline + detail link */}
+                {expanded && (
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={colCount} className="py-3">
+                      <div className="pl-9 pr-2 space-y-3 max-w-xl">
+                        {workflowDocTypes.has(doc.document_type) ? (
+                          <DocumentWorkflowTimeline
+                            tracking={doc}
+                            docType={doc.document_type === "leave_request" ? "leave" : doc.document_type}
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            เอกสารประเภทนี้ไม่มีเส้นทางลงนามอัตโนมัติ — ใช้ช่อง ส่งลงนาม/รับคืน/สแกน/ส่งหน่วยงาน บันทึกด้วยตนเอง
+                          </p>
+                        )}
+                        {href && (
+                          <Link href={href} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                            ดูรายละเอียดคำขอ <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                </Fragment>
               );
             })}
           </TableBody>
         </Table>
       </div>
+
+      {totalCount > 0 && (
+        <ClientPaginationControls
+          currentPage={safePage}
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={deletingDoc !== null}
+        onOpenChange={(open) => { if (!open) setDeletingDoc(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบรายการติดตามเอกสาร?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingDoc && (
+                <>
+                  รายการ{" "}
+                  <span className="font-medium text-foreground">
+                    {docTypeLabels[deletingDoc.document_type] ?? deletingDoc.document_type}
+                  </span>
+                  {refInfo[deletingDoc.reference_id]?.employeeName && (
+                    <> ของ <span className="font-medium text-foreground">{refInfo[deletingDoc.reference_id].employeeName}</span></>
+                  )}
+                  {" "}จะถูกนำออกจากรายการติดตาม การดำเนินการนี้ย้อนกลับไม่ได้จากหน้านี้
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (deletingDoc) handleDelete(deletingDoc.id);
+              }}
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isPending ? "กำลังลบ..." : "ลบรายการ"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

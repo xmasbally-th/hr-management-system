@@ -106,7 +106,12 @@ export async function proxy(request: NextRequest) {
     if (isDashboard) {
       // HR/Admin-only routes
       if (HR_ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
-        if (profile.role !== "hr" && profile.role !== "admin") {
+        // Exception: the merged document-tracking page is readable by
+        // manager (replaces the former /dashboard/approvals/documents).
+        const managerAllowed =
+          profile.role === "manager" &&
+          pathname.startsWith("/dashboard/hr/documents");
+        if (!managerAllowed && profile.role !== "hr" && profile.role !== "admin") {
           return NextResponse.redirect(new URL("/dashboard", request.url));
         }
       }

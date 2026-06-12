@@ -86,10 +86,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager"],
       },
       {
+        // Merged page — hr/admin reach it from the "การจัดการบุคลากร" group
+        // instead, so only manager sees this entry (avoids duplicate menus).
         title: "ติดตามเอกสาร",
-        href: "/dashboard/approvals/documents",
+        href: "/dashboard/hr/documents",
         icon: "FolderSearch",
-        roles: ["admin", "hr", "manager"],
+        roles: ["manager"],
       },
     ],
   },

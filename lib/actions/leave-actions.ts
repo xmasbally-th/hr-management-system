@@ -1281,7 +1281,6 @@ async function runLeaveStage(requestId: string, cfg: StageConfig): Promise<void>
   revalidatePath("/dashboard/hr/leaves");
   revalidatePath("/dashboard/hr/documents");
   revalidatePath("/dashboard/approvals/leaves");
-  revalidatePath("/dashboard/approvals/documents");
 }
 
 /** Step 0a (vacation + academic staff only): HR ส่งให้ประธานสาขาวิชาให้ความเห็น */
@@ -1534,7 +1533,6 @@ export async function rejectLeaveAtStage(
   revalidatePath("/dashboard/hr/leaves");
   revalidatePath("/dashboard/hr/documents");
   revalidatePath("/dashboard/approvals/leaves");
-  revalidatePath("/dashboard/approvals/documents");
 }
 
 // ═══════════════════════════════════════════════════════════

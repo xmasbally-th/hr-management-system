@@ -481,7 +481,6 @@ async function runTravelStage(requestId: string, cfg: TravelStageConfig): Promis
   revalidatePath("/dashboard/hr/travel");
   revalidatePath("/dashboard/hr/documents");
   revalidatePath("/dashboard/approvals/travel");
-  revalidatePath("/dashboard/approvals/documents");
 }
 
 /** Step 1: HR ส่งคำสั่งเดินทางให้ผู้อำนวยการลงนาม */
@@ -649,7 +648,6 @@ export async function rejectTravelAtStage(
   revalidatePath("/dashboard/hr/travel");
   revalidatePath("/dashboard/hr/documents");
   revalidatePath("/dashboard/approvals/travel");
-  revalidatePath("/dashboard/approvals/documents");
 }
 
 // ═══════════════════════════════════════════════════════════════════

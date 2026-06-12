@@ -14,9 +14,13 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
+vi.mock("@/lib/actions/notification-actions", () => ({
+  createNotificationInternal: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { createNotificationInternal } from "@/lib/actions/notification-actions";
 import {
   getAllDocumentTracking,
   getMyDocuments,
@@ -58,7 +62,20 @@ describe("getAllDocumentTracking", () => {
     expect(result).toEqual(docs);
   });
 
-  it("rejects non-HR user", async () => {
+  it("returns data for manager user (read-only merged view)", async () => {
+    const docs = [{ id: "d1" }];
+    const profileChain = createMockChain({ data: profileRow("manager") });
+    const docChain = createMockChain({ data: docs });
+    setupMock({
+      authUser: TEST_USER,
+      fromOverrides: { profiles: profileChain, document_tracking: docChain },
+    });
+
+    const result = await getAllDocumentTracking();
+    expect(result).toEqual(docs);
+  });
+
+  it("rejects employee user", async () => {
     const profileChain = createMockChain({ data: profileRow("employee") });
     setupMock({
       authUser: TEST_USER,
@@ -212,6 +229,32 @@ describe("updateSentForSignature", () => {
     });
 
     await expect(updateSentForSignature("doc-1")).rejects.toThrow("Forbidden");
+  });
+
+  it("notifies the leave owner after stamping", async () => {
+    const profileChain = createMockChain({ data: profileRow("hr") });
+    // Same chain answers both the update and the helper's select.single().
+    const docChain = createMockChain({
+      data: { reference_id: "leave-1", document_type: "leave" },
+      error: null,
+    });
+    const leaveChain = createMockChain({ data: { employee_id: "emp-1" } });
+    setupMock({
+      authUser: TEST_HR_USER,
+      fromOverrides: {
+        profiles: profileChain,
+        document_tracking: docChain,
+        leave_requests: leaveChain,
+      },
+    });
+
+    await updateSentForSignature("doc-1");
+    expect(createNotificationInternal).toHaveBeenCalledWith(
+      expect.anything(),
+      "emp-1",
+      "leave_status_update",
+      "เอกสารของคุณ: ส่งเอกสารไปลงนาม",
+    );
   });
 });
 
