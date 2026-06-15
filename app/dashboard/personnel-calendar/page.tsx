@@ -163,7 +163,7 @@ const TRAVEL_TYPE_LABELS: Record<string, string> = {
 const TRAVEL_STATUS_LABELS: Record<string, string> = {
   pending: "รอตรวจสอบ",
   awaiting_chair: "รอประธานสาขา",
-  awaiting_director: "รอผอ.",
+  awaiting_director: "รอผอ.สำนักงาน",
   awaiting_dean: "รอคณบดี",
   approved: "อนุมัติ",
   awaiting_university: "รออธิการบดี",

@@ -483,7 +483,7 @@ async function runTravelStage(requestId: string, cfg: TravelStageConfig): Promis
   revalidatePath("/dashboard/approvals/travel");
 }
 
-/** Step 1: HR ส่งคำสั่งเดินทางให้ผู้อำนวยการลงนาม */
+/** Step 1: HR ส่งคำสั่งเดินทางให้ผอ.สำนักงานลงนาม */
 export async function routeToTravelDirector(requestId: string) {
   return runTravelStage(requestId, {
     from: ["pending"],
@@ -491,18 +491,18 @@ export async function routeToTravelDirector(requestId: string) {
     trackingDates: ["sent_to_director_date"],
     audit: "route_travel_to_director",
     notifyType: "travel_status_update",
-    notifyMsg: "คำสั่งเดินทางของคุณถูกส่งให้ผู้อำนวยการลงนามแล้ว",
+    notifyMsg: "คำสั่งเดินทางของคุณถูกส่งให้ผอ.สำนักงานลงนามแล้ว",
   });
 }
 
-/** Step 2: ผู้อำนวยการลงนาม */
+/** Step 2: ผอ.สำนักงานลงนาม */
 export async function markTravelDirectorSigned(requestId: string) {
   return runTravelStage(requestId, {
     from: ["awaiting_director"],
     trackingDates: ["director_signed_date"],
     audit: "travel_director_signed",
     notifyType: "travel_status_update",
-    notifyMsg: "ผู้อำนวยการลงนามคำสั่งเดินทางของคุณแล้ว",
+    notifyMsg: "ผอ.สำนักงานลงนามคำสั่งเดินทางของคุณแล้ว",
   });
 }
 
@@ -628,7 +628,7 @@ export async function rejectTravelAtStage(
     .eq("document_type", "travel");
 
   const levelLabel =
-    level === "director" ? "ผู้อำนวยการ"
+    level === "director" ? "ผอ.สำนักงาน"
     : level === "dean" ? "คณบดี"
     : level === "president" ? "อธิการบดี"
     : "HR";
@@ -798,7 +798,7 @@ export async function routeTravelCancellationToDirector(cancellationId: string) 
     to: "awaiting_director",
     trackingDates: ["sent_to_director_date"],
     audit: "route_travel_cancel_to_director",
-    notifyMsg: "คำขอยกเลิกคำสั่งเดินทางของคุณถูกส่งให้ผู้อำนวยการลงนาม",
+    notifyMsg: "คำขอยกเลิกคำสั่งเดินทางของคุณถูกส่งให้ผอ.สำนักงานลงนาม",
   });
 }
 
@@ -807,7 +807,7 @@ export async function markTravelCancellationDirectorSigned(cancellationId: strin
     from: ["awaiting_director"],
     trackingDates: ["director_signed_date"],
     audit: "travel_cancel_director_signed",
-    notifyMsg: "ผู้อำนวยการลงนามคำขอยกเลิกคำสั่งเดินทางของคุณแล้ว",
+    notifyMsg: "ผอ.สำนักงานลงนามคำขอยกเลิกคำสั่งเดินทางของคุณแล้ว",
   });
 }
 
@@ -925,7 +925,7 @@ export async function rejectTravelCancellationAtStage(
     .eq("document_type", "travel_cancellation");
 
   const levelLabel =
-    level === "director" ? "ผู้อำนวยการ"
+    level === "director" ? "ผอ.สำนักงาน"
     : level === "dean" ? "คณบดี"
     : level === "president" ? "อธิการบดี"
     : "HR";

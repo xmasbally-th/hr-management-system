@@ -33,8 +33,8 @@ interface Stage {
 
 function leaveStages(t: Tracking): Stage[] {
   return [
-    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
-    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งผอ.สำนักงานลงนาม", date: t.sent_to_director_date },
+    { label: "ผอ.สำนักงานลงนาม", date: t.director_signed_date },
     { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
     { label: "คณบดีลงนาม (อนุมัติ)", date: t.dean_signed_date },
     { label: "สแกน + อัปโหลดเอกสาร (ระดับคณะ)", date: t.scanned_upload_date, fileUrl: t.scanned_document_url },
@@ -45,8 +45,8 @@ function leaveStages(t: Tracking): Stage[] {
 
 function cancellationStages(t: Tracking): Stage[] {
   return [
-    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
-    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งผอ.สำนักงานลงนาม", date: t.sent_to_director_date },
+    { label: "ผอ.สำนักงานลงนาม", date: t.director_signed_date },
     { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
     { label: "คณบดีลงนาม", date: t.dean_signed_date },
     { label: "ส่งอธิการบดี", date: t.sent_to_president_date },
@@ -59,8 +59,8 @@ function travelStages(t: Tracking): Stage[] {
   // university step. Columns are the same shared `document_tracking`
   // columns used by leave.
   return [
-    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
-    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งผอ.สำนักงานลงนาม", date: t.sent_to_director_date },
+    { label: "ผอ.สำนักงานลงนาม", date: t.director_signed_date },
     { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
     { label: "คณบดีลงนาม (อนุมัติ)", date: t.dean_signed_date },
     { label: "สแกน + อัปโหลดคำสั่ง (ระดับคณะ)", date: t.scanned_upload_date, fileUrl: t.scanned_document_url },
@@ -72,8 +72,8 @@ function travelStages(t: Tracking): Stage[] {
 /** D5: cancellation of a completed travel order — mirrors cancellationStages. */
 function travelCancellationStages(t: Tracking): Stage[] {
   return [
-    { label: "ส่งผู้อำนวยการลงนาม", date: t.sent_to_director_date },
-    { label: "ผู้อำนวยการลงนาม", date: t.director_signed_date },
+    { label: "ส่งผอ.สำนักงานลงนาม", date: t.sent_to_director_date },
+    { label: "ผอ.สำนักงานลงนาม", date: t.director_signed_date },
     { label: "ส่งคณบดีลงนาม", date: t.sent_to_dean_date },
     { label: "คณบดีลงนาม", date: t.dean_signed_date },
     { label: "ส่งอธิการบดี", date: t.sent_to_president_date },
@@ -92,7 +92,7 @@ function formatDateTime(iso: string | null): string {
 function levelLabel(level: string | null): string {
   switch (level) {
     case "hr": return "HR";
-    case "director": return "ผู้อำนวยการ";
+    case "director": return "ผอ.สำนักงาน";
     case "dean": return "คณบดี";
     case "president": return "อธิการบดี";
     default: return level ?? "";

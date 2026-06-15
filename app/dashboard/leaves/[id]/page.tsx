@@ -11,13 +11,14 @@ import { LeaveDetailActions } from "./leave-detail-actions";
 import { LeaveWorkflowPanel } from "./leave-workflow-panel";
 import { CancellationWorkflowPanel } from "./cancellation-workflow-panel";
 import { DocumentWorkflowTimeline } from "@/components/document-workflow-timeline";
+import { LeaveWorkflowStepper } from "@/components/leave-workflow-stepper";
 
 export const metadata = { title: "รายละเอียดคำขอลา" };
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
   awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", variant: "secondary" },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary" },
+  awaiting_director: { label: "รอผอ.สำนักงานลงนาม", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติ (คณบดีลงนาม)", variant: "default" },
   awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดี", variant: "secondary" },
@@ -75,7 +76,7 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   // Roles in this leave's signing path that have nobody assigned — surfaced
   // so HR knows the request would otherwise stall at that step.
   const roleLabel: Record<string, string> = {
-    chair: "ประธานสาขาวิชา", director: "ผู้อำนวยการ", dean: "คณบดี",
+    chair: "ประธานสาขาวิชา", director: "ผอ.สำนักงาน", dean: "คณบดี",
   };
   const pathRoles = needsChair ? ["chair", "director", "dean"] : ["director", "dean"];
   const assigned: Record<string, boolean> = {
@@ -154,6 +155,9 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         </div>
         <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
       </div>
+
+      {/* Progress stepper — where the request is in the signature workflow */}
+      <LeaveWorkflowStepper status={leave.status} needsChair={needsChair} />
 
       {/* Basic info */}
       <div className="border rounded-lg bg-card divide-y">

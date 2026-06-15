@@ -35,7 +35,7 @@ interface TravelRequestRow {
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
-  awaiting_director: { label: "รอผอ.", variant: "secondary" },
+  awaiting_director: { label: "รอผอ.สำนักงาน", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดี", variant: "secondary" },
   approved: { label: "อนุมัติ", variant: "default" },
   awaiting_university: { label: "รออธิการบดี", variant: "secondary" },

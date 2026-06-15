@@ -52,7 +52,7 @@ interface Props {
 const STAGE: Record<string, { label: string; step: number }> = {
   pending: { label: "รอตรวจสอบ / เริ่มเดินเอกสาร", step: 0 },
   awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", step: 1 },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", step: 2 },
+  awaiting_director: { label: "รอผอ.สำนักงานลงนาม", step: 2 },
   awaiting_dean: { label: "รอคณบดีลงนาม", step: 3 },
   approved: { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 4 },
   awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 5 },
@@ -138,8 +138,8 @@ export function LeaveWorkflowPanel({
                 <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ประธานสาขาวิชา
               </Button>
             ) : (
-              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
-                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
+              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผอ.สำนักงานแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผอ.สำนักงานลงนาม
               </Button>
             )}
             <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("hr")} disabled={isPending}>
@@ -167,8 +167,8 @@ export function LeaveWorkflowPanel({
               </div>
             )}
             {isHrAdmin && chairSigned && (
-              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
-                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
+              <Button onClick={() => run(() => routeToDirector(requestId), "ส่งให้ผอ.สำนักงานแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผอ.สำนักงานลงนาม
               </Button>
             )}
             {(canChair || isHrAdmin) && (
@@ -183,8 +183,8 @@ export function LeaveWorkflowPanel({
           <>
             {!directorSigned
               ? (canDirector || isHrAdmin) && (
-                  <Button onClick={() => run(() => markDirectorSigned(requestId), "บันทึกผู้อำนวยการลงนามแล้ว")} disabled={isPending}>
-                    <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนามแล้ว
+                  <Button onClick={() => run(() => markDirectorSigned(requestId), "บันทึกผอ.สำนักงานลงนามแล้ว")} disabled={isPending}>
+                    <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผอ.สำนักงานลงนามแล้ว
                   </Button>
                 )
               : isHrAdmin && (
@@ -194,7 +194,7 @@ export function LeaveWorkflowPanel({
                 )}
             {(canDirector || isHrAdmin) && (
               <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
-                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
+                <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.สำนักงาน)
               </Button>
             )}
           </>

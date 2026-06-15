@@ -41,7 +41,7 @@ interface Props {
 
 const STAGE: Record<string, { label: string }> = {
   pending: { label: "ใบขอยกเลิก: รอตรวจสอบ" },
-  awaiting_director: { label: "ใบขอยกเลิก: รอผู้อำนวยการลงนาม" },
+  awaiting_director: { label: "ใบขอยกเลิก: รอผอ.สำนักงานลงนาม" },
   awaiting_dean: { label: "ใบขอยกเลิก: รอคณบดีลงนาม" },
   approved: { label: "ใบขอยกเลิก: คณบดีลงนามแล้ว — รอส่งอธิการบดี" },
   awaiting_university: { label: "ใบขอยกเลิก: รออธิการบดีรับทราบ" },
@@ -155,8 +155,8 @@ export function CancellationWorkflowPanel({
         <div className="flex flex-wrap gap-2">
           {status === "pending" && isHrAdmin && (
             <>
-              <Button onClick={() => run(() => routeCancellationToDirector(cancellationId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
-                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
+              <Button onClick={() => run(() => routeCancellationToDirector(cancellationId), "ส่งให้ผอ.สำนักงานแล้ว")} disabled={isPending}>
+                <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผอ.สำนักงานลงนาม
               </Button>
               <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("hr")} disabled={isPending}>
                 <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (HR)
@@ -168,8 +168,8 @@ export function CancellationWorkflowPanel({
             <>
               {!directorSigned
                 ? (canDirector || isHrAdmin) && (
-                    <Button onClick={() => run(() => markCancellationDirectorSigned(cancellationId), "บันทึกผอ.เซ็นแล้ว")} disabled={isPending}>
-                      <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนาม
+                    <Button onClick={() => run(() => markCancellationDirectorSigned(cancellationId), "บันทึกผอ.สำนักงานเซ็นแล้ว")} disabled={isPending}>
+                      <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผอ.สำนักงานลงนาม
                     </Button>
                   )
                 : isHrAdmin && (
@@ -179,7 +179,7 @@ export function CancellationWorkflowPanel({
                   )}
               {isHrAdmin && (
                 <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
-                  <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
+                  <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.สำนักงาน)
                 </Button>
               )}
             </>

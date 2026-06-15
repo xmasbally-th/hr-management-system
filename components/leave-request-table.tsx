@@ -40,7 +40,7 @@ export const LEAVE_STATUS_MAP: Record<
 > = {
   pending: { label: "รอ HR ตรวจสอบ/ส่งลงนาม", variant: "secondary", tone: "blue" },
   awaiting_chair: { label: "รอประธานสาขาให้ความเห็น", variant: "secondary", tone: "amber" },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary", tone: "amber" },
+  awaiting_director: { label: "รอผอ.สำนักงานลงนาม", variant: "secondary", tone: "amber" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary", tone: "amber" },
   approved: { label: "คณบดีลงนามแล้ว — รอ HR ส่งมหาวิทยาลัย", variant: "secondary", tone: "blue" },
   awaiting_university: { label: "รออธิการบดีลงนาม", variant: "secondary", tone: "amber" },

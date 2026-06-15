@@ -11,7 +11,7 @@ export const metadata = { title: "จัดการใบลา" };
 /** Stage a designated approver signs, keyed by approver role. */
 const ROLE_STAGE: Record<string, { status: string; label: string }> = {
   chair: { status: "awaiting_chair", label: "ประธานสาขาวิชา" },
-  director: { status: "awaiting_director", label: "ผู้อำนวยการ" },
+  director: { status: "awaiting_director", label: "ผอ.สำนักงาน" },
   dean: { status: "awaiting_dean", label: "คณบดี" },
 };
 

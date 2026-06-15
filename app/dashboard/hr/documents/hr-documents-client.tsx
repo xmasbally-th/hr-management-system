@@ -164,8 +164,8 @@ function getStatus(doc: DocumentRecord): {
   if (doc.sent_to_president_date) return { label: "รออธิการบดี", variant: "secondary", tone: "amber" };
   if (doc.dean_signed_date) return { label: "คณบดีลงนามแล้ว", variant: "secondary", tone: "amber" };
   if (doc.sent_to_dean_date) return { label: "รอคณบดีลงนาม", variant: "secondary", tone: "amber" };
-  if (doc.director_signed_date) return { label: "ผู้อำนวยการลงนามแล้ว", variant: "secondary", tone: "amber" };
-  if (doc.sent_to_director_date) return { label: "รอผู้อำนวยการลงนาม", variant: "secondary", tone: "amber" };
+  if (doc.director_signed_date) return { label: "ผอ.สำนักงานลงนามแล้ว", variant: "secondary", tone: "amber" };
+  if (doc.sent_to_director_date) return { label: "รอผอ.สำนักงานลงนาม", variant: "secondary", tone: "amber" };
   if (doc.chair_signed_date) return { label: "ประธานสาขาให้ความเห็นแล้ว", variant: "secondary", tone: "amber" };
   if (doc.sent_to_chair_date) return { label: "รอประธานสาขา", variant: "outline", tone: "amber" };
   if (doc.scanned_upload_date) return { label: "สแกนแล้ว", variant: "secondary", tone: "amber" };

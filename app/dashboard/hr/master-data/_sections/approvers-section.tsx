@@ -116,7 +116,7 @@ export function ApproversSection({ approvers, delegations, employees, department
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-4 gap-y-3 items-center">
-          <Label className="text-sm">ผู้อำนวยการ (ผอ.)</Label>
+          <Label className="text-sm">ผอ.สำนักงาน</Label>
           <select
             className={SELECT_CLS}
             value={director?.user?.id ?? ""}

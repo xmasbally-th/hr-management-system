@@ -15,7 +15,7 @@ export const metadata = { title: "รายละเอียดการเด�
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "รอตรวจสอบ", variant: "secondary" },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", variant: "secondary" },
+  awaiting_director: { label: "รอผอ.สำนักงานลงนาม", variant: "secondary" },
   awaiting_dean: { label: "รอคณบดีลงนาม", variant: "secondary" },
   approved: { label: "อนุมัติ (คณบดีลงนาม)", variant: "default" },
   awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดี", variant: "secondary" },

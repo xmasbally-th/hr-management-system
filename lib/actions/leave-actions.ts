@@ -1324,7 +1324,7 @@ export async function markChairSigned(requestId: string, opinion?: string) {
   }
 }
 
-/** Step 1: HR ส่งใบลาให้ผู้อำนวยการลงนาม (จาก pending หรือหลังประธานสาขาลงนาม) */
+/** Step 1: HR ส่งใบลาให้ผอ.สำนักงานลงนาม (จาก pending หรือหลังประธานสาขาลงนาม) */
 export async function routeToDirector(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["pending", "awaiting_chair"],
@@ -1332,12 +1332,12 @@ export async function routeToDirector(requestId: string) {
     trackingDates: ["sent_to_director_date"],
     audit: "route_to_director",
     notifyType: "leave_status_update",
-    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ผู้อำนวยการลงนามแล้ว`,
+    notifyMsg: (lt) => `คำขอ${lt}ของคุณถูกส่งให้ผอ.สำนักงานลงนามแล้ว`,
     notifyApproverRole: "director",
   });
 }
 
-/** Step 2: ผู้อำนวยการลงนาม (signable by the director or HR/Admin) */
+/** Step 2: ผอ.สำนักงานลงนาม (signable by the director or HR/Admin) */
 export async function markDirectorSigned(requestId: string) {
   return runLeaveStage(requestId, {
     from: ["awaiting_director"],
@@ -1345,7 +1345,7 @@ export async function markDirectorSigned(requestId: string) {
     signerRole: "director",
     audit: "director_signed",
     notifyType: "leave_status_update",
-    notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอ${lt}ของคุณแล้ว`,
+    notifyMsg: (lt) => `ผอ.สำนักงานลงนามคำขอ${lt}ของคุณแล้ว`,
   });
 }
 
@@ -1513,7 +1513,7 @@ export async function rejectLeaveAtStage(
   const ltName = lt?.name ?? "ลา";
   const levelLabel =
     level === "chair" ? "ประธานสาขาวิชา"
-    : level === "director" ? "ผู้อำนวยการ"
+    : level === "director" ? "ผอ.สำนักงาน"
     : level === "dean" ? "คณบดี"
     : level === "president" ? "อธิการบดี"
     : "HR";
@@ -2194,7 +2194,7 @@ export async function routeCancellationToDirector(id: string) {
     from: ["pending"], to: "awaiting_director",
     trackingDates: ["sent_to_director_date"],
     audit: "cancel_route_director",
-    notifyMsg: (lt) => `คำขอยกเลิกใบ${lt}ของคุณถูกส่งให้ผู้อำนวยการลงนาม`,
+    notifyMsg: (lt) => `คำขอยกเลิกใบ${lt}ของคุณถูกส่งให้ผอ.สำนักงานลงนาม`,
   });
 }
 export async function markCancellationDirectorSigned(id: string) {
@@ -2203,7 +2203,7 @@ export async function markCancellationDirectorSigned(id: string) {
     trackingDates: ["director_signed_date"],
     signerRole: "director",
     audit: "cancel_director_signed",
-    notifyMsg: (lt) => `ผู้อำนวยการลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
+    notifyMsg: (lt) => `ผอ.สำนักงานลงนามคำขอยกเลิกใบ${lt}ของคุณแล้ว`,
   });
 }
 export async function routeCancellationToDean(id: string) {

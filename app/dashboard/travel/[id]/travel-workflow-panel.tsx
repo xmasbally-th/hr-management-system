@@ -36,7 +36,7 @@ interface Props {
 
 const STAGE: Record<string, { label: string; step: number }> = {
   pending: { label: "รอตรวจสอบ / เริ่มเดินเอกสาร", step: 0 },
-  awaiting_director: { label: "รอผู้อำนวยการลงนาม", step: 1 },
+  awaiting_director: { label: "รอผอ.สำนักงานลงนาม", step: 1 },
   awaiting_dean: { label: "รอคณบดีลงนาม", step: 2 },
   approved: { label: "อนุมัติแล้ว (คณบดีลงนาม)", step: 3 },
   awaiting_university: { label: "ส่งมหาวิทยาลัย — รออธิการบดีลงนาม", step: 4 },
@@ -91,8 +91,8 @@ export function TravelWorkflowPanel({ requestId, status, tracking }: Props) {
       <div className="flex flex-wrap gap-2">
         {status === "pending" && (
           <>
-            <Button onClick={() => run(() => routeToTravelDirector(requestId), "ส่งให้ผู้อำนวยการแล้ว")} disabled={isPending}>
-              <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผู้อำนวยการลงนาม
+            <Button onClick={() => run(() => routeToTravelDirector(requestId), "ส่งให้ผอ.สำนักงานแล้ว")} disabled={isPending}>
+              <ArrowRight className="h-4 w-4 mr-2" /> ส่งให้ผอ.สำนักงานลงนาม
             </Button>
             <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("hr")} disabled={isPending}>
               <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (HR)
@@ -103,8 +103,8 @@ export function TravelWorkflowPanel({ requestId, status, tracking }: Props) {
         {status === "awaiting_director" && (
           <>
             {!directorSigned ? (
-              <Button onClick={() => run(() => markTravelDirectorSigned(requestId), "บันทึกผู้อำนวยการลงนามแล้ว")} disabled={isPending}>
-                <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผู้อำนวยการลงนามแล้ว
+              <Button onClick={() => run(() => markTravelDirectorSigned(requestId), "บันทึกผอ.สำนักงานลงนามแล้ว")} disabled={isPending}>
+                <PenLine className="h-4 w-4 mr-2" /> บันทึก: ผอ.สำนักงานลงนามแล้ว
               </Button>
             ) : (
               <Button onClick={() => run(() => routeToTravelDean(requestId), "ส่งให้คณบดีแล้ว")} disabled={isPending}>
@@ -112,7 +112,7 @@ export function TravelWorkflowPanel({ requestId, status, tracking }: Props) {
               </Button>
             )}
             <Button variant="outline" className="text-destructive" onClick={() => setRejectLevel("director")} disabled={isPending}>
-              <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.)
+              <XCircle className="h-4 w-4 mr-2" /> ปฏิเสธ (ผอ.สำนักงาน)
             </Button>
           </>
         )}
