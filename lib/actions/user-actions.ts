@@ -1,13 +1,18 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import type { ProfileStatus, UserRole } from "@/types/supabase";
+import type { Database, ProfileStatus, UserRole } from "@/types/supabase";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { env } from "@/lib/env";
 import { isEmailAllowed } from "@/lib/system-settings";
+import { toCanonicalAuthEmail } from "@/lib/auth/canonical-email";
+import { rekeyPlaceholderProfile } from "@/lib/auth/rekey-profile";
 import { createNotificationInternal } from "./notification-actions";
 import { initializeLeaveBalances, initializeAllEmployeesBalances } from "./leave-actions";
 
@@ -332,6 +337,152 @@ export async function createUserByAdmin(data: {
 
   revalidatePath("/dashboard/hr/users");
 
+  return { success: true };
+}
+
+/**
+ * Find an auth user by email via the admin API. Supabase has no direct
+ * get-by-email, so we page through listUsers. For ~100 org users a single
+ * large page suffices.
+ */
+async function findAuthUserByEmail(
+  admin: SupabaseClient<Database>,
+  email: string,
+): Promise<{ id: string } | null> {
+  const target = email.toLowerCase();
+  const { data, error } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+  if (error || !data) return null;
+  const found = data.users.find((u) => (u.email ?? "").toLowerCase() === target);
+  return found ? { id: found.id } : null;
+}
+
+/**
+ * Set (or reset) a user's login password — HR/admin only.
+ *
+ * For employees who can't access Google SSO: HR issues a password they sign
+ * in with (email+password; the @lpru.ac.th address they know is folded to the
+ * canonical @g.lpru.ac.th form at login). No email is ever sent — the auth
+ * user is created with email_confirm so there is no verification step.
+ *
+ * Two cases, keyed on whether the profile already has an auth.users row:
+ *   - real profile (logged in before / created by admin) → updateUserById
+ *   - placeholder profile (HR-imported, never logged in) → createUser with the
+ *     canonical email, then re-key the placeholder onto the new auth id
+ */
+export async function setUserPassword(userId: string, newPassword: string) {
+  const supabase = await createClient();
+  const actorId = await checkHrAdminRole(supabase);
+  checkRateLimit(actorId);
+
+  const password = (newPassword ?? "").trim();
+  if (password.length < 8) {
+    throw new Error("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
+  }
+  if (password.length > 72) {
+    throw new Error("รหัสผ่านยาวเกินไป (สูงสุด 72 ตัวอักษร)");
+  }
+
+  // Load the target profile
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, email, full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileError || !profile) {
+    throw new Error("ไม่พบผู้ใช้");
+  }
+
+  const authEmail = toCanonicalAuthEmail(profile.email);
+  if (!authEmail || !authEmail.includes("@")) {
+    throw new Error("ผู้ใช้ไม่มีอีเมลที่ถูกต้อง");
+  }
+
+  const supabaseAdmin: SupabaseClient<Database> = createSupabaseClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+
+  // Does an auth user already exist for this profile id?
+  const { data: existing } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+  if (existing?.user) {
+    // Real account — just set the password.
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password,
+    });
+    if (error) {
+      console.error("[user-actions] setUserPassword update failed:", error);
+      throw new Error("ตั้งรหัสผ่านไม่สำเร็จ");
+    }
+  } else {
+    // Placeholder — create the auth user, then re-key the placeholder onto it.
+    const { data: created, error: createError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email: authEmail,
+        password,
+        email_confirm: true, // no verification email — HR is provisioning
+        user_metadata: { full_name: profile.full_name },
+      });
+
+    let authUserId = created?.user?.id ?? null;
+    const weCreatedTheUser = !createError && !!authUserId;
+
+    if (createError) {
+      // Email already has an auth user (e.g. signed in via Google before, but
+      // this placeholder was never re-keyed). Find it, set its password, link.
+      const alreadyExists =
+        createError.status === 422 ||
+        /already.*(registered|exists)/i.test(createError.message);
+      if (!alreadyExists) {
+        console.error("[user-actions] setUserPassword create failed:", createError);
+        throw new Error("สร้างบัญชีเข้าสู่ระบบไม่สำเร็จ");
+      }
+      const found = await findAuthUserByEmail(supabaseAdmin, authEmail);
+      if (!found) {
+        throw new Error("อีเมลนี้มีบัญชีอยู่แล้วแต่ค้นหาไม่พบ กรุณาลองใหม่");
+      }
+      const { error: updError } = await supabaseAdmin.auth.admin.updateUserById(
+        found.id,
+        { password },
+      );
+      if (updError) {
+        throw new Error("ตั้งรหัสผ่านไม่สำเร็จ");
+      }
+      authUserId = found.id;
+    }
+
+    if (!authUserId) {
+      throw new Error("สร้างบัญชีเข้าสู่ระบบไม่สำเร็จ");
+    }
+
+    // Re-key the placeholder profile onto the auth user id.
+    if (authUserId !== userId) {
+      try {
+        await rekeyPlaceholderProfile(
+          supabaseAdmin,
+          userId,
+          authUserId,
+          authEmail,
+        );
+      } catch (err) {
+        console.error("[user-actions] setUserPassword re-key failed:", err);
+        // Roll back only an auth user WE created — never delete a pre-existing one.
+        if (weCreatedTheUser) {
+          await supabaseAdmin.auth.admin.deleteUser(authUserId);
+        }
+        throw new Error("เชื่อมโยงบัญชีไม่สำเร็จ กรุณาลองใหม่");
+      }
+    }
+  }
+
+  await logAudit(supabase, actorId, "set_user_password", "profile", userId, {
+    email: authEmail,
+  });
+  revalidatePath("/dashboard/hr/users");
   return { success: true };
 }
 
