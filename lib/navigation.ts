@@ -51,7 +51,7 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
-        title: "ประวัติการเดินทาง",
+        title: "เดินทางไปราชการ",
         href: "/dashboard/travel",
         icon: "Plane",
         roles: ["admin", "hr", "manager", "employee"],
