@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getAllowedDomains,
   getSingleHostedDomain,
+  isEmailAllowed,
 } from "@/lib/auth/allowed-domains";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,8 @@ import {
   HelpCircle,
   Lock,
   AlertTriangle,
+  Mail,
+  CheckCircle2,
 } from "lucide-react";
 
 /** Dev/staging escape hatch — enables an email+password form for test users.
@@ -42,8 +45,10 @@ const ERROR_MESSAGES: Record<string, string> = {
  * HR Hybrid Workflow — Login page.
  *
  * Split-screen layout (brand panel left, form panel right). On mobile the
- * brand panel hides and the form centers. Authentication is Google SSO only,
- * gated by the email-domain allowlist (NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS).
+ * brand panel hides and the form centers. Primary auth is Google SSO, with a
+ * magic-link fallback for org accounts that can't use Google (e.g. @lpru.ac.th
+ * Microsoft/Outlook). Both are gated by the email-domain allowlist
+ * (NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS) and whitelist-first onboarding.
  */
 export function LoginClient() {
   const router = useRouter();
@@ -53,6 +58,9 @@ export function LoginClient() {
   const [pwEmail, setPwEmail] = useState("");
   const [pwPassword, setPwPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
+  const [magicEmail, setMagicEmail] = useState("");
+  const [magicLoading, setMagicLoading] = useState(false);
+  const [magicSentTo, setMagicSentTo] = useState<string | null>(null);
 
   // Surface server-side redirect errors (e.g. ?error=domain)
   useEffect(() => {
@@ -95,6 +103,50 @@ export function LoginClient() {
     } catch {
       setError("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง");
       setIsLoading(false);
+    }
+  }
+
+  /**
+   * Magic-link sign-in — for org accounts that can't use Google SSO
+   * (e.g. @lpru.ac.th Microsoft/Outlook mailboxes). Supabase emails a
+   * one-time login link that redirects through /auth/callback, where the
+   * same domain-allowlist + whitelist-first onboarding gate applies.
+   */
+  async function handleMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    const email = magicEmail.trim().toLowerCase();
+    setError(null);
+
+    // Client-side domain guard — avoids dispatching links to addresses the
+    // backend would reject anyway (server still enforces in /auth/callback).
+    if (!isEmailAllowed(email)) {
+      setError(ERROR_MESSAGES.domain);
+      return;
+    }
+
+    setMagicLoading(true);
+    try {
+      const supabase = createClient();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // First-time users have no auth.users row yet (HR only created a
+          // placeholder profile). Allow creation so the link sends; the
+          // callback re-keys the placeholder and gates non-whitelisted users.
+          shouldCreateUser: true,
+        },
+      });
+      if (otpError) {
+        setError("ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        setMagicLoading(false);
+        return;
+      }
+      setMagicSentTo(email);
+      setMagicLoading(false);
+    } catch {
+      setError("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง");
+      setMagicLoading(false);
     }
   }
 
@@ -298,6 +350,70 @@ export function LoginClient() {
                 </p>
               </div>
             </div>
+
+            {/* Magic-link login — for org accounts that can't use Google SSO
+                (e.g. @lpru.ac.th Microsoft/Outlook mailboxes). Always shown. */}
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs text-slate-400">หรือ</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            {magicSentTo ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 flex gap-3">
+                <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-emerald-900 leading-relaxed">
+                  <p className="font-semibold mb-0.5">ส่งลิงก์เข้าสู่ระบบแล้ว</p>
+                  <p className="text-emerald-800">
+                    เปิดอีเมล{" "}
+                    <span className="font-mono font-medium">{magicSentTo}</span>{" "}
+                    แล้วคลิกลิงก์เพื่อเข้าสู่ระบบ (ลิงก์มีอายุจำกัด)
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs font-medium text-emerald-700 underline hover:text-emerald-900"
+                    onClick={() => setMagicSentTo(null)}
+                  >
+                    ส่งลิงก์ใหม่อีกครั้ง
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleMagicLink} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="magic-email" className="text-xs">
+                    เข้าสู่ระบบด้วยอีเมลองค์กร (สำหรับบัญชีที่ใช้ Google ไม่ได้)
+                  </Label>
+                  <Input
+                    id="magic-email"
+                    type="email"
+                    autoComplete="email"
+                    value={magicEmail}
+                    onChange={(e) => setMagicEmail(e.target.value)}
+                    placeholder="yourname@lpru.ac.th"
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={magicLoading}
+                >
+                  {magicLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      กำลังส่งลิงก์...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="size-4" />
+                      ส่งลิงก์เข้าสู่ระบบทางอีเมล
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
 
             {/* Dev/staging password login — gated by NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN.
                 Used for test accounts before SSO rollout is complete. */}
