@@ -11,7 +11,7 @@ import { getEmployeesForSelection } from "@/lib/actions/leave-actions";
 import { getHolidays } from "@/lib/actions/holiday-actions";
 import { getExamPeriods } from "@/lib/actions/exam-period-actions";
 import { getExamDutyPositions } from "@/lib/actions/settings-actions";
-import { getLeaveTemplates } from "@/lib/actions/template-actions";
+import { getLeaveTemplates, getTravelTemplates } from "@/lib/actions/template-actions";
 import { getMyProfile } from "@/lib/actions/profile-actions";
 import { currentFiscalYear, getFiscalYearOptions } from "@/lib/date-ranges";
 import { MasterDataClient } from "./master-data-client";
@@ -35,6 +35,7 @@ export default async function MasterDataPage() {
     educationLevels,
     decorationCatalog,
     documentTemplates,
+    travelTemplates,
     profile,
     leavePolicy,
     approverData,
@@ -51,6 +52,7 @@ export default async function MasterDataPage() {
     getEducationLevels(),
     getDecorationCatalog(),
     getLeaveTemplates(),
+    getTravelTemplates(),
     getMyProfile(),
     getLeavePolicy(),
     // Admin-only — HR gets null and the tab is hidden.
@@ -82,6 +84,7 @@ export default async function MasterDataPage() {
         educationLevels={educationLevels}
         decorationCatalog={decorationCatalog}
         documentTemplates={documentTemplates}
+        travelTemplates={travelTemplates}
         canManageTemplates={profile.role === "admin"}
         leavePolicy={leavePolicy}
         approverData={approverData}

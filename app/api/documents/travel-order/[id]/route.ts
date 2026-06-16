@@ -10,6 +10,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Packer } from "docx";
 import { generateTravelOrderDocument } from "@/lib/document-templates/travel-order";
+import { generateTravelDocx, NO_TRAVEL_TEMPLATE } from "@/lib/document-templates/travel-merge";
+
+export const runtime = "nodejs";
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export async function GET(
   _request: NextRequest,
@@ -32,8 +38,33 @@ export async function GET(
       .eq("id", user.id)
       .single();
 
-    if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const isHrAdmin = !!profile && (profile.role === "hr" || profile.role === "admin");
+    if (!isHrAdmin) {
+      // Non-HR/Admin may download only their OWN travel order.
+      const { data: tr } = await supabase
+        .from("travel_requests").select("employee_id").eq("id", id).single();
+      if (!tr || tr.employee_id !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    // Prefer the Admin-uploaded original .docx template (mail-merge, exact
+    // layout). Fall back to the code-built order document when no template
+    // has been uploaded yet.
+    try {
+      const { buffer, filename } = await generateTravelDocx(id);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": DOCX_MIME,
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        },
+      });
+    } catch (e) {
+      if (!(e instanceof Error && e.message === NO_TRAVEL_TEMPLATE)) {
+        const message = e instanceof Error ? e.message : "เกิดข้อผิดพลาด";
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+      // no active template → fall through to the code-built order below
     }
 
     // Fetch travel request with employee and expenses

@@ -60,6 +60,76 @@ export async function getLeaveTemplates(): Promise<LeaveTemplate[]> {
   return data ?? [];
 }
 
+/** List travel-order .docx templates (any authenticated user can read metadata). */
+export async function getTravelTemplates(): Promise<LeaveTemplate[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  const { data, error } = await supabase
+    .from("document_templates")
+    .select("id, leave_type_code, name, storage_path, is_active, created_at")
+    .eq("doc_type", "travel")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error("ไม่สามารถดึงรายการเทมเพลตได้");
+  return data ?? [];
+}
+
+/**
+ * Upload a .docx travel-order template (Admin only). A single active template
+ * is used for all travel types; uploading a new one deactivates the previous.
+ */
+export async function uploadTravelTemplate(formData: FormData): Promise<{ id: string }> {
+  const actorId = await requireAdmin();
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) throw new Error("กรุณาเลือกไฟล์ .docx");
+  if (file.size > MAX_TEMPLATE_SIZE) throw new Error("ไฟล์เกิน 5 MB");
+  const isDocx = file.type === DOCX_MIME || file.name.toLowerCase().endsWith(".docx");
+  if (!isDocx) throw new Error("รองรับเฉพาะไฟล์ Word (.docx)");
+
+  const admin = adminClient();
+  const storagePath = `travel/order-${Date.now()}.docx`;
+
+  const { error: upErr } = await admin.storage
+    .from(TEMPLATE_BUCKET)
+    .upload(storagePath, file, { contentType: DOCX_MIME, upsert: false });
+  if (upErr) {
+    console.error("[template-actions] travel upload failed:", upErr.message);
+    throw new Error("อัปโหลดไฟล์ไม่สำเร็จ");
+  }
+
+  await admin
+    .from("document_templates")
+    .update({ is_active: false })
+    .eq("doc_type", "travel")
+    .eq("is_active", true);
+
+  const { data: created, error: insErr } = await admin
+    .from("document_templates")
+    .insert({
+      doc_type: "travel",
+      leave_type_code: null,
+      name: file.name,
+      storage_path: storagePath,
+      is_active: true,
+      uploaded_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (insErr || !created) {
+    await admin.storage.from(TEMPLATE_BUCKET).remove([storagePath]);
+    throw new Error("บันทึกเทมเพลตไม่สำเร็จ");
+  }
+
+  const supabase = await createClient();
+  await logAudit(supabase, actorId, "upload_travel_template", "document_template", created.id, {
+    name: file.name,
+  });
+  revalidatePath("/dashboard/hr/master-data");
+  return { id: created.id };
+}
+
 /**
  * Upload a .docx leave template (Admin only). Deactivates any previously
  * active template for the same leave_type_code so only one is active.

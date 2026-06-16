@@ -100,6 +100,7 @@ interface Props {
   educationLevels: NameOrderRow[];
   decorationCatalog: DecorationCatalogRow[];
   documentTemplates: LeaveTemplate[];
+  travelTemplates: LeaveTemplate[];
   canManageTemplates: boolean;
   leavePolicy: LeavePolicy;
   approverData: { approvers: ApproverAssignment[]; delegations: ActingDelegation[] } | null;
@@ -121,6 +122,7 @@ export function MasterDataClient({
   educationLevels,
   decorationCatalog,
   documentTemplates,
+  travelTemplates,
   canManageTemplates,
   leavePolicy,
   approverData,
@@ -223,7 +225,11 @@ export function MasterDataClient({
         {active === "education-levels" && <EducationLevelsSection rows={educationLevels} />}
         {active === "decoration-catalog" && <DecorationCatalogSection rows={decorationCatalog} />}
         {active === "doc-templates" && (
-          <DocumentTemplatesSection templates={documentTemplates} canManage={canManageTemplates} />
+          <DocumentTemplatesSection
+            templates={documentTemplates}
+            travelTemplates={travelTemplates}
+            canManage={canManageTemplates}
+          />
         )}
       </div>
     </div>
