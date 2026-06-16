@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getAllowedDomains,
   getSingleHostedDomain,
-  isEmailAllowed,
 } from "@/lib/auth/allowed-domains";
+import { toCanonicalAuthEmail } from "@/lib/auth/canonical-email";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,16 +17,9 @@ import {
   ShieldCheck,
   Users,
   HelpCircle,
-  Lock,
   AlertTriangle,
-  Mail,
-  CheckCircle2,
+  KeyRound,
 } from "lucide-react";
-
-/** Dev/staging escape hatch — enables an email+password form for test users.
- *  Turn off in production by unsetting the env var. */
-const PASSWORD_LOGIN_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN === "true";
 
 const ERROR_MESSAGES: Record<string, string> = {
   domain:
@@ -45,10 +38,12 @@ const ERROR_MESSAGES: Record<string, string> = {
  * HR Hybrid Workflow — Login page.
  *
  * Split-screen layout (brand panel left, form panel right). On mobile the
- * brand panel hides and the form centers. Primary auth is Google SSO, with a
- * magic-link fallback for org accounts that can't use Google (e.g. @lpru.ac.th
- * Microsoft/Outlook). Both are gated by the email-domain allowlist
- * (NEXT_PUBLIC_ALLOWED_EMAIL_DOMAINS) and whitelist-first onboarding.
+ * brand panel hides and the form centers. Two sign-in methods, both landing
+ * on the same account:
+ *   - Google SSO (@g.lpru.ac.th) — for users whose Google account works
+ *   - Email + password (@lpru.ac.th, HR-issued) — for users who can't access
+ *     Google. The typed email is folded to the canonical @g.lpru.ac.th form
+ *     (toCanonicalAuthEmail) so both methods authenticate one Supabase user.
  */
 export function LoginClient() {
   const router = useRouter();
@@ -58,9 +53,6 @@ export function LoginClient() {
   const [pwEmail, setPwEmail] = useState("");
   const [pwPassword, setPwPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
-  const [magicEmail, setMagicEmail] = useState("");
-  const [magicLoading, setMagicLoading] = useState(false);
-  const [magicSentTo, setMagicSentTo] = useState<string | null>(null);
 
   // Surface server-side redirect errors (e.g. ?error=domain)
   useEffect(() => {
@@ -107,49 +99,12 @@ export function LoginClient() {
   }
 
   /**
-   * Magic-link sign-in — for org accounts that can't use Google SSO
-   * (e.g. @lpru.ac.th Microsoft/Outlook mailboxes). Supabase emails a
-   * one-time login link that redirects through /auth/callback, where the
-   * same domain-allowlist + whitelist-first onboarding gate applies.
+   * Email + password sign-in — for users who can't use Google SSO (their
+   * @g.lpru.ac.th Google account is broken/inaccessible). The typed email is
+   * folded to the canonical @g.lpru.ac.th form so the @lpru.ac.th address a
+   * user knows resolves to the same Supabase account. Password auth never
+   * contacts Google, so it works even when the Google account is down.
    */
-  async function handleMagicLink(e: React.FormEvent) {
-    e.preventDefault();
-    const email = magicEmail.trim().toLowerCase();
-    setError(null);
-
-    // Client-side domain guard — avoids dispatching links to addresses the
-    // backend would reject anyway (server still enforces in /auth/callback).
-    if (!isEmailAllowed(email)) {
-      setError(ERROR_MESSAGES.domain);
-      return;
-    }
-
-    setMagicLoading(true);
-    try {
-      const supabase = createClient();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          // First-time users have no auth.users row yet (HR only created a
-          // placeholder profile). Allow creation so the link sends; the
-          // callback re-keys the placeholder and gates non-whitelisted users.
-          shouldCreateUser: true,
-        },
-      });
-      if (otpError) {
-        setError("ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-        setMagicLoading(false);
-        return;
-      }
-      setMagicSentTo(email);
-      setMagicLoading(false);
-    } catch {
-      setError("เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง");
-      setMagicLoading(false);
-    }
-  }
-
   async function handlePasswordSignIn(e: React.FormEvent) {
     e.preventDefault();
     setPwLoading(true);
@@ -157,7 +112,7 @@ export function LoginClient() {
     try {
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: pwEmail.trim(),
+        email: toCanonicalAuthEmail(pwEmail),
         password: pwPassword,
       });
       if (signInError) {
@@ -337,133 +292,80 @@ export function LoginClient() {
               )}
             </p>
 
-            {/* SSO info box */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex gap-3">
-              <Lock className="size-4 text-slate-500 shrink-0 mt-0.5" />
-              <div className="text-xs text-slate-600 leading-relaxed">
-                <p className="font-semibold text-slate-700 mb-0.5">
-                  Single Sign-On ผ่าน Google Workspace
-                </p>
-                <p>
-                  ระบบใช้การยืนยันตัวตนของ Google
-                  รองรับ 2-Step Verification — ไม่ต้องตั้งรหัสผ่านใหม่
+            {/* Two-method explanation — Google SSO vs. HR-issued password.
+                Both methods authenticate the same account. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-slate-700">
+                เลือกวิธีเข้าสู่ระบบ
+              </p>
+              <div className="flex gap-2.5">
+                <GoogleLogo />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <span className="font-medium text-slate-700">ปุ่ม Google ด้านบน</span>{" "}
+                  — สำหรับผู้ที่ใช้บัญชี Google{" "}
+                  <span className="font-mono">@g.lpru.ac.th</span> ได้ตามปกติ
                 </p>
               </div>
+              <div className="flex gap-2.5">
+                <KeyRound className="size-4 text-slate-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <span className="font-medium text-slate-700">อีเมล + รหัสผ่านด้านล่าง</span>{" "}
+                  — สำหรับผู้ที่เข้า Google ไม่ได้ ใช้อีเมล{" "}
+                  <span className="font-mono">@lpru.ac.th</span>{" "}
+                  กับรหัสผ่านที่ได้รับจากฝ่ายบุคคล
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-400 border-t border-slate-200 pt-2">
+                ทั้งสองวิธีเข้าถึงข้อมูลบัญชีเดียวกัน
+              </p>
             </div>
 
-            {/* Magic-link login — for org accounts that can't use Google SSO
-                (e.g. @lpru.ac.th Microsoft/Outlook mailboxes). Always shown. */}
+            {/* Email + password — for users who can't use Google. Always shown. */}
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs text-slate-400">หรือ</span>
+              <span className="text-xs text-slate-400">หรือเข้าสู่ระบบด้วยรหัสผ่าน</span>
               <div className="h-px flex-1 bg-slate-200" />
             </div>
-
-            {magicSentTo ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 flex gap-3">
-                <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="text-sm text-emerald-900 leading-relaxed">
-                  <p className="font-semibold mb-0.5">ส่งลิงก์เข้าสู่ระบบแล้ว</p>
-                  <p className="text-emerald-800">
-                    เปิดอีเมล{" "}
-                    <span className="font-mono font-medium">{magicSentTo}</span>{" "}
-                    แล้วคลิกลิงก์เพื่อเข้าสู่ระบบ (ลิงก์มีอายุจำกัด)
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-2 text-xs font-medium text-emerald-700 underline hover:text-emerald-900"
-                    onClick={() => setMagicSentTo(null)}
-                  >
-                    ส่งลิงก์ใหม่อีกครั้ง
-                  </button>
-                </div>
+            <form onSubmit={handlePasswordSignIn} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pw-email" className="text-xs">
+                  อีเมล <span className="text-slate-400">(@lpru.ac.th)</span>
+                </Label>
+                <Input
+                  id="pw-email"
+                  type="email"
+                  autoComplete="email"
+                  value={pwEmail}
+                  onChange={(e) => setPwEmail(e.target.value)}
+                  placeholder="yourname@lpru.ac.th"
+                  required
+                />
               </div>
-            ) : (
-              <form onSubmit={handleMagicLink} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="magic-email" className="text-xs">
-                    เข้าสู่ระบบด้วยอีเมลองค์กร (สำหรับบัญชีที่ใช้ Google ไม่ได้)
-                  </Label>
-                  <Input
-                    id="magic-email"
-                    type="email"
-                    autoComplete="email"
-                    value={magicEmail}
-                    onChange={(e) => setMagicEmail(e.target.value)}
-                    placeholder="yourname@lpru.ac.th"
-                    required
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  variant="outline"
-                  className="w-full gap-2"
-                  disabled={magicLoading}
-                >
-                  {magicLoading ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      กำลังส่งลิงก์...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="size-4" />
-                      ส่งลิงก์เข้าสู่ระบบทางอีเมล
-                    </>
-                  )}
-                </Button>
-              </form>
-            )}
-
-            {/* Dev/staging password login — gated by NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN.
-                Used for test accounts before SSO rollout is complete. */}
-            {PASSWORD_LOGIN_ENABLED && (
-              <>
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="text-xs text-slate-400">หรือทดสอบด้วยรหัสผ่าน</span>
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
-                <form onSubmit={handlePasswordSignIn} className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="pw-email" className="text-xs">อีเมล</Label>
-                    <Input
-                      id="pw-email"
-                      type="email"
-                      autoComplete="email"
-                      value={pwEmail}
-                      onChange={(e) => setPwEmail(e.target.value)}
-                      placeholder="test-employee@g.lpru.ac.th"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="pw-password" className="text-xs">รหัสผ่าน</Label>
-                    <Input
-                      id="pw-password"
-                      type="password"
-                      autoComplete="current-password"
-                      value={pwPassword}
-                      onChange={(e) => setPwPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={pwLoading}>
-                    {pwLoading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin mr-2" />
-                        กำลังเข้าสู่ระบบ...
-                      </>
-                    ) : (
-                      "เข้าสู่ระบบด้วยรหัสผ่าน"
-                    )}
-                  </Button>
-                  <p className="text-[10px] text-slate-400 text-center">
-                    เฉพาะบัญชีทดสอบ — ปิดได้โดย unset <code>NEXT_PUBLIC_ENABLE_PASSWORD_LOGIN</code>
-                  </p>
-                </form>
-              </>
-            )}
+              <div className="space-y-1.5">
+                <Label htmlFor="pw-password" className="text-xs">รหัสผ่าน</Label>
+                <Input
+                  id="pw-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwPassword}
+                  onChange={(e) => setPwPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={pwLoading}>
+                {pwLoading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin mr-2" />
+                    กำลังเข้าสู่ระบบ...
+                  </>
+                ) : (
+                  "เข้าสู่ระบบด้วยรหัสผ่าน"
+                )}
+              </Button>
+              <p className="text-[11px] text-slate-400 text-center">
+                ยังไม่มีรหัสผ่าน? ติดต่อฝ่ายบุคคลเพื่อขอรหัสผ่านเข้าใช้งาน
+              </p>
+            </form>
           </div>
 
           <div className="mt-10 border-t border-slate-100 pt-6 flex items-center justify-center">
