@@ -30,6 +30,9 @@ interface Props {
   isOwner: boolean;
   isSick: boolean;
   existingMedicalCert: string | null;
+  /** HR/Admin — gates the HR-only cancel actions. */
+  isHrAdmin?: boolean;
+  /** Owner OR HR/Admin — gates the .docx download button. */
   canDownloadDoc?: boolean;
   /** ช่วงวันลาเดิม — ใช้จำกัดช่วงที่ขอยกเลิกบางส่วน */
   leaveStartDate: string;
@@ -48,6 +51,7 @@ export function LeaveDetailActions({
   isOwner,
   isSick,
   existingMedicalCert,
+  isHrAdmin = false,
   canDownloadDoc = false,
   leaveStartDate,
   leaveEndDate,
@@ -71,16 +75,13 @@ export function LeaveDetailActions({
     }
   }, [existingMedicalCert]);
 
-  // canDownloadDoc is passed as isHrAdmin from the detail page
-  const isHrAdmin = canDownloadDoc;
-
   const showMedicalCertUpload = isOwner && isSick && status === "pending";
   // ยกเลิกระดับคณะ (ก่อนส่งมหาวิทยาลัย) — HR/Admin ดำเนินการแทนเท่านั้น
   const showInProcessCancel = isHrAdmin && CANCELLABLE_INPROCESS.includes(status);
   // ยื่นใบขอยกเลิก — ใบที่ส่งมหาวิทยาลัย/เสร็จสิ้นแล้ว (เจ้าของ หรือ HR/Admin)
   const showRequestCancel =
     (status === "completed" || status === "awaiting_university") &&
-    (isOwner || canDownloadDoc);
+    (isOwner || isHrAdmin);
 
   async function handleDownloadDoc() {
     setDownloading(true);

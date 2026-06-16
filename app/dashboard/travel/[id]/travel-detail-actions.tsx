@@ -61,7 +61,8 @@ export function TravelDetailActions({
 
   const showCancelAction = isOwner && status === "pending";
   const showRequestCancellation = isOwner && status === "completed" && !hasActiveCancellation;
-  const showOrderDownload = isHr && (
+  // Owner can download a copy of their own order too (not just HR/Admin).
+  const showOrderDownload = (isHr || isOwner) && (
     status === "approved" || status === "awaiting_university" || status === "completed"
   );
   const showScannedView = !!scannedDocumentPath;

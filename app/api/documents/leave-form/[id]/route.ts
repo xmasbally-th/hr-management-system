@@ -26,8 +26,15 @@ export async function GET(
     }
     const { data: profile } = await supabase
       .from("profiles").select("role").eq("id", user.id).single();
-    if (!profile || (profile.role !== "hr" && profile.role !== "admin")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const isHrAdmin = !!profile && (profile.role === "hr" || profile.role === "admin");
+    if (!isHrAdmin) {
+      // Non-HR/Admin may download only their OWN leave form (RLS also guards
+      // this read; we compare explicitly because the merge uses service-role).
+      const { data: lr } = await supabase
+        .from("leave_requests").select("employee_id").eq("id", id).single();
+      if (!lr || lr.employee_id !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     const { buffer, filename } = await generateLeaveDocx(id);

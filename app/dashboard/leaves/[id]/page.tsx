@@ -288,7 +288,8 @@ export default async function LeaveDetailPage({ params }: PageProps) {
         isOwner={isOwner}
         isSick={isSick}
         existingMedicalCert={leave.medical_cert_url ?? null}
-        canDownloadDoc={isHrAdmin}
+        isHrAdmin={isHrAdmin}
+        canDownloadDoc={isHrAdmin || isOwner}
         leaveStartDate={leave.start_date}
         leaveEndDate={leave.end_date}
       />
