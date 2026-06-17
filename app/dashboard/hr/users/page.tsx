@@ -208,6 +208,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
                           status: profile.status as "approved" | "pending" | "rejected",
                           role: profile.role as "admin" | "hr" | "manager" | "employee",
                           full_name: profile.full_name as string,
+                          email: profile.email as string,
                         }}
                       />
                     </div>

@@ -20,18 +20,20 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, UserCheck, UserX, Shield, Loader2, Pencil } from "lucide-react";
+import { MoreHorizontal, UserCheck, UserX, Shield, Loader2, Pencil, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SetPasswordDialog } from "./set-password-dialog";
 import { toast } from "sonner";
 import type { ProfileStatus, UserRole } from "@/types/supabase";
 
-export function UserActionsMenu({ profile }: { profile: { id: string; status: ProfileStatus; role: UserRole; full_name?: string } }) {
+export function UserActionsMenu({ profile }: { profile: { id: string; status: ProfileStatus; role: UserRole; full_name?: string; email?: string } }) {
   const [isPending, startTransition] = useTransition();
   const [confirmAction, setConfirmAction] = useState<{
     type: "status" | "role";
     value: string;
     label: string;
   } | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   function handleConfirm() {
     if (!confirmAction) return;
@@ -114,6 +116,14 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
 
         <DropdownMenuSeparator />
 
+        {/* Set / reset login password — for users who can't use Google SSO */}
+        <DropdownMenuItem onClick={() => setPasswordOpen(true)}>
+          <KeyRound className="mr-2 h-4 w-4" />
+          ตั้ง/รีเซ็ตรหัสผ่าน
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
         {/* Role Sub-menu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
@@ -146,6 +156,14 @@ export function UserActionsMenu({ profile }: { profile: { id: string; status: Pr
           onConfirm={handleConfirm}
         />
       </DropdownMenu>
+
+      <SetPasswordDialog
+        open={passwordOpen}
+        onOpenChange={setPasswordOpen}
+        userId={profile.id}
+        fullName={profile.full_name ?? "ผู้ใช้นี้"}
+        email={profile.email ?? ""}
+      />
     </>
   );
 }
