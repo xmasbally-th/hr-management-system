@@ -8,6 +8,7 @@ import { createNotificationInternal } from "./notification-actions";
 import { UUID_RE, validateRequestDates, validateEmployeeExists, validateTextField, sanitizeText } from "./validators";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
+import { fiscalYearRange } from "@/lib/date-ranges";
 import type { Database } from "@/types/supabase";
 
 // D5: service-role client for document_tracking writes from employee-owned
@@ -135,6 +136,38 @@ export async function getAllTravelRequests(params?: PaginationParams): Promise<P
 
   if (error) throw new Error("ไม่สามารถดึงข้อมูลการเดินทางทั้งหมดได้");
   return { data: data ?? [], totalCount: count ?? 0, page, pageSize };
+}
+
+/**
+ * All travel requests whose start_date falls in the given fiscal year — the
+ * travel hub loads a whole FY and filters round/tab client-side (mirrors
+ * getLeaveRequestsForFiscalYear). hr/admin/manager only.
+ */
+export async function getTravelRequestsForFiscalYear(
+  fy: number,
+): Promise<Record<string, unknown>[]> {
+  const supabase = await createClient();
+  const user = await getAuthUser(supabase);
+  const profile = await getProfile(supabase, user.id);
+
+  if (!profile || (profile.role !== "hr" && profile.role !== "admin" && profile.role !== "manager")) {
+    throw new Error("Forbidden: Insufficient permissions");
+  }
+
+  const range = fiscalYearRange(fy);
+  const { data, error } = await supabase
+    .from("travel_requests")
+    .select(`
+      *,
+      employee:profiles!travel_requests_employee_id_fkey(full_name, email, position_title, department_id),
+      expenses:travel_expenses(*)
+    `)
+    .gte("start_date", range.start)
+    .lte("start_date", range.end)
+    .order("start_date", { ascending: false });
+
+  if (error) throw new Error("ไม่สามารถดึงข้อมูลการเดินทางตามปีงบประมาณได้");
+  return data ?? [];
 }
 
 export interface CreateTravelRequestInput {

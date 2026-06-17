@@ -10,6 +10,7 @@ import { TravelExpensesTable } from "./travel-expenses-table";
 import { TravelWorkflowPanel } from "./travel-workflow-panel";
 import { CancellationWorkflowPanel } from "./cancellation-workflow-panel";
 import { DocumentWorkflowTimeline } from "@/components/document-workflow-timeline";
+import { TravelWorkflowStepper } from "@/components/travel-workflow-stepper";
 
 export const metadata = { title: "รายละเอียดการเดินทางราชการ" };
 
@@ -120,6 +121,9 @@ export default async function TravelDetailPage({ params }: PageProps) {
         </div>
         <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
       </div>
+
+      {/* Workflow stepper (ยื่น → ผอ.สำนักงาน → คณบดี → อธิการบดี → เสร็จสิ้น) */}
+      <TravelWorkflowStepper status={travel.status} />
 
       {/* Basic info */}
       <div className="border rounded-lg bg-card divide-y">

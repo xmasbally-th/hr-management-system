@@ -71,26 +71,6 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "การอนุมัติ",
-    items: [
-      {
-        title: "อนุมัติการเดินทาง",
-        href: "/dashboard/approvals/travel",
-        icon: "ClipboardList",
-        roles: ["admin", "hr", "manager"],
-      },
-      {
-        // Travel doc tracking — hr/admin reach it from the "การจัดการบุคลากร"
-        // group instead, so only manager sees this entry (no duplicate menus).
-        // Leave docs live in the leave hub's ติดตามเอกสาร tab.
-        title: "ติดตามเอกสารเดินทาง",
-        href: "/dashboard/hr/documents",
-        icon: "FolderSearch",
-        roles: ["manager"],
-      },
-    ],
-  },
-  {
     label: "การจัดการบุคลากร",
     items: [
       {
@@ -114,10 +94,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager"],
       },
       {
+        // Unified travel hub — queue / all requests / budget overview /
+        // doc-tracking. Mirrors the leave hub; all roles enter through here.
         title: "จัดการเดินทางราชการ",
         href: "/dashboard/hr/travel",
-        icon: "MapPin",
-        roles: ["admin", "hr"],
+        icon: "Plane",
+        roles: ["admin", "hr", "manager"],
       },
       {
         title: "จัดการการอบรม",
@@ -129,12 +111,6 @@ export const navigationGroups: NavGroup[] = [
         title: "ช่องทางกระดาษ",
         href: "/dashboard/hr/paper-channel",
         icon: "FileInput",
-        roles: ["admin", "hr"],
-      },
-      {
-        title: "ติดตามเอกสารเดินทาง",
-        href: "/dashboard/hr/documents",
-        icon: "FolderSearch",
         roles: ["admin", "hr"],
       },
       {
