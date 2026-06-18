@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const BUCKET = "documents";
@@ -12,8 +13,8 @@ const ALLOWED_TYPES = [
   "image/webp",
 ];
 
-async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

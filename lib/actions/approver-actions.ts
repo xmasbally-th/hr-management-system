@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit-log";
 
@@ -20,8 +21,8 @@ import { logAudit } from "@/lib/audit-log";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 export type ApproverRole = "chair" | "director" | "dean";
 
-async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }
@@ -239,14 +240,19 @@ export async function getSingletonApproverUserId(role: "director" | "dean"): Pro
 export async function getEffectiveDeanSignerIds(onDateISO: string): Promise<string[]> {
   const supabase = await createClient();
   const ids = new Set<string>();
-  const dean = await getSingletonApproverUserId("dean");
+
+  // dean lookup + acting delegations are independent — run in parallel
+  const [dean, { data: delegations }] = await Promise.all([
+    getSingletonApproverUserId("dean"),
+    supabase
+      .from("acting_delegations")
+      .select("delegate_user_id")
+      .eq("approver_role", "dean")
+      .lte("start_date", onDateISO)
+      .gte("end_date", onDateISO),
+  ]);
+
   if (dean) ids.add(dean);
-  const { data } = await supabase
-    .from("acting_delegations")
-    .select("delegate_user_id")
-    .eq("approver_role", "dean")
-    .lte("start_date", onDateISO)
-    .gte("end_date", onDateISO);
-  for (const d of data ?? []) ids.add(d.delegate_user_id);
+  for (const d of delegations ?? []) ids.add(d.delegate_user_id);
   return [...ids];
 }

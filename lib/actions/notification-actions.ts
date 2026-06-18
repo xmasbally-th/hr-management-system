@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { env } from "@/lib/env";
@@ -12,8 +13,8 @@ import {
 } from "@/lib/notification-types";
 import { getEffectiveTypeSetting } from "./notification-settings-actions";
 
-async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

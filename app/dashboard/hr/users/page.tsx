@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import UsersLoading from "./loading";
 import { getProfiles } from "@/lib/actions/user-actions";
 import { getPendingCorrectionCountsByUser } from "@/lib/actions/correction-actions";
 import {
@@ -76,7 +77,15 @@ async function getStatusCounts() {
   };
 }
 
-export default async function UsersPage({ searchParams }: UsersPageProps) {
+export default function UsersPage({ searchParams }: UsersPageProps) {
+  return (
+    <Suspense fallback={<UsersLoading />}>
+      <UsersContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function UsersContent({ searchParams }: UsersPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = params.search ?? "";

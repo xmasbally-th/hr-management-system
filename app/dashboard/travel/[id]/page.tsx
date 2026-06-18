@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import TravelDetailLoading from "./loading";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTravelRequestById } from "@/lib/actions/travel-actions";
@@ -35,7 +38,15 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function TravelDetailPage({ params }: PageProps) {
+export default function TravelDetailPage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<TravelDetailLoading />}>
+      <TravelDetailContent params={params} />
+    </Suspense>
+  );
+}
+
+async function TravelDetailContent({ params }: PageProps) {
   const { id } = await params;
 
   let travel: Awaited<ReturnType<typeof getTravelRequestById>>;
@@ -45,8 +56,8 @@ export default async function TravelDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const user = await getCachedUser();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { env } from "@/lib/env";
@@ -23,10 +24,10 @@ function adminClient(): SupabaseClient<Database> {
 
 /** Require the caller to be an Admin (template management is Admin-only). */
 async function requireAdmin(): Promise<string> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   checkRateLimit(user.id);
+  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
   if (!profile || profile.role !== "admin") {
@@ -46,9 +47,9 @@ export interface LeaveTemplate {
 
 /** List all leave .docx templates (any authenticated user can read metadata). */
 export async function getLeaveTemplates(): Promise<LeaveTemplate[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("document_templates")
@@ -62,9 +63,9 @@ export async function getLeaveTemplates(): Promise<LeaveTemplate[]> {
 
 /** List travel-order .docx templates (any authenticated user can read metadata). */
 export async function getTravelTemplates(): Promise<LeaveTemplate[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("document_templates")

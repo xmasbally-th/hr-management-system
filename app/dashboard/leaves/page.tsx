@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import LeavesLoading from "./loading";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import {
   getMyLeaveRequests,
   getMyLeaveBalances,
@@ -55,7 +57,15 @@ interface LeavesPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string; fy?: string; round?: string }>;
 }
 
-export default async function LeavesPage({ searchParams }: LeavesPageProps) {
+export default function LeavesPage({ searchParams }: LeavesPageProps) {
+  return (
+    <Suspense fallback={<LeavesLoading />}>
+      <LeavesContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function LeavesContent({ searchParams }: LeavesPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = params.search ?? "";
@@ -63,8 +73,8 @@ export default async function LeavesPage({ searchParams }: LeavesPageProps) {
   const fy = Number(params.fy) || currentFiscalYear();
   const round = (Number(params.round) || currentCycle().half) as 1 | 2;
 
+  const user = await getCachedUser();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = user
     ? await supabase.from("profiles").select("role").eq("id", user.id).single()
     : { data: null };

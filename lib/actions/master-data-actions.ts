@@ -1,15 +1,14 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit-log";
 
 async function checkHrAdminRole(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
 
   const { data: profile } = await supabase
@@ -212,10 +211,8 @@ export async function countEmployeesByPosition(id: string): Promise<number> {
  * Any authenticated user may read catalogs (used by profile editor dropdowns
  * and decoration autocomplete). RLS still enforces this server-side.
  */
-async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

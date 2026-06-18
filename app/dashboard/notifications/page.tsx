@@ -1,9 +1,19 @@
+import { Suspense } from "react";
 import { getMyNotifications } from "@/lib/actions/notification-actions";
 import { NotificationsClient } from "./notifications-client";
+import NotificationsLoading from "./loading";
 
 export const metadata = { title: "การแจ้งเตือนทั้งหมด" };
 
-export default async function NotificationsPage() {
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={<NotificationsLoading />}>
+      <NotificationsContent />
+    </Suspense>
+  );
+}
+
+async function NotificationsContent() {
   const notifications = await getMyNotifications();
 
   return (

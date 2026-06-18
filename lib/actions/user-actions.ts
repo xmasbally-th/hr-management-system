@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import {
   createClient as createSupabaseClient,
   type SupabaseClient,
@@ -21,7 +22,7 @@ import { initializeLeaveBalances, initializeAllEmployeesBalances } from "./leave
  * Throws an error if not authorized.
  */
 async function checkHrAdminRole(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized: Please log in");
 
   const { data: profile } = await supabase

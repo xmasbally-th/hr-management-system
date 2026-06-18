@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import TravelFormLoading from "./loading";
 import { TravelRequestForm } from "./travel-request-form";
 import { getMyProfile } from "@/lib/actions/profile-actions";
 import { getExamPeriods } from "@/lib/actions/exam-period-actions";
@@ -7,7 +9,15 @@ import { matchesExamDuty } from "@/lib/exam-period";
 
 export const metadata = { title: "ยื่นคำขอเดินทางราชการ" };
 
-export default async function NewTravelPage() {
+export default function NewTravelPage() {
+  return (
+    <Suspense fallback={<TravelFormLoading />}>
+      <NewTravelContent />
+    </Suspense>
+  );
+}
+
+async function NewTravelContent() {
   const curFy = currentFiscalYear();
   const [profile, examThisFy, examNextFy, dutyPositions] = await Promise.all([
     getMyProfile().catch(() => null),

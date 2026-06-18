@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { notifyAllHrAdmins } from "./notification-actions";
@@ -20,12 +21,8 @@ const ONBOARDING_STATUSES = new Set([
   "pending",
 ]);
 
-async function getAuthUser(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

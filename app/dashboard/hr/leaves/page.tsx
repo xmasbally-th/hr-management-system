@@ -1,19 +1,30 @@
+import { Suspense } from "react";
 import { getLeaveTypes, getLeaveRequestsForFiscalYear } from "@/lib/actions/leave-actions";
 import { getAllDocumentTracking } from "@/lib/actions/document-actions";
 import { getEffectiveDeanSignerIds } from "@/lib/actions/approver-actions";
 import { currentFiscalYear, getFiscalYearOptions } from "@/lib/date-ranges";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { loadDocRefInfo } from "@/lib/document-ref-info";
 import { LeavesDashboardClient } from "./leaves-dashboard-client";
+import HrLeavesLoading from "./loading";
 
 export const metadata = { title: "จัดการใบลา" };
 
-/** Stage a designated approver signs, keyed by approver role. */
 const ROLE_STAGE: Record<string, { status: string; label: string }> = {
   chair: { status: "awaiting_chair", label: "ประธานสาขาวิชา" },
   director: { status: "awaiting_director", label: "ผอ.สำนักงาน" },
   dean: { status: "awaiting_dean", label: "คณบดี" },
 };
+
+const IN_PROGRESS_STATUSES = [
+  "pending",
+  "awaiting_chair",
+  "awaiting_director",
+  "awaiting_dean",
+  "approved",
+  "awaiting_university",
+];
 
 async function getActivePersonnel() {
   const supabase = await createClient();
@@ -25,18 +36,19 @@ async function getActivePersonnel() {
   return data ?? [];
 }
 
-/** Resolve which signature stages the viewer can sign + how many wait. */
 async function resolveMyQueue() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return null;
 
   const roles = new Set<string>();
-  const { data: assigned } = await supabase
-    .from("workflow_approvers").select("approver_role").eq("user_id", user.id);
-  for (const r of assigned ?? []) roles.add(r.approver_role as string);
 
-  const deanToday = await getEffectiveDeanSignerIds(new Date().toISOString().slice(0, 10));
+  const [{ data: assigned }, deanToday] = await Promise.all([
+    supabase.from("workflow_approvers").select("approver_role").eq("user_id", user.id),
+    getEffectiveDeanSignerIds(new Date().toISOString().slice(0, 10)),
+  ]);
+
+  for (const r of assigned ?? []) roles.add(r.approver_role as string);
   if (deanToday.includes(user.id)) roles.add("dean");
 
   const stages = [...roles].map((r) => ROLE_STAGE[r]).filter(Boolean);
@@ -51,42 +63,35 @@ async function resolveMyQueue() {
   return { labels: stages.map((s) => s.label), count: count ?? 0, statuses };
 }
 
-/**
- * Every still-moving status (not completed/rejected/cancelled). HR/Admin see
- * all of these in "รอดำเนินการ" — including stages they don't sign — so no
- * unfinished request slips through; they follow up / chase the pending signer.
- */
-const IN_PROGRESS_STATUSES = [
-  "pending",
-  "awaiting_chair",
-  "awaiting_director",
-  "awaiting_dean",
-  "approved",
-  "awaiting_university",
-];
+// Renders instantly — browser receives skeleton HTML in ~50ms
+export default function LeaveHubPage() {
+  return (
+    <Suspense fallback={<HrLeavesLoading />}>
+      <LeaveHubContent />
+    </Suspense>
+  );
+}
 
-export default async function LeaveHubPage() {
+// All data-fetching happens here — streams in when ready (~400ms warm)
+async function LeaveHubContent() {
   const fy = currentFiscalYear();
   const supabase = await createClient();
+  const user = await getCachedUser();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = user
-    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
-    : { data: null };
-  const role = profile?.role ?? "employee";
-
-  const [leaveTypes, personnel, initialRequests, documents, myQueue] = await Promise.all([
+  const [profileResult, leaveTypes, personnel, initialRequests, documents, myQueue] = await Promise.all([
+    (user
+      ? supabase.from("profiles").select("role").eq("id", user.id).single()
+      : Promise.resolve({ data: null })) as Promise<{ data: { role: string } | null }>,
     getLeaveTypes(),
     getActivePersonnel(),
     getLeaveRequestsForFiscalYear(fy),
     getAllDocumentTracking({ family: "leave" }),
     resolveMyQueue(),
   ]);
+  const role = profileResult.data?.role ?? "employee";
 
   const docRefInfo = await loadDocRefInfo(supabase, documents);
 
-  // "รอดำเนินการ" tab scope: HR/Admin track every unfinished request (to
-  // follow up), while a pure signer sees only the stages they must sign.
   const actionStatuses = Array.from(
     new Set([
       ...(role === "hr" || role === "admin" ? IN_PROGRESS_STATUSES : []),

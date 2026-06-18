@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import TravelLoading from "./loading";
 import { getMyTravelRequests } from "@/lib/actions/travel-actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,15 @@ interface TravelPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
 }
 
-export default async function TravelPage({ searchParams }: TravelPageProps) {
+export default function TravelPage({ searchParams }: TravelPageProps) {
+  return (
+    <Suspense fallback={<TravelLoading />}>
+      <TravelContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function TravelContent({ searchParams }: TravelPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = params.search ?? "";

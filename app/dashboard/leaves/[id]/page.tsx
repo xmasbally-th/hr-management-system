@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import LeaveDetailLoading from "./loading";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLeaveRequestById } from "@/lib/actions/leave-actions";
@@ -31,7 +34,15 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function LeaveDetailPage({ params }: PageProps) {
+export default function LeaveDetailPage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<LeaveDetailLoading />}>
+      <LeaveDetailContent params={params} />
+    </Suspense>
+  );
+}
+
+async function LeaveDetailContent({ params }: PageProps) {
   const { id } = await params;
 
   let leave: Awaited<ReturnType<typeof getLeaveRequestById>>;
@@ -42,8 +53,8 @@ export default async function LeaveDetailPage({ params }: PageProps) {
   }
 
   // Determine viewer role for showing approve/reject vs cancel
+  const user = await getCachedUser();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")

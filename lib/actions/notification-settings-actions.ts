@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
 import type { Database } from "@/types/supabase";
@@ -32,9 +33,7 @@ function getAdminClient() {
 async function checkAdmin(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   const { data: profile } = await supabase
     .from("profiles")
@@ -107,11 +106,9 @@ export async function getEffectiveTypeSetting(
  * defaults if the table can't be read.
  */
 export async function getRealtimeEnabledTypes(): Promise<string[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return [];
+  const supabase = await createClient();
 
   // Start from defaults, override with any DB rows (RLS allows SELECT)
   const map: Record<string, boolean> = {};

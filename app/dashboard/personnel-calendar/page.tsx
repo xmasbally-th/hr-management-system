@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import PersonnelCalendarLoading from "./loading";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -197,12 +200,18 @@ const TH_MONTH_NAMES = [
 ];
 const TH_WEEKDAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
-export default async function PersonnelCalendarPage({ searchParams }: PageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function PersonnelCalendarPage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<PersonnelCalendarLoading />}>
+      <PersonnelCalendarContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function PersonnelCalendarContent({ searchParams }: PageProps) {
+  const user = await getCachedUser();
   if (!user) redirect("/login");
+  const supabase = await createClient();
 
   const sp = (await searchParams) ?? {};
   const monthStart = parseMonth(sp.m);

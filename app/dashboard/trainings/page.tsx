@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import TrainingsLoading from "./loading";
 import { getMyTrainings } from "@/lib/actions/training-actions";
 import { getTrainingTypeLabel } from "@/lib/training-types";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,15 @@ interface TrainingsPageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
 }
 
-export default async function TrainingsPage({ searchParams }: TrainingsPageProps) {
+export default function TrainingsPage({ searchParams }: TrainingsPageProps) {
+  return (
+    <Suspense fallback={<TrainingsLoading />}>
+      <TrainingsContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function TrainingsContent({ searchParams }: TrainingsPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = params.search ?? "";

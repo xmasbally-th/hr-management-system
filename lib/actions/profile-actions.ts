@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { ISO_DATE_RE } from "@/lib/actions/validators";
@@ -11,12 +12,8 @@ import { ISO_DATE_RE } from "@/lib/actions/validators";
  * Distinct from `user-actions.ts` (HR/Admin-only management of others).
  */
 
-async function getAuthUser(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+async function getAuthUser(_supabase?: Awaited<ReturnType<typeof createClient>>) {
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
   return user;
 }

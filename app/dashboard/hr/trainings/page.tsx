@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import HrTrainingsLoading from "./loading";
 import Link from "next/link";
 import { getAllTrainings } from "@/lib/actions/training-actions";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,15 @@ interface HrTrainingsPageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
 }
 
-export default async function HrTrainingsPage({ searchParams }: HrTrainingsPageProps) {
+export default function HrTrainingsPage({ searchParams }: HrTrainingsPageProps) {
+  return (
+    <Suspense fallback={<HrTrainingsLoading />}>
+      <HrTrainingsContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function HrTrainingsContent({ searchParams }: HrTrainingsPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = params.search ?? "";

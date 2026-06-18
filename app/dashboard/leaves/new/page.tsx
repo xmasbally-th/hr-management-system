@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import LeaveFormLoading from "./loading";
 import {
   getLeaveTypes,
   getEmployeesForSelection,
@@ -12,7 +14,15 @@ import { LeaveRequestForm } from "./leave-request-form";
 
 export const metadata = { title: "ยื่นคำขอลา" };
 
-export default async function NewLeavePage() {
+export default function NewLeavePage() {
+  return (
+    <Suspense fallback={<LeaveFormLoading />}>
+      <NewLeaveContent />
+    </Suspense>
+  );
+}
+
+async function NewLeaveContent() {
   const curFy = currentFiscalYear();
   const [
     leaveTypes,

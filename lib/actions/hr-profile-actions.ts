@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/supabase/cached-user";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit-log";
 import { createNotificationInternal } from "./notification-actions";
@@ -31,9 +32,7 @@ import type {
 async function checkHrAdmin(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) throw new Error("Unauthorized");
 
   const { data: profile } = await supabase
