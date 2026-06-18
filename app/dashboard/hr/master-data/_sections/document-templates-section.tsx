@@ -33,7 +33,8 @@ const COMMON = [
   "contact", "today_thai",
 ];
 const VACATION_EXTRA = [
-  "accumulated_days", "annual_days",
+  "accumulated_days", "annual_days", "total_entitlement",
+  "used_before", "used_total", "remaining_days",
   "substitute_1", "substitute_2", "substitute_3", "branch_head_opinion",
 ];
 const PLACEHOLDERS_BY_CODE: Record<string, string[]> = {
@@ -62,6 +63,10 @@ const PLACEHOLDER_LABELS: Record<string, string> = {
   edd: "วันกำหนดคลอด (ลาคลอด)",
   accumulated_days: "วันลาพักผ่อนสะสม",
   annual_days: "วันลาพักผ่อนประจำปี",
+  total_entitlement: "สิทธิลาพักผ่อนรวม (สะสม+ประจำปี)",
+  used_before: "ลามาแล้ว (วันทำการ ไม่รวมครั้งนี้)",
+  used_total: "ลารวมทั้งสิ้น (วันทำการ รวมครั้งนี้)",
+  remaining_days: "วันลาคงเหลือ (วันทำการ)",
   substitute_1: "ผู้ปฏิบัติงานแทน คนที่ 1",
   substitute_2: "ผู้ปฏิบัติงานแทน คนที่ 2",
   substitute_3: "ผู้ปฏิบัติงานแทน คนที่ 3",

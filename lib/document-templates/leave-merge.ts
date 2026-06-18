@@ -11,12 +11,18 @@
  *   {reason} {contact} {edd}
  *   {accumulated_days} {annual_days} {substitute_1} {substitute_2}
  *   {substitute_3} {branch_head_opinion} {today_thai}
+ * Vacation statistics (computed from leave_balances/committed requests):
+ *   {total_entitlement}  สิทธิลาพักผ่อนรวม = สะสม + ประจำปี
+ *   {used_before}        ลามาแล้ว (วันทำการ) — ปีงบฯ นี้ ไม่รวมครั้งนี้
+ *   {used_total}         ลารวมทั้งสิ้น (วันทำการ) = ลามาแล้ว + ครั้งนี้
+ *   {remaining_days}     วันลาคงเหลือ (วันทำการ) = สิทธิรวม − ลารวมทั้งสิ้น
  */
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
-import { formatThai } from "@/lib/date-ranges";
+import { formatThai, currentFiscalYear, fiscalYearRange } from "@/lib/date-ranges";
+import { COMMITTED_LEAVE_STATUSES } from "@/lib/leave-rules";
 import type { Database } from "@/types/supabase";
 
 function admin(): SupabaseClient<Database> {
@@ -94,6 +100,39 @@ export async function generateLeaveDocx(
     }
   }
 
+  // 4b. Vacation statistics (only when this is a vacation request with details).
+  //     สิทธิรวม = สะสม + ประจำปี; ลามาแล้ว = วันลาพักผ่อนที่ commit ในปีงบฯ นี้
+  //     (ไม่รวมใบนี้); รวมทั้งสิ้น = ลามาแล้ว + ครั้งนี้; คงเหลือ = สิทธิรวม − รวมทั้งสิ้น.
+  const stats: Record<string, string | number> = {
+    total_entitlement: "",
+    used_before: "",
+    used_total: "",
+    remaining_days: "",
+  };
+  if (vac) {
+    const entitlement = Number(vac.accumulated_days ?? 0) + Number(vac.annual_days ?? 0);
+    const usedThis = Number(l.working_days ?? l.total_days ?? 0);
+    const fy = currentFiscalYear(new Date(l.start_date));
+    const { start, end } = fiscalYearRange(fy);
+    const { data: others } = await supa
+      .from("leave_requests")
+      .select("working_days, total_days, status")
+      .eq("employee_id", l.employee_id)
+      .eq("leave_type_id", l.leave_type_id)
+      .neq("id", l.id)
+      .gte("start_date", start)
+      .lte("start_date", end);
+    const committed = COMMITTED_LEAVE_STATUSES as readonly string[];
+    const usedBefore = (others ?? [])
+      .filter((r) => committed.includes(r.status))
+      .reduce((sum, r) => sum + Number(r.working_days ?? r.total_days ?? 0), 0);
+    const usedTotal = usedBefore + usedThis;
+    stats.total_entitlement = entitlement;
+    stats.used_before = usedBefore;
+    stats.used_total = usedTotal;
+    stats.remaining_days = entitlement - usedTotal;
+  }
+
   // 5. Build merge data
   const data: Record<string, string | number> = {
     title_th: l.employee?.title_th ?? "",
@@ -112,6 +151,7 @@ export async function generateLeaveDocx(
     annual_days: vac?.annual_days ?? "",
     branch_head_opinion: vac?.branch_head_opinion ?? "",
     today_thai: fmt(new Date().toISOString().slice(0, 10)),
+    ...stats,
     ...subNames,
   };
 
