@@ -57,6 +57,12 @@ export const navigationGroups: NavGroup[] = [
         roles: ["admin", "hr", "manager", "employee"],
       },
       {
+        title: "การมาปฏิบัติงาน",
+        href: "/dashboard/attendance",
+        icon: "ClipboardList",
+        roles: ["admin", "hr", "manager", "employee"],
+      },
+      {
         title: "ประวัติการอบรม",
         href: "/dashboard/trainings",
         icon: "GraduationCap",
@@ -99,6 +105,14 @@ export const navigationGroups: NavGroup[] = [
         title: "จัดการเดินทางราชการ",
         href: "/dashboard/hr/travel",
         icon: "Plane",
+        roles: ["admin", "hr", "manager"],
+      },
+      {
+        // Monthly attendance summary hub — import the university HR's PDF,
+        // review/match the grid, publish. Manager sees it read-only.
+        title: "สรุปการมาปฏิบัติงาน",
+        href: "/dashboard/hr/attendance",
+        icon: "ClipboardCheck",
         roles: ["admin", "hr", "manager"],
       },
       {

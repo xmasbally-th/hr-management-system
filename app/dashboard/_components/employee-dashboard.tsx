@@ -10,6 +10,19 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { StatCard, Panel } from "./dashboard-primitives";
+import { periodLabel } from "@/lib/attendance/labels";
+
+interface LatestAttendance {
+  month: number;
+  buddhist_year: number;
+  working_days: number;
+  work_days: number;
+  travel_days: number;
+  leave_total: number;
+  late_online_days: number;
+  missing_checkout_count: number;
+  total_days: number;
+}
 
 interface LeaveBalance {
   leaveType: string;
@@ -32,6 +45,7 @@ interface Props {
   myPendingTravel: number;
   leaveBalances: LeaveBalance[];
   recentActivity: RecentItem[];
+  latestAttendance: LatestAttendance | null;
 }
 
 const statusBadgeTone: Record<string, string> = {
@@ -60,6 +74,7 @@ export function EmployeeDashboard({
   myPendingTravel,
   leaveBalances,
   recentActivity,
+  latestAttendance,
 }: Props) {
   const today = new Date().toLocaleDateString("th-TH", {
     weekday: "long",
@@ -264,6 +279,64 @@ export function EmployeeDashboard({
             ))}
           </div>
         </Panel>
+      </div>
+
+      {/* Latest monthly attendance summary */}
+      {latestAttendance && (
+        <Panel
+          title="การมาปฏิบัติงานล่าสุด"
+          sub={periodLabel(latestAttendance.month, latestAttendance.buddhist_year)}
+          action={
+            <Link
+              href="/dashboard/attendance"
+              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
+            >
+              ดูทั้งหมด <ArrowRight className="h-3 w-3" />
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <MiniStat label="วันทำงาน" value={latestAttendance.work_days} />
+            <MiniStat label="ไปราชการ" value={latestAttendance.travel_days} />
+            <MiniStat label="ลารวม" value={latestAttendance.leave_total} />
+            <MiniStat label="รวม" value={latestAttendance.total_days} strong />
+            <MiniStat
+              label="มาสาย"
+              value={latestAttendance.late_online_days}
+              warn={latestAttendance.late_online_days > 0}
+            />
+            <MiniStat
+              label="ไม่ลงออก"
+              value={latestAttendance.missing_checkout_count}
+              warn={latestAttendance.missing_checkout_count > 0}
+            />
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  strong,
+  warn,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  warn?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-center">
+      <div className="text-[0.7rem] text-muted-foreground leading-tight">{label}</div>
+      <div
+        className={`mt-0.5 tabular-nums ${strong ? "text-xl font-bold" : "text-lg font-semibold"} ${
+          warn ? "text-amber-600" : value > 0 ? "text-slate-900" : "text-muted-foreground/40"
+        }`}
+      >
+        {value}
       </div>
     </div>
   );
