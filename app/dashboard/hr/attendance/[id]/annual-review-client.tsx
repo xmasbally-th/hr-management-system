@@ -10,12 +10,16 @@ import {
   setAttendancePeriodStatus,
   getSystemLeaveStats,
   getProfileLeaveInstances,
-  ANNUAL_KEY_TO_CODE,
   type AnnualEntryInput,
   type AnnualLeaveStats,
   type LeaveInstance,
 } from "@/lib/actions/attendance-actions";
-import { fiscalYearLabel, ANNUAL_LEAVE_COLUMNS, STAFF_LINE_LABELS } from "@/lib/attendance/labels";
+import {
+  fiscalYearLabel,
+  ANNUAL_LEAVE_COLUMNS,
+  ANNUAL_KEY_TO_CODE,
+  STAFF_LINE_LABELS,
+} from "@/lib/attendance/labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

@@ -76,20 +76,6 @@ export type AttendanceEntryInput = {
 } & Record<(typeof NUMERIC_DAY_FIELDS)[number], number> &
   Record<(typeof COUNT_FIELDS)[number], number>;
 
-/** Soft check used by UI + server: total should equal work+travel+all leave. */
-export function entrySumMatches(e: AttendanceEntryInput): boolean {
-  const sum =
-    e.work_days +
-    e.travel_days +
-    e.leave_vacation +
-    e.leave_personal +
-    e.leave_sick +
-    e.leave_study +
-    e.leave_maternity +
-    e.leave_ordination;
-  return sum === e.total_days;
-}
-
 function sanitizeEntry(e: AttendanceEntryInput): AttendanceEntryInput {
   if (!UUID_RE.test(e.profile_id)) throw new Error("profile_id ไม่ถูกต้อง");
   const out = { ...e };
@@ -807,14 +793,6 @@ export async function saveAnnualEntries(
 
 /** Leave statuses that count as "taken/granted" for verification. */
 const TAKEN_STATUSES = ["approved", "awaiting_university", "completed"] as const;
-
-/** File annual leave key → system leave_types.code (only 4 are verifiable). */
-export const ANNUAL_KEY_TO_CODE: Partial<Record<AnnualLeaveKey, string>> = {
-  leave_sick: "SICK",
-  leave_personal: "PERSONAL",
-  leave_vacation: "VACATION",
-  leave_maternity: "MATERNITY",
-};
 
 /** Resolve the [start,end] ISO (ค.ศ.) bounds of an annual period. */
 function annualBounds(p: {

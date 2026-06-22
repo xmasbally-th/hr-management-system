@@ -52,6 +52,17 @@ export const LEAVE_TYPE_LABELS: Record<string, string> = {
   leave_spouse_childbirth: "ลาช่วยเหลือภริยาที่คลอดบุตร",
 };
 
+/**
+ * File annual leave key → system leave_types.code. Only these 4 types exist in
+ * the leave system, so only they can be auto-verified against leave_requests.
+ */
+export const ANNUAL_KEY_TO_CODE: Record<string, string> = {
+  leave_sick: "SICK",
+  leave_personal: "PERSONAL",
+  leave_vacation: "VACATION",
+  leave_maternity: "MATERNITY",
+};
+
 /** Leave columns of the ANNUAL form, left→right, each carried as ครั้ง/วัน. */
 export const ANNUAL_LEAVE_COLUMNS = [
   { key: "leave_sick", label: "ลาป่วย" },
