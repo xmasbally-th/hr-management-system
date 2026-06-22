@@ -316,7 +316,67 @@ export function AuditLogSection() {
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile (<md): divided list inside the same card */}
+        <ul className="divide-y divide-border md:hidden">
+          {rows.length === 0 ? (
+            <li className="py-10 text-center text-sm text-muted-foreground">
+              {isPending ? "กำลังโหลด..." : "ไม่พบ audit log ที่ตรงกับเงื่อนไข"}
+            </li>
+          ) : (
+            rows.map((r) => {
+              const isExpanded = expandedId === r.id;
+              const tone = actionToneClass(r.action);
+              return (
+                <li key={r.id} className="p-3">
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground grid place-items-center text-[0.625rem] font-semibold shrink-0">
+                          {r.user_initials}
+                        </span>
+                        <span className="font-medium text-sm truncate">{r.user_name}</span>
+                      </div>
+                      <span
+                        className={cn(
+                          "font-mono text-[0.625rem] uppercase tracking-wider px-1.5 py-0.5 rounded ring-1 shrink-0",
+                          TONE_BG[tone],
+                        )}
+                      >
+                        {r.action}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono truncate">{r.target_type}#{r.target_id.slice(0, 8)}</span>
+                      <span className="font-mono whitespace-nowrap">
+                        {new Date(r.created_at).toLocaleString("th-TH", {
+                          year: "2-digit", month: "2-digit", day: "2-digit",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 space-y-2 border-t border-border/60 pt-2">
+                      <div className="text-xs text-muted-foreground font-mono break-all">
+                        target_id: {r.target_id}
+                      </div>
+                      <pre className="text-xs bg-background border border-border rounded p-2 overflow-x-auto font-mono">
+                        {r.details ? JSON.stringify(r.details, null, 2) : "(empty)"}
+                      </pre>
+                    </div>
+                  )}
+                </li>
+              );
+            })
+          )}
+        </ul>
+
+        {/* Tablet/desktop (md+): table */}
+        <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -365,7 +425,7 @@ export function AuditLogSection() {
                         </TableCell>
                         <TableCell className="text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 grid place-items-center text-white text-[0.625rem] font-semibold shrink-0">
+                            <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground grid place-items-center text-[0.625rem] font-semibold shrink-0">
                               {r.user_initials}
                             </span>
                             <span className="font-medium truncate max-w-[160px]">{r.user_name}</span>

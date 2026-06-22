@@ -69,8 +69,45 @@ async function TrainingsContent({ searchParams }: TrainingsPageProps) {
         </Suspense>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg bg-card overflow-hidden">
+      {/* Mobile (<md): stacked cards */}
+      <ul className="space-y-2.5 md:hidden">
+        {result.data.map((t) => (
+          <li key={t.id as string} className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-medium leading-tight">{t.course_name as string}</p>
+              <Badge variant="outline" className="shrink-0">{getTrainingTypeLabel(t.training_type as string)}</Badge>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div className="col-span-2">
+                <dt className="text-xs text-muted-foreground">สถานที่</dt>
+                <dd>{(t.location as string) || "-"}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs text-muted-foreground">วันที่</dt>
+                <dd className="font-mono">{t.start_date as string} ~ {t.end_date as string}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">ชั่วโมง</dt>
+                <dd>{(t.total_hours as number) ?? "-"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">ค่าใช้จ่าย</dt>
+                <dd className="font-mono">
+                  {(t.total_cost as number) ? `${(t.total_cost as number).toLocaleString()} ฿` : "-"}
+                </dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+        {result.data.length === 0 && (
+          <li className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+            {search ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข" : "ยังไม่มีประวัติการอบรม"}
+          </li>
+        )}
+      </ul>
+
+      {/* Tablet/desktop (md+): full table */}
+      <div className="hidden md:block border rounded-lg bg-card overflow-x-auto">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>

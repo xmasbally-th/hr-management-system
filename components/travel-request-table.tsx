@@ -142,7 +142,69 @@ export function TravelRequestTable({
         <span className="text-sm text-muted-foreground shrink-0">{filtered.length} รายการ</span>
       </div>
 
-      <div className="border border-border rounded-lg bg-card overflow-x-auto">
+      {/* Mobile (<md): stacked cards — avoids horizontal-scrolling a 9-col table */}
+      <ul className="space-y-2.5 md:hidden">
+        {pageRows.map((req) => {
+          const status = TRAVEL_STATUS_MAP[req.status] ?? { label: req.status, variant: "outline" as const, tone: "gray" as const };
+          const expenses = req.expenses ?? [];
+          const totalEstimated = expenses.reduce((s, e) => s + Number(e.estimated_amount ?? 0), 0);
+          const totalActual = expenses.reduce((s, e) => s + Number(e.actual_amount ?? 0), 0);
+          return (
+            <li key={req.id}>
+              <Link
+                href={`/dashboard/travel/${req.id}`}
+                className="block rounded-lg border border-border bg-card p-4 transition-colors active:bg-muted/50"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium leading-tight truncate">{req.employee?.full_name ?? "-"}</p>
+                    {req.employee?.position_title && (
+                      <p className="text-xs text-muted-foreground truncate">{req.employee.position_title}</p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="shrink-0">{TRAVEL_TYPE_MAP[req.travel_type] ?? req.travel_type}</Badge>
+                </div>
+
+                <p className="mt-2 text-sm font-medium leading-snug">{req.title}</p>
+
+                <div className="mt-2 flex items-start gap-1.5 text-sm font-medium">
+                  <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${TONE_DOT[status.tone]}`} />
+                  <span>{status.label}</span>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted-foreground">สถานที่</dt>
+                    <dd>{req.location}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted-foreground">วันที่</dt>
+                    <dd className="font-mono">{formatThai(req.start_date)} – {formatThai(req.end_date)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">งบประมาณ</dt>
+                    <dd className="font-mono">{totalEstimated.toLocaleString()} ฿</dd>
+                  </div>
+                  {totalActual > 0 && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">จ่ายจริง</dt>
+                      <dd className="font-mono text-emerald-600 dark:text-emerald-400">{totalActual.toLocaleString()} ฿</dd>
+                    </div>
+                  )}
+                </dl>
+              </Link>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && (
+          <li className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+            {emptyText}
+          </li>
+        )}
+      </ul>
+
+      {/* Tablet/desktop (md+): full table */}
+      <div className="hidden md:block border border-border rounded-lg bg-card overflow-x-auto">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>

@@ -153,7 +153,72 @@ async function UsersContent({ searchParams }: UsersPageProps) {
         </Suspense>
       </div>
 
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* Mobile (<md): stacked cards */}
+      <ul className="space-y-2.5 md:hidden">
+        {result.data.map((profile) => {
+          const pct = completionPct(profile);
+          const corrCount = correctionCounts[profile.id as string] ?? 0;
+          return (
+            <li key={profile.id as string} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium leading-tight truncate">{profile.full_name as string}</p>
+                  <p className="text-xs text-muted-foreground truncate font-mono">{profile.email as string}</p>
+                </div>
+                <RoleBadge role={profile.role as string} />
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">แผนก</dt>
+                  <dd>{(profile.department as { name: string } | null)?.name || "-"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">% ครบ</dt>
+                  <dd className="mt-1"><CompletionCell pct={pct} /></dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs text-muted-foreground">สถานะ</dt>
+                  <dd className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    <StatusBadge status={profile.status as string} />
+                    {corrCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-800 border border-amber-200">
+                        <FileEdit className="size-3" />
+                        {corrCount}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-3 flex items-center justify-end gap-1 border-t border-border/60 pt-3">
+                <UserRowActions
+                  id={profile.id as string}
+                  status={profile.status as "approved" | "pending" | "rejected"}
+                  fullName={profile.full_name as string}
+                />
+                <UserActionsMenu
+                  profile={{
+                    id: profile.id as string,
+                    status: profile.status as "approved" | "pending" | "rejected",
+                    role: profile.role as "admin" | "hr" | "manager" | "employee",
+                    full_name: profile.full_name as string,
+                    email: profile.email as string,
+                  }}
+                />
+              </div>
+            </li>
+          );
+        })}
+        {result.data.length === 0 && (
+          <li className="rounded-lg border border-border bg-card py-12 text-center text-sm text-muted-foreground">
+            {search || role !== "all" || status !== "all"
+              ? "ไม่พบข้อมูลที่ตรงกับเงื่อนไข"
+              : "ไม่พบข้อมูลผู้ใช้งาน"}
+          </li>
+        )}
+      </ul>
+
+      {/* Tablet/desktop (md+): full table */}
+      <div className="hidden md:block rounded-xl border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
