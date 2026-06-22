@@ -208,7 +208,73 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="border rounded-lg bg-card overflow-hidden">
+      {/* Mobile (<md): agenda list — a 7-col month grid is too cramped on a phone */}
+      <div className="md:hidden border rounded-lg bg-card divide-y divide-border overflow-hidden">
+        {(() => {
+          const agenda = weeks
+            .flat()
+            .filter(
+              (d) =>
+                d.getMonth() === monthStart.getMonth() &&
+                (holidays.get(toIso(d)) || (byDay.get(toIso(d))?.length ?? 0) > 0),
+            );
+          if (agenda.length === 0) {
+            return (
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                ไม่มีการลาในเดือนนี้
+              </p>
+            );
+          }
+          return agenda.map((d) => {
+            const iso = toIso(d);
+            const holidayName = holidays.get(iso);
+            const entries = byDay.get(iso) ?? [];
+            const isToday = iso === todayIso;
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            return (
+              <div key={iso} className={cn("flex gap-3 p-3", isToday && "bg-sky-50")}>
+                <div className="shrink-0 w-11 text-center">
+                  <div className={cn("text-[0.7rem]", isWeekend ? "text-rose-600" : "text-muted-foreground")}>
+                    {TH_WEEKDAY_SHORT[d.getDay()]}
+                  </div>
+                  <div className={cn("font-mono text-lg leading-tight font-semibold", isToday && "text-sky-700")}>
+                    {d.getDate()}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0 space-y-1 py-0.5">
+                  {holidayName && (
+                    <div className="flex items-center gap-1.5 text-xs text-rose-700 font-medium">
+                      <Badge
+                        variant="outline"
+                        className="text-[0.65rem] px-1 py-0 border-rose-300 text-rose-700 bg-rose-50"
+                      >
+                        หยุด
+                      </Badge>
+                      <span className="truncate">{holidayName}</span>
+                    </div>
+                  )}
+                  {entries.map((e, i) => (
+                    <Link
+                      key={`${e.id}-${i}`}
+                      href={`/dashboard/leaves/${e.id}`}
+                      className={cn(
+                        "block px-1.5 py-0.5 rounded border text-xs truncate hover:opacity-80",
+                        TYPE_COLORS[e.typeCode] ?? "bg-muted text-foreground border-border",
+                      )}
+                      title={`${e.employeeName} — ${e.typeName}`}
+                    >
+                      {e.employeeName} <span className="opacity-70">· {e.typeName}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
+      {/* Tablet/desktop (md+): month grid */}
+      <div className="hidden md:block border rounded-lg bg-card overflow-hidden">
         <div className="grid grid-cols-7 bg-muted/50 text-xs font-semibold text-muted-foreground">
           {TH_WEEKDAY_SHORT.map((w) => (
             <div key={w} className="p-2 text-center border-b">
