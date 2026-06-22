@@ -382,9 +382,9 @@ export function TravelRequestForm({
             ))}
           </div>
 
-          {/* Total — indigo gradient */}
-          <div className="rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5">
-            <div className="text-xs uppercase tracking-widest font-mono text-indigo-200">
+          {/* Total — solid brand panel */}
+          <div className="rounded-xl bg-primary text-primary-foreground p-5">
+            <div className="text-xs uppercase tracking-widest font-mono text-primary-foreground/70">
               รวมงบประมาณ (ประมาณการ)
             </div>
             <div className="mt-2 flex items-baseline gap-3 flex-wrap">
@@ -392,7 +392,7 @@ export function TravelRequestForm({
                 ฿{totalBudget.toLocaleString()}
               </div>
               {totalDays > 0 && (
-                <div className="text-sm text-indigo-200">
+                <div className="text-sm text-primary-foreground/70">
                   เฉลี่ย ฿{avgPerDay.toLocaleString()} / วัน · {totalDays} วัน
                 </div>
               )}

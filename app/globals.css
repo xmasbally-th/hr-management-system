@@ -56,8 +56,9 @@
   }
 
   @keyframes notifPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
-    50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+    /* destructive-rose from DESIGN.md, fading out */
+    0%, 100% { box-shadow: 0 0 0 0 oklch(0.577 0.245 27.325 / 0.6); }
+    50% { box-shadow: 0 0 0 5px oklch(0.577 0.245 27.325 / 0); }
   }
 }
 
@@ -234,7 +235,8 @@
 
 @layer utilities {
   .dotted-bg {
-    background-image: radial-gradient(rgba(99,102,241,0.12) 1px, transparent 1px);
+    /* Civic Indigo (primary) from DESIGN.md, low alpha for faint texture */
+    background-image: radial-gradient(oklch(0.488 0.243 264.376 / 0.12) 1px, transparent 1px);
     background-size: 16px 16px;
   }
   .grid-bg {
@@ -245,7 +247,7 @@
     mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent);
   }
   .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 3px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: oklch(0.556 0 0 / 0.4); border-radius: 9999px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .sidebar-transition { transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1); }
 }

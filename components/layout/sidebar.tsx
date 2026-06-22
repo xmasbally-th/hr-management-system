@@ -96,8 +96,8 @@ export function Sidebar({ role, collapsed, onToggleCollapse, mobileOpen, onMobil
           collapsed ? "justify-center px-3" : "px-5"
         )}>
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 grid place-items-center shadow-lg shadow-indigo-900/40 shrink-0">
-              <span className="text-white font-bold text-sm tracking-tight">HR</span>
+            <div className="w-9 h-9 rounded-lg bg-primary grid place-items-center shrink-0">
+              <span className="text-primary-foreground font-bold text-sm tracking-tight">HR</span>
             </div>
             {!collapsed && (
               <div className="animate-fade-in min-w-0">

@@ -207,7 +207,7 @@ export function EditUserClient({
               className="w-20 h-20 rounded-full object-cover ring-2 ring-border shadow-sm shrink-0"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-2xl font-semibold ring-2 ring-border shadow-sm shrink-0">
+            <div className="w-20 h-20 rounded-full bg-primary grid place-items-center text-primary-foreground text-2xl font-semibold ring-2 ring-border shrink-0">
               {(profile.full_name ?? profile.email)
                 .split(" ")
                 .map((n) => n[0])

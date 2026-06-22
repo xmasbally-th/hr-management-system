@@ -13,9 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Loader2,
-  Zap,
+  CalendarCheck,
+  ScanLine,
   ShieldCheck,
-  Users,
   HelpCircle,
   AlertTriangle,
   KeyRound,
@@ -131,84 +131,64 @@ export function LoginClient() {
 
   return (
     <div className="flex min-h-screen w-full bg-white">
-      {/* ─── Left: brand panel (lg+) ──────────────────────────────────── */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-slate-950 p-10 lg:flex xl:p-16">
-        {/* Background effects */}
-        <div className="absolute inset-0 dotted-bg opacity-30" />
-        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-indigo-600/20 blur-[120px]" />
-        <div className="absolute top-[60%] -right-[20%] w-[60%] h-[60%] rounded-full bg-purple-600/10 blur-[100px]" />
+      {/* ─── Left: brand panel (lg+) — calm institutional, deep indigo ──── */}
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-indigo-950 p-10 lg:flex xl:p-16">
+        {/* Subtle texture — faint masked dotted grid, one quiet indigo wash */}
+        <div className="absolute inset-0 dotted-bg opacity-20" />
+        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-indigo-600/15 blur-[120px]" />
 
         {/* Top header */}
         <div className="relative z-10 flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-900/50">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
             <span className="text-lg font-bold text-white tracking-tight">HR</span>
           </div>
           <div>
             <h2 className="text-base font-semibold text-white leading-tight">
               HR Hybrid Workflow
             </h2>
-            <p className="text-xs text-slate-400">Enterprise Edition · v2.4</p>
+            <p className="text-xs text-indigo-200/70">ระบบสารสนเทศทรัพยากรบุคคล</p>
           </div>
         </div>
 
         {/* Middle content */}
         <div className="relative z-10 mt-12 flex-1">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-slate-300">
-              ระบบพร้อมใช้งาน · All systems operational
-            </span>
-          </div>
-
-          <h1 className="mt-8 text-5xl xl:text-6xl font-bold text-white tracking-tight leading-[1.1]">
-            HR Management <br />{" "}
-            <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-indigo-400 bg-clip-text text-transparent">
-              System.
-            </span>
+          <h1 className="text-4xl xl:text-5xl font-bold text-white tracking-tight leading-[1.15] text-balance">
+            จัดการงานบุคคล<br />ทั้งดิจิทัลและกระดาษ ในระบบเดียว
           </h1>
 
-          <h3 className="mt-8 text-lg font-medium text-slate-200">
-            ระบบรองรับการทำงานแบบผสมผสาน (Hybrid Workflow)
-          </h3>
-
-          <p className="mt-3 text-sm text-slate-400 max-w-md leading-relaxed">
-            จัดการคำขอลา การเดินทาง และการอนุมัติเอกสารทั้งแบบดิจิทัลและกระดาษ
-            ในระบบเดียว ที่ปลอดภัยและตรวจสอบได้
+          <p className="mt-6 text-sm text-indigo-100/70 max-w-md leading-relaxed">
+            ยื่นและอนุมัติคำขอลา การเดินทางไปราชการ และเอกสารต่าง ๆ
+            อย่างเป็นระบบ ปลอดภัย และตรวจสอบย้อนหลังได้
           </p>
 
-          {/* Feature pills */}
-          <div className="mt-12 grid grid-cols-3 gap-4 max-w-2xl">
-            <FeaturePill icon={Zap} title="รวดเร็ว" subtitle="อนุมัติแบบเรียลไทม์" tone="indigo" />
-            <FeaturePill
+          {/* Capabilities — calm, factual rows (no glass, no fabricated metrics) */}
+          <ul className="mt-12 max-w-md divide-y divide-white/10 overflow-hidden rounded-xl ring-1 ring-white/10">
+            <Capability
+              icon={CalendarCheck}
+              title="คำขอลาและเดินทางไปราชการ"
+              desc="ยื่น อนุมัติ และติดตามสถานะได้ในระบบเดียว"
+            />
+            <Capability
+              icon={ScanLine}
+              title="รองรับทั้งดิจิทัลและกระดาษ"
+              desc="บันทึกแทนผู้ยื่น แนบเอกสารที่เซ็นแล้ว และออกหนังสือราชการ"
+            />
+            <Capability
               icon={ShieldCheck}
-              title="ปลอดภัย"
-              subtitle="SSO + Audit logging"
-              tone="purple"
+              title="ปลอดภัยและตรวจสอบได้"
+              desc="ควบคุมสิทธิ์ตามบทบาท พร้อมบันทึกการใช้งานครบถ้วน"
             />
-            <FeaturePill
-              icon={Users}
-              title="ครอบคลุม"
-              subtitle="รองรับทั้งองค์กร"
-              tone="blue"
-            />
-          </div>
-
-          {/* Stats bar */}
-          <div className="mt-10 max-w-2xl flex items-stretch divide-x divide-white/10 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
-            <Stat label="ผู้ใช้งาน" value="248" />
-            <Stat label="อัปไทม์" value="99.9%" />
-            <Stat label="คำขอ/เดือน" value="1.2k" />
-          </div>
+          </ul>
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 flex items-center justify-between text-xs text-slate-500">
+        <div className="relative z-10 flex items-center justify-between text-xs text-indigo-200/50">
           <p>© 2569 HR Hybrid Workflow</p>
           <div className="flex gap-4">
-            <a href="#" className="hover:text-slate-300 transition-colors">
+            <a href="#" className="hover:text-indigo-100 transition-colors">
               นโยบายความเป็นส่วนตัว
             </a>
-            <a href="#" className="hover:text-slate-300 transition-colors">
+            <a href="#" className="hover:text-indigo-100 transition-colors">
               ข้อตกลงการใช้งาน
             </a>
           </div>
@@ -220,8 +200,8 @@ export function LoginClient() {
         <div className="w-full max-w-[420px] animate-fade-in">
           {/* Mobile compact logo */}
           <div className="lg:hidden mb-8 flex items-center justify-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-600 shadow-md shadow-indigo-200">
-              <span className="text-base font-bold text-white tracking-tight">HR</span>
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary">
+              <span className="text-base font-bold text-primary-foreground tracking-tight">HR</span>
             </div>
             <div className="text-left">
               <div className="text-sm font-semibold text-slate-900 leading-tight">
@@ -383,39 +363,25 @@ export function LoginClient() {
   );
 }
 
-function FeaturePill({
+function Capability({
   icon: Icon,
   title,
-  subtitle,
-  tone,
+  desc,
 }: {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   title: string;
-  subtitle: string;
-  tone: "indigo" | "purple" | "blue";
+  desc: string;
 }) {
-  const toneCls = {
-    indigo: "bg-indigo-500/20 text-indigo-300",
-    purple: "bg-purple-500/20 text-purple-300",
-    blue: "bg-blue-500/20 text-blue-300",
-  }[tone];
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-colors hover:bg-white/10">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-4 ${toneCls}`}>
+    <li className="flex items-start gap-3.5 bg-white/[0.03] px-4 py-3.5 transition-colors hover:bg-white/[0.06]">
+      <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-indigo-200">
         <Icon size={16} />
       </div>
-      <h4 className="text-sm font-semibold text-white">{title}</h4>
-      <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex-1 px-5 py-4">
-      <div className="text-[10px] uppercase tracking-widest text-slate-500 font-mono">{label}</div>
-      <div className="text-xl font-bold text-white font-mono mt-0.5">{value}</div>
-    </div>
+      <div className="min-w-0">
+        <h4 className="text-sm font-semibold text-white">{title}</h4>
+        <p className="mt-0.5 text-xs text-indigo-100/60 leading-relaxed">{desc}</p>
+      </div>
+    </li>
   );
 }
 
