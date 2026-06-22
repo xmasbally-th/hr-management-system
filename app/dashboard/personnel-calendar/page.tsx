@@ -538,7 +538,84 @@ async function PersonnelCalendarContent({ searchParams }: PageProps) {
         </div>
       )}
 
-      <div className="border rounded-lg bg-card overflow-hidden">
+      {/* Mobile (<md): agenda list — a 7-col month grid is unreadable below 640px */}
+      <div className="md:hidden border rounded-lg bg-card divide-y divide-border overflow-hidden">
+        {(() => {
+          const agenda = days.filter(
+            (d) =>
+              d.getMonth() === monthStart.getMonth() &&
+              (holidays.get(toIso(d)) || (byDay.get(toIso(d))?.length ?? 0) > 0),
+          );
+          if (agenda.length === 0) {
+            return (
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                ไม่มีรายการในเดือนนี้
+              </p>
+            );
+          }
+          return agenda.map((d) => {
+            const iso = toIso(d);
+            const holiday = holidays.get(iso);
+            const entries = byDay.get(iso) ?? [];
+            const isToday = iso === todayIso;
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            return (
+              <div key={iso} className={cn("flex gap-3 p-3", isToday && "bg-indigo-50/40")}>
+                <div className="shrink-0 w-11 text-center">
+                  <div className={cn("text-[0.7rem]", isWeekend ? "text-rose-600" : "text-muted-foreground")}>
+                    {TH_WEEKDAY_SHORT[d.getDay()]}
+                  </div>
+                  <div className={cn("font-mono text-lg leading-tight font-semibold", isToday && "text-indigo-700")}>
+                    {d.getDate()}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0 space-y-1 py-0.5">
+                  {holiday && (
+                    <EventChip
+                      label={holiday.name}
+                      colorClass={CATEGORY_COLORS.holiday}
+                      categoryLabel={CATEGORY_LABELS.holiday}
+                      detail={{
+                        heading: holiday.name,
+                        typeName: holidayTypeLabel[holiday.type] ?? holiday.type,
+                        dateLabel: formatThai(iso),
+                        note: holiday.note ?? undefined,
+                      }}
+                    />
+                  )}
+                  {entries.map((e, i) =>
+                    e.detail ? (
+                      <EventChip
+                        key={`${e.category}-${i}`}
+                        label={e.label}
+                        colorClass={e.colorClass ?? CATEGORY_COLORS[e.category]}
+                        categoryLabel={CATEGORY_LABELS[e.category]}
+                        detail={e.detail}
+                        href={e.href}
+                        pending={e.pending}
+                      />
+                    ) : (
+                      <div
+                        key={`${e.category}-${i}`}
+                        className={cn(
+                          "block px-1.5 py-0.5 rounded border text-xs truncate",
+                          e.colorClass ?? CATEGORY_COLORS[e.category],
+                        )}
+                        title={e.title ?? e.label}
+                      >
+                        {e.label}
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
+      {/* Tablet/desktop (md+): month grid */}
+      <div className="hidden md:block border rounded-lg bg-card overflow-hidden">
         {/* min-w + overflow-x: keep 7 columns readable on narrow screens */}
         <div className="overflow-x-auto"><div className="min-w-[640px]">
         <div className="grid grid-cols-7 bg-muted/50 text-xs font-semibold text-muted-foreground">

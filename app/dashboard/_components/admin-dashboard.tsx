@@ -17,7 +17,7 @@ const roleLabel: Record<string, string> = {
 
 const roleTone: Record<string, string> = {
   employee: "sky",
-  manager: "violet",
+  manager: "indigo",
   hr: "emerald",
   admin: "rose",
 };
@@ -90,7 +90,7 @@ export function AdminDashboard({ data }: Props) {
           label="Audit Events (24h)"
           value={data.apiCalls24h}
           hint="ใน 24 ชม. ที่ผ่านมา"
-          tone="violet"
+          tone="indigo"
           icon={Database}
         />
         <StatCard
@@ -112,7 +112,7 @@ export function AdminDashboard({ data }: Props) {
           action={
             <Link
               href="/dashboard/settings?tab=audit"
-              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -124,7 +124,7 @@ export function AdminDashboard({ data }: Props) {
             <div className="overflow-x-auto -mx-5">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[0.625rem] font-mono uppercase tracking-wider text-slate-500 border-b border-border">
+                  <tr className="text-left text-[0.625rem] font-mono uppercase tracking-wider text-muted-foreground border-b border-border">
                     <th className="px-5 py-2 font-semibold">Timestamp</th>
                     <th className="px-2 py-2 font-semibold">User</th>
                     <th className="px-2 py-2 font-semibold">Action</th>
@@ -139,7 +139,7 @@ export function AdminDashboard({ data }: Props) {
                         key={e.id}
                         className="border-b border-border/70 last:border-b-0 hover:bg-muted/40"
                       >
-                        <td className="px-5 py-2.5 font-mono text-slate-600">
+                        <td className="px-5 py-2.5 font-mono text-muted-foreground">
                           {new Date(e.timestamp).toLocaleTimeString("th-TH", {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -148,10 +148,10 @@ export function AdminDashboard({ data }: Props) {
                         </td>
                         <td className="px-2 py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 grid place-items-center text-white text-[0.625rem] font-semibold">
+                            <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground grid place-items-center text-[0.625rem] font-semibold">
                               {e.initials}
                             </span>
-                            <span className="text-slate-800 font-medium truncate max-w-[120px]">
+                            <span className="text-foreground font-medium truncate max-w-[120px]">
                               {e.user}
                             </span>
                           </div>
@@ -163,7 +163,7 @@ export function AdminDashboard({ data }: Props) {
                             {e.action}
                           </span>
                         </td>
-                        <td className="px-5 py-2.5 font-mono text-slate-600 truncate max-w-[160px]">
+                        <td className="px-5 py-2.5 font-mono text-muted-foreground truncate max-w-[160px]">
                           {e.target}
                         </td>
                       </tr>
@@ -184,14 +184,14 @@ export function AdminDashboard({ data }: Props) {
               return (
                 <div key={rr.role}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-foreground">
                       {roleLabel[rr.role] ?? rr.role}
                     </span>
-                    <span className="font-mono text-slate-500">
+                    <span className="font-mono text-muted-foreground">
                       {rr.count} · {pct.toFixed(1)}%
                     </span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-${tone}-500 rounded-full`}
                       style={{ width: `${pct}%` }}
@@ -201,8 +201,8 @@ export function AdminDashboard({ data }: Props) {
               );
             })}
             <div className="pt-3 border-t border-border/70 flex items-center justify-between">
-              <span className="text-xs text-slate-500">รวม</span>
-              <span className="text-sm font-mono font-bold text-slate-900">
+              <span className="text-xs text-muted-foreground">รวม</span>
+              <span className="text-sm font-mono font-bold text-foreground">
                 {data.totalUsers} ผู้ใช้
               </span>
             </div>

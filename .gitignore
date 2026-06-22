@@ -48,3 +48,8 @@ next-env.d.ts
 
 # Local-only DB introspection tool (uses SUPABASE_DB_URL)
 scripts/db.mjs
+
+# impeccable design skill — runtime cache & live-session state (config/docs are committed)
+.impeccable/hook.cache.json
+.impeccable/live/sessions/
+.codex/

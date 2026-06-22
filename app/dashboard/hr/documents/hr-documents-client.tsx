@@ -109,7 +109,7 @@ function docTypeBadgeClass(docType: string): string {
   if (docType === "travel_order" || docType === "travel_claim") {
     return "border-sky-300 text-sky-700 bg-sky-50 dark:bg-sky-950/30 dark:text-sky-400";
   }
-  return "border-violet-300 text-violet-700 bg-violet-50 dark:bg-violet-950/30 dark:text-violet-400";
+  return "border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 dark:text-indigo-400";
 }
 
 /** Type-filter options shown in the dropdown (value → label). */

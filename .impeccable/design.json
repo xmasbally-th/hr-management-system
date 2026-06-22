@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-22T00:00:00.000Z",
+  "title": "Design System: HR Management System",
+  "extensions": {
+    "colorMeta": {
+      "civic-indigo": {
+        "role": "primary",
+        "displayName": "Civic Indigo",
+        "canonical": "oklch(0.488 0.243 264.376)",
+        "tonalRamp": [
+          "oklch(0.22 0.10 264)",
+          "oklch(0.30 0.15 264)",
+          "oklch(0.38 0.20 264)",
+          "oklch(0.45 0.23 264)",
+          "oklch(0.488 0.243 264)",
+          "oklch(0.58 0.20 264)",
+          "oklch(0.72 0.14 264)",
+          "oklch(0.88 0.06 264)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.145 0 0)",
+        "tonalRamp": [
+          "oklch(0.145 0 0)",
+          "oklch(0.22 0 0)",
+          "oklch(0.32 0 0)",
+          "oklch(0.43 0 0)",
+          "oklch(0.556 0 0)",
+          "oklch(0.70 0 0)",
+          "oklch(0.85 0 0)",
+          "oklch(0.97 0 0)"
+        ]
+      },
+      "paper-bg": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(0.985 0 0)",
+        "tonalRamp": [
+          "oklch(0.40 0 0)",
+          "oklch(0.55 0 0)",
+          "oklch(0.70 0 0)",
+          "oklch(0.85 0 0)",
+          "oklch(0.922 0 0)",
+          "oklch(0.96 0 0)",
+          "oklch(0.985 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "destructive-rose": {
+        "role": "tertiary",
+        "displayName": "Rose (Destructive)",
+        "canonical": "oklch(0.577 0.245 27.325)",
+        "tonalRamp": [
+          "oklch(0.30 0.12 27)",
+          "oklch(0.40 0.18 27)",
+          "oklch(0.50 0.23 27)",
+          "oklch(0.577 0.245 27)",
+          "oklch(0.66 0.21 27)",
+          "oklch(0.76 0.15 27)",
+          "oklch(0.86 0.08 27)",
+          "oklch(0.94 0.03 27)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Card titles and section headings; one quiet step above body." },
+      "body": { "displayName": "Body", "purpose": "Default UI text in both Thai and English." },
+      "data": { "displayName": "Data (Mono)", "purpose": "Balances, day counts, amounts, IDs, emails — anything countable or copyable." },
+      "label": { "displayName": "Label", "purpose": "Form labels, badge text, table headers, metadata." }
+    },
+    "shadows": [
+      { "name": "ring-hairline", "value": "0 0 0 1px oklch(0.145 0 0 / 0.10)", "purpose": "Resting separation for cards and surfaces — a hairline ring, not a drop shadow." },
+      { "name": "overlay", "value": "0 8px 24px oklch(0.145 0 0 / 0.12)", "purpose": "Transient overlays only: dropdowns, popovers, dialogs, toasts." },
+      { "name": "focus-ring", "value": "0 0 0 3px oklch(0.488 0.243 264.376 / 0.50)", "purpose": "Focus-visible indicator on interactive controls." }
+    ],
+    "motion": [
+      { "name": "fade-in", "value": "180ms ease-out", "purpose": "Default content/state fade (translateY -4px → 0)." },
+      { "name": "sidebar", "value": "220ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Sidebar collapse/expand width transition." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions; honor prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single high-emphasis action per view. Civic Indigo fill, compact h-8.",
+      "html": "<button class=\"ds-btn-primary\">บันทึก</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 2rem; padding: 0 0.625rem; border: 1px solid transparent; border-radius: 0.5rem; background: var(--color-primary, oklch(0.488 0.243 264.376)); color: var(--color-primary-foreground, oklch(0.985 0 0)); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s, transform 0.05s; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--color-primary, oklch(0.488 0.243 264.376)) 80%, transparent); } .ds-btn-primary:focus-visible { outline: none; border-color: var(--color-ring, oklch(0.488 0.243 264.376)); box-shadow: 0 0 0 3px oklch(0.488 0.243 264.376 / 0.5); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The quiet majority of actions: hairline border on paper, muted hover.",
+      "html": "<button class=\"ds-btn-outline\">ยกเลิก</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; height: 2rem; padding: 0 0.625rem; border: 1px solid var(--color-border, oklch(0.922 0 0)); border-radius: 0.5rem; background: var(--color-background, oklch(0.985 0 0)); color: var(--color-foreground, oklch(0.145 0 0)); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s; } .ds-btn-outline:hover { background: var(--color-muted, oklch(0.97 0 0)); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--color-ring, oklch(0.488 0.243 264.376)); box-shadow: 0 0 0 3px oklch(0.488 0.243 264.376 / 0.5); }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Signalled, not screamed — a rose tint, never a solid-red fill.",
+      "html": "<button class=\"ds-btn-destructive\">ลบ</button>",
+      "css": ".ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; height: 2rem; padding: 0 0.625rem; border: 1px solid transparent; border-radius: 0.5rem; background: oklch(0.577 0.245 27.325 / 0.1); color: oklch(0.577 0.245 27.325); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s; } .ds-btn-destructive:hover { background: oklch(0.577 0.245 27.325 / 0.2); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Compact hairline-bordered field; indigo focus ring, no glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"ค้นหา…\" />",
+      "css": ".ds-input { height: 2rem; width: 100%; padding: 0.25rem 0.625rem; border: 1px solid var(--color-input, oklch(0.922 0 0)); border-radius: 0.5rem; background: transparent; color: var(--color-foreground, oklch(0.145 0 0)); font-size: 0.875rem; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: var(--color-muted-foreground, oklch(0.556 0 0)); } .ds-input:focus-visible { outline: none; border-color: var(--color-ring, oklch(0.488 0.243 264.376)); box-shadow: 0 0 0 3px oklch(0.488 0.243 264.376 / 0.5); } .ds-input:disabled { background: oklch(0.922 0 0 / 0.5); cursor: not-allowed; opacity: 0.5; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat surface separated by a hairline ring, not a shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">คำขอลาพักผ่อน</div><div class=\"ds-card-body\">รออนุมัติจากผู้บังคับบัญชา</div></div>",
+      "css": ".ds-card { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; border-radius: 0.7rem; background: var(--color-card, oklch(1 0 0)); color: var(--color-card-foreground, oklch(0.145 0 0)); box-shadow: 0 0 0 1px oklch(0.145 0 0 / 0.1); } .ds-card-title { font-size: 1rem; font-weight: 500; line-height: 1.375; } .ds-card-body { font-size: 0.875rem; color: var(--color-muted-foreground, oklch(0.556 0 0)); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "Full-pill status marker; color always paired with a label.",
+      "html": "<span class=\"ds-badge ds-badge--approved\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6 9 17l-5-5\"/></svg>อนุมัติแล้ว</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; white-space: nowrap; } .ds-badge--approved { background: oklch(0.95 0.05 155); color: oklch(0.45 0.13 155); } .ds-badge svg { width: 12px; height: 12px; }"
+    },
+    {
+      "name": "Data Value (Mono)",
+      "kind": "custom",
+      "refersTo": "typography.data",
+      "description": "The Mono-for-Numbers rule in practice — a leave balance figure.",
+      "html": "<span class=\"ds-data\">คงเหลือ <strong class=\"ds-data-num\">7.5</strong> วัน</span>",
+      "css": ".ds-data { font-size: 0.875rem; color: var(--color-foreground, oklch(0.145 0 0)); } .ds-data-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Civil Registry",
+    "overview": "The dependable government desk made digital: a calm, exact place where leave, travel, attendance, and official paperwork are recorded and trusted. The interface carries quiet institutional authority — not stiff, not loud, never decorative for its own sake. Civic Indigo signals competence without shouting; everything else is a near-neutral surface so the one thing that matters on any screen — where a request is and what happens next — stands out. The system rejects both the cramped legacy Thai-government look (gray-on-gray, shadow-stacked dense tables) and over-minimal sparseness that hides the data HR needs to scan. Density is tunable (compact/normal/large); depth is hairline rings and tonal layering, never drop shadows.",
+    "keyCharacteristics": [
+      "Calm, trustworthy, institutional — steady, legible, unsurprising.",
+      "Civic Indigo as the single accent; everything else neutral.",
+      "Status is the most prominent thing on any workflow screen.",
+      "Flat surfaces with hairline rings; no decorative shadows.",
+      "Monospace for all numeric/tabular data (balances, day counts, IDs, emails).",
+      "Bilingual Thai/English legibility and WCAG 2.1 AA as hard constraints.",
+      "Four themes (light/dark/soft/bold) and three density modes share one token system."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Civic Indigo is the only brand color on the surface. If a screen has two competing accents, one is wrong. Status colors are a separate, semantic system and do not count as decoration.", "section": "colors" },
+      { "name": "The No-Warm-Tint Rule", "body": "Neutrals sit at chroma 0 (or tinted toward indigo in the soft/bold themes, never toward warm). The cream/sand/parchment body background is forbidden.", "section": "colors" },
+      { "name": "The Mono-for-Numbers Rule", "body": "Every balance, day count, amount, ID, and email renders in font-mono. Tabular figures are data, not prose; they must align and never reflow ambiguously.", "section": "typography" },
+      { "name": "The No-Eyebrow Rule", "body": "No tiny uppercase tracked kicker above sections. Headings stand on their own weight and size.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Structure is drawn with 1px lines and one-step brightness changes. A colored border-left/border-right thicker than 1px as an accent stripe is forbidden.", "section": "elevation" },
+      { "name": "The Flat-At-Rest Rule", "body": "Surfaces are flat until they're transient. Shadows appear only on things that float above the page and will disappear (menus, dialogs, toasts).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Civic Indigo as the only brand accent — primary actions, active state, focus rings. One accent per screen.",
+      "Do render every number, balance, day count, amount, ID, and email in font-mono.",
+      "Do draw structure with 1px hairlines and one-step brightness changes; separate cards with ring-1 ring-foreground/10.",
+      "Do keep body text at or near Ink contrast; verify ≥4.5:1 (≥3:1 for large/bold), including placeholders and muted text on tinted surfaces.",
+      "Do pair every status color with a label or icon, for color-blind users.",
+      "Do ship the full state set on every control: default, hover, focus-visible, active, disabled, aria-invalid.",
+      "Do honor reduced motion and the three density modes; keep transitions in the 150–250ms range.",
+      "Do keep Thai legible — sentence case, generous line-height, the Noto Sans Thai stack."
+    ],
+    "donts": [
+      "Don't reproduce the cramped legacy Thai-government look: tiny gray-on-gray text, shadow-stacked dense tables, ASP.NET-era forms with no whitespace.",
+      "Don't over-minimize to the point HR can't scan dense info — whitespace serves legibility, it doesn't replace data.",
+      "Don't add consumer-SaaS decoration (gradient heroes, marketing-style cards, decorative illustrations) or generic AI-dashboard scaffolding (identical icon+number stat-card grids, tracked uppercase eyebrows, gradient accents).",
+      "Don't use a warm cream/sand/parchment background; neutrals stay at chroma 0 (or tinted toward indigo, never warm).",
+      "Don't use drop shadows on resting surfaces — shadows are only for transient overlays (menus, dialogs, toasts).",
+      "Don't use a colored border-left/border-right thicker than 1px as an accent stripe.",
+      "Don't use gradient text (background-clip: text) or decorative glassmorphism.",
+      "Don't make destructive actions solid-red and loud — tint them (bg-destructive/10), signal don't scream.",
+      "Don't nest cards, and don't let an eyebrow or 01 / 02 / 03 marker scaffold every section."
+    ]
+  }
+}

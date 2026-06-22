@@ -33,7 +33,7 @@ const ACCEPT = "image/jpeg,image/png,image/webp";
  *      to the `avatars` Supabase Storage bucket under `{userId}/avatar.jpg`
  *   4. Server action persists the public URL to `profiles.avatar_url`
  *
- * The bucket is public-readable so the URL can be used directly in <img>.
+ * The bucket is public-readable so the URL can be used directly as an image source.
  */
 export function AvatarUpload({
   currentUrl,
@@ -139,7 +139,7 @@ export function AvatarUpload({
             className="w-24 h-24 rounded-full object-cover ring-2 ring-border shadow-sm"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 grid place-items-center text-white text-2xl font-semibold ring-2 ring-border shadow-sm">
+          <div className="w-24 h-24 rounded-full bg-primary grid place-items-center text-primary-foreground text-2xl font-semibold ring-2 ring-border">
             {initials}
           </div>
         )}

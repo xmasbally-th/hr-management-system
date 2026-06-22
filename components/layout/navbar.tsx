@@ -41,21 +41,19 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
     employee: "พนักงาน",
   };
 
-  // Role-tinted avatar gradient (matches dashboard role accents)
-  const roleGradient: Record<string, string> = {
-    admin: "from-rose-400 to-rose-600",
-    hr: "from-emerald-400 to-emerald-600",
-    manager: "from-violet-400 to-violet-600",
-    employee: "from-sky-400 to-sky-600",
+  // Flat role-tinted avatar (recognition cue; matches dashboard role accents)
+  const roleAvatar: Record<string, string> = {
+    admin: "bg-rose-500",
+    hr: "bg-emerald-500",
+    manager: "bg-indigo-500",
+    employee: "bg-sky-500",
   };
-  const avatarGradient = profile?.role
-    ? roleGradient[profile.role]
-    : "from-indigo-400 to-indigo-600";
+  const avatarBg = profile?.role ? roleAvatar[profile.role] : "bg-primary";
 
   const roleBadgeCls: Record<string, string> = {
     admin: "text-rose-700 bg-rose-50 border-rose-100",
     hr: "text-emerald-700 bg-emerald-50 border-emerald-100",
-    manager: "text-violet-700 bg-violet-50 border-violet-100",
+    manager: "text-indigo-700 bg-indigo-50 border-indigo-100",
     employee: "text-sky-700 bg-sky-50 border-sky-100",
   };
   const roleBadgeStyle = profile?.role
@@ -120,7 +118,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
                   className="w-9 h-9 rounded-full object-cover ring-2 ring-border shadow-sm"
                 />
               ) : (
-                <div className={cn("w-9 h-9 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold shadow-sm", avatarGradient)}>
+                <div className={cn("w-9 h-9 rounded-full grid place-items-center text-white text-sm font-semibold", avatarBg)}>
                   {initials}
                 </div>
               )}
@@ -148,7 +146,7 @@ export function Navbar({ profile, onMenuClick, onSignOut }: NavbarProps) {
                       className="w-10 h-10 rounded-full object-cover ring-2 ring-border"
                     />
                   ) : (
-                    <div className={cn("w-10 h-10 rounded-full bg-gradient-to-br grid place-items-center text-white text-sm font-semibold", avatarGradient)}>
+                    <div className={cn("w-10 h-10 rounded-full grid place-items-center text-white text-sm font-semibold", avatarBg)}>
                       {initials}
                     </div>
                   )}

@@ -103,7 +103,77 @@ export function LeaveRequestTable({
         <span className="text-sm text-muted-foreground shrink-0">{filtered.length} รายการ</span>
       </div>
 
-      <div className="border border-border rounded-lg bg-card overflow-x-auto">
+      {/* Mobile (<md): stacked cards — avoids horizontal-scrolling an 8-col table */}
+      <ul className="space-y-2.5 md:hidden">
+        {pageRows.map((req) => {
+          const status = LEAVE_STATUS_MAP[req.status] ?? { label: req.status, variant: "outline" as const, tone: "gray" as const };
+          return (
+            <li key={req.id}>
+              <Link
+                href={`/dashboard/leaves/${req.id}`}
+                className="block rounded-lg border border-border bg-card p-4 transition-colors active:bg-muted/50"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium leading-tight truncate">{req.employee?.full_name ?? "-"}</p>
+                    {req.employee?.position_title && (
+                      <p className="text-xs text-muted-foreground truncate">{req.employee.position_title}</p>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                </div>
+
+                <div className="mt-2 flex items-start gap-1.5 text-sm font-medium">
+                  <span className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${TONE_DOT[status.tone]}`} />
+                  <span>{status.label}</span>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">ประเภท</dt>
+                    <dd>{req.leave_type?.name ?? "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">จำนวน</dt>
+                    <dd>
+                      <span className="font-mono font-semibold">{req.total_days}</span> วัน
+                      {req.working_days != null && req.working_days !== req.total_days && (
+                        <span className="text-xs text-muted-foreground"> ({req.working_days} ทำการ)</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted-foreground">วันที่</dt>
+                    <dd className="font-mono">{formatThai(req.start_date)} – {formatThai(req.end_date)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">ช่องทาง</dt>
+                    <dd>{req.submission_channel === "paper" ? "กระดาษ" : "ออนไลน์"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">ใบรับรองแพทย์</dt>
+                    <dd className="flex items-center gap-1.5">
+                      {req.medical_cert_url ? (
+                        <><FileCheck className="h-4 w-4 text-emerald-600" /> มี</>
+                      ) : (
+                        <span className="text-muted-foreground">ไม่มี</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </Link>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && (
+          <li className="rounded-lg border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+            {emptyText}
+          </li>
+        )}
+      </ul>
+
+      {/* Tablet/desktop (md+): full table */}
+      <div className="hidden md:block border border-border rounded-lg bg-card overflow-x-auto">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>

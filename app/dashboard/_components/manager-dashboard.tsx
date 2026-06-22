@@ -16,7 +16,7 @@ function formatWaiting(hours: number): string {
 }
 
 /**
- * Manager dashboard view — violet/dark-toned.
+ * Manager dashboard view — indigo/dark welcome panel.
  * Shows approval queue with inline actions, team status, monthly approvals.
  */
 export function ManagerDashboard({ userName, data }: Props) {
@@ -29,20 +29,20 @@ export function ManagerDashboard({ userName, data }: Props) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Welcome hero — dark violet */}
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-950 via-slate-900 to-slate-900 text-white">
+      {/* Welcome panel — deep indigo (fixed dark surface, brand-hued) */}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 text-white">
         <div className="absolute inset-0 grid-bg opacity-60"></div>
-        <div className="absolute -top-32 -left-20 w-[420px] h-[420px] rounded-full bg-violet-600/20 blur-3xl"></div>
+        <div className="absolute -top-32 -left-20 w-[420px] h-[420px] rounded-full bg-indigo-500/20 blur-3xl"></div>
         <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1">
-            <div className="inline-flex items-center gap-2 text-xs font-medium text-violet-200 bg-violet-500/10 border border-violet-400/20 px-2.5 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+            <div className="inline-flex items-center gap-2 text-xs font-medium text-indigo-200 bg-indigo-500/10 border border-indigo-400/20 px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
               <span>
                 มี <span className="font-semibold text-white">{totalQueue} คำขอ</span> รอการพิจารณาของคุณ
               </span>
             </div>
             <h1 className="mt-3 text-3xl font-bold tracking-tight">
-              ภาพรวมทีม — <span className="text-violet-300">{userName}</span>
+              ภาพรวมทีม — <span className="text-indigo-300">{userName}</span>
             </h1>
             <p className="mt-1.5 text-sm text-slate-300 max-w-lg">
               ทีมของคุณมี <span className="font-semibold text-white">{data.teamCount} คน</span> วันนี้มาทำงาน{" "}
@@ -66,7 +66,7 @@ export function ManagerDashboard({ userName, data }: Props) {
 
           {/* Approval queue tile */}
           <div className="shrink-0 w-52 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-4">
-            <div className="text-xs font-medium text-violet-200">คิวอนุมัติ</div>
+            <div className="text-xs font-medium text-indigo-200">คิวอนุมัติ</div>
             <div className="mt-1 text-5xl font-bold leading-none font-mono">{totalQueue}</div>
             <div className="text-xs text-slate-300 mt-1">
               ใบลา {data.pendingLeavesCount} · เดินทาง {data.pendingTravelCount}
@@ -87,7 +87,7 @@ export function ManagerDashboard({ userName, data }: Props) {
           label="รออนุมัติของฉัน"
           value={totalQueue}
           hint={`ใบลา ${data.pendingLeavesCount} · เดินทาง ${data.pendingTravelCount}`}
-          tone="violet"
+          tone="indigo"
           icon={Clock}
         />
         <StatCard label="ทีมของฉัน" value={data.teamCount} hint="ทั้งหมด" tone="slate" icon={Users} />
@@ -116,7 +116,7 @@ export function ManagerDashboard({ userName, data }: Props) {
           action={
             <Link
               href="/dashboard/approvals/leaves"
-              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -134,24 +134,24 @@ export function ManagerDashboard({ userName, data }: Props) {
                     key={`${q.type}-${q.id}`}
                     className="flex items-center gap-3 py-3 px-1 hover:bg-muted/40 rounded-md"
                   >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 grid place-items-center text-white text-xs font-semibold shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground grid place-items-center text-xs font-semibold shrink-0">
                       {q.initials}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-slate-900 truncate">
+                        <span className="text-sm font-medium text-foreground truncate">
                           {q.name}
                         </span>
-                        <span className="font-mono text-[0.625rem] text-slate-400">
+                        <span className="font-mono text-[0.625rem] text-muted-foreground">
                           {q.type === "leave" ? "LV" : "TR"}-{q.id.slice(0, 8)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-600 truncate">{q.detail}</div>
+                      <div className="text-xs text-muted-foreground truncate">{q.detail}</div>
                     </div>
                     <div className="text-right shrink-0">
                       <div
                         className={`text-xs font-medium ${
-                          q.urgent ? "text-rose-600" : "text-slate-500"
+                          q.urgent ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
                         }`}
                       >
                         รอ {formatWaiting(q.waitingHours)}
@@ -176,10 +176,10 @@ export function ManagerDashboard({ userName, data }: Props) {
         <Panel title="ทีมวันนี้" sub="Team Status">
           <div className="space-y-3">
             <div className="flex items-baseline gap-2">
-              <div className="text-4xl font-bold text-slate-900 font-mono leading-none">{onDuty}</div>
-              <div className="text-xs text-slate-500">/ {data.teamCount} มาทำงาน</div>
+              <div className="text-4xl font-bold text-foreground font-mono leading-none">{onDuty}</div>
+              <div className="text-xs text-muted-foreground">/ {data.teamCount} มาทำงาน</div>
             </div>
-            <div className="flex h-2 rounded-full overflow-hidden bg-slate-100">
+            <div className="flex h-2 rounded-full overflow-hidden bg-muted">
               <div className="bg-emerald-500" style={{ width: `${onDutyPct}%` }}></div>
               <div className="bg-amber-400" style={{ width: `${leavePct}%` }}></div>
               <div className="bg-rose-400" style={{ width: `${travelPct}%` }}></div>
@@ -188,36 +188,36 @@ export function ManagerDashboard({ userName, data }: Props) {
               <li className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span className="text-slate-700">มาทำงาน</span>
+                  <span className="text-foreground">มาทำงาน</span>
                 </span>
-                <span className="font-semibold text-slate-900">{onDuty}</span>
+                <span className="font-semibold text-foreground">{onDuty}</span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                  <span className="text-slate-700">ลาวันนี้</span>
+                  <span className="text-foreground">ลาวันนี้</span>
                 </span>
-                <span className="font-semibold text-slate-900">{data.leavesToday}</span>
+                <span className="font-semibold text-foreground">{data.leavesToday}</span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                  <span className="text-slate-700">เดินทาง</span>
+                  <span className="text-foreground">เดินทาง</span>
                 </span>
-                <span className="font-semibold text-slate-900">{data.travelToday}</span>
+                <span className="font-semibold text-foreground">{data.travelToday}</span>
               </li>
             </ul>
             {data.todayLeaves.length > 0 && (
               <div className="pt-3 border-t border-border/70">
-                <div className="text-xs text-slate-500 mb-2 font-medium">ลาวันนี้</div>
+                <div className="text-xs text-muted-foreground mb-2 font-medium">ลาวันนี้</div>
                 <ul className="space-y-1.5">
                   {data.todayLeaves.slice(0, 4).map((p, i) => (
                     <li key={i} className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 grid place-items-center text-white text-[0.625rem] font-semibold ring-2 ring-white">
+                      <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center text-[0.625rem] font-semibold ring-2 ring-card">
                         {p.initials}
                       </div>
-                      <div className="text-xs text-slate-700 truncate">
-                        {p.name} <span className="text-slate-400">· {p.leaveType}</span>
+                      <div className="text-xs text-foreground truncate">
+                        {p.name} <span className="text-muted-foreground">· {p.leaveType}</span>
                       </div>
                     </li>
                   ))}

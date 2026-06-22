@@ -10,6 +10,19 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { StatCard, Panel } from "./dashboard-primitives";
+import { periodLabel } from "@/lib/attendance/labels";
+
+interface LatestAttendance {
+  month: number;
+  buddhist_year: number;
+  working_days: number;
+  work_days: number;
+  travel_days: number;
+  leave_total: number;
+  late_online_days: number;
+  missing_checkout_count: number;
+  total_days: number;
+}
 
 interface LeaveBalance {
   leaveType: string;
@@ -32,6 +45,7 @@ interface Props {
   myPendingTravel: number;
   leaveBalances: LeaveBalance[];
   recentActivity: RecentItem[];
+  latestAttendance: LatestAttendance | null;
 }
 
 const statusBadgeTone: Record<string, string> = {
@@ -39,7 +53,7 @@ const statusBadgeTone: Record<string, string> = {
   approved: "bg-sky-50 text-sky-700 ring-sky-200",
   completed: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   rejected: "bg-rose-50 text-rose-700 ring-rose-200",
-  cancelled: "bg-slate-50 text-slate-600 ring-slate-200",
+  cancelled: "bg-muted text-muted-foreground ring-border",
 };
 
 const statusLabel: Record<string, string> = {
@@ -60,6 +74,7 @@ export function EmployeeDashboard({
   myPendingTravel,
   leaveBalances,
   recentActivity,
+  latestAttendance,
 }: Props) {
   const today = new Date().toLocaleDateString("th-TH", {
     weekday: "long",
@@ -97,14 +112,14 @@ export function EmployeeDashboard({
               <Sparkles className="h-3 w-3" />
               <span>{today}</span>
             </div>
-            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              สวัสดี, <span className="text-sky-600">{userName}</span>
+            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+              สวัสดี, <span className="text-sky-600 dark:text-sky-400">{userName}</span>
             </h1>
-            <p className="mt-1.5 text-sm text-slate-600 max-w-lg">
+            <p className="mt-1.5 text-sm text-muted-foreground max-w-lg">
               {totalPending > 0 ? (
                 <>
                   คำขอของคุณ{" "}
-                  <span className="font-semibold text-slate-900">{totalPending} รายการ</span> รออนุมัติ
+                  <span className="font-semibold text-foreground">{totalPending} รายการ</span> รออนุมัติ
                 </>
               ) : (
                 "ไม่มีคำขอที่รอดำเนินการ"
@@ -113,13 +128,13 @@ export function EmployeeDashboard({
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
                 href="/dashboard/leaves/new"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
               >
                 <Plus className="h-3.5 w-3.5" /> ยื่นใบลา
               </Link>
               <Link
                 href="/dashboard/travel/new"
-                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-border text-slate-700 text-sm font-medium hover:bg-slate-50 transition"
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-card border border-border text-foreground text-sm font-medium hover:bg-muted transition"
               >
                 <Plane className="h-3.5 w-3.5" /> ขออนุญาตเดินทาง
               </Link>
@@ -127,17 +142,17 @@ export function EmployeeDashboard({
           </div>
 
           {leaveTotal > 0 && (
-            <div className="shrink-0 w-44 h-32 rounded-xl bg-gradient-to-br from-sky-600 to-sky-800 text-white p-4 flex flex-col justify-between shadow-lg shadow-sky-900/20">
-              <div className="text-xs font-medium text-sky-200">วันลาคงเหลือ</div>
+            <div className="shrink-0 w-44 h-32 rounded-xl bg-primary text-primary-foreground p-4 flex flex-col justify-between">
+              <div className="text-xs font-medium text-primary-foreground/70">วันลาคงเหลือ</div>
               <div>
                 <div className="text-4xl font-bold leading-none font-mono">
                   {leaveTotal - leaveUsed}
-                  <span className="text-sm font-medium text-sky-200 ml-1">/{leaveTotal}</span>
+                  <span className="text-sm font-medium text-primary-foreground/70 ml-1">/{leaveTotal}</span>
                 </div>
                 <div className="mt-2 h-1.5 bg-white/15 rounded-full overflow-hidden">
                   <div className="h-full bg-white/80 rounded-full" style={{ width: `${pct}%` }}></div>
                 </div>
-                <div className="text-[0.625rem] text-sky-200 mt-1">{vacation?.leaveType ?? "วันลา"}</div>
+                <div className="text-[0.625rem] text-primary-foreground/70 mt-1">{vacation?.leaveType ?? "วันลา"}</div>
               </div>
             </div>
           )}
@@ -185,7 +200,7 @@ export function EmployeeDashboard({
           action={
             <Link
               href="/dashboard/leaves"
-              className="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
             >
               ดูทั้งหมด <ArrowRight className="h-3 w-3" />
             </Link>
@@ -204,7 +219,7 @@ export function EmployeeDashboard({
                     className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${
                       r.type === "leave"
                         ? "bg-amber-100 text-amber-700"
-                        : "bg-violet-100 text-violet-700"
+                        : "bg-indigo-100 text-indigo-700"
                     }`}
                   >
                     {r.type === "leave" ? (
@@ -214,10 +229,10 @@ export function EmployeeDashboard({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-900 truncate">
+                    <div className="text-sm font-medium text-foreground truncate">
                       {r.description}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground">
                       {new Date(r.date).toLocaleDateString("th-TH", {
                         day: "numeric",
                         month: "short",
@@ -227,7 +242,7 @@ export function EmployeeDashboard({
                   </div>
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ring-1 shrink-0 ${
-                      statusBadgeTone[r.status] ?? "bg-slate-50 text-slate-600 ring-slate-200"
+                      statusBadgeTone[r.status] ?? "bg-muted text-muted-foreground ring-border"
                     }`}
                   >
                     {statusLabel[r.status] ?? r.status}
@@ -245,25 +260,83 @@ export function EmployeeDashboard({
               { label: "ลาพักผ่อน", Ico: CalendarDays, href: "/dashboard/leaves/new", tone: "sky" },
               { label: "ลาป่วย", Ico: Hospital, href: "/dashboard/leaves/new", tone: "emerald" },
               { label: "ลากิจ", Ico: Briefcase, href: "/dashboard/leaves/new", tone: "amber" },
-              { label: "เดินทาง", Ico: Plane, href: "/dashboard/travel/new", tone: "violet" },
+              { label: "เดินทาง", Ico: Plane, href: "/dashboard/travel/new", tone: "indigo" },
             ].map((a) => (
               <Link
                 key={a.label}
                 href={a.href}
-                className="group flex flex-col items-start gap-2 p-3 rounded-lg border border-border hover:border-slate-300 hover:bg-slate-50 transition"
+                className="group flex flex-col items-start gap-2 p-3 rounded-lg border border-border hover:border-foreground/20 hover:bg-muted transition"
               >
                 <div
                   className={`w-8 h-8 rounded-lg bg-${a.tone}-100 text-${a.tone}-700 grid place-items-center`}
                 >
                   <a.Ico className="h-[15px] w-[15px]" />
                 </div>
-                <div className="text-xs font-medium text-slate-800 group-hover:text-slate-900">
+                <div className="text-xs font-medium text-foreground">
                   {a.label}
                 </div>
               </Link>
             ))}
           </div>
         </Panel>
+      </div>
+
+      {/* Latest monthly attendance summary */}
+      {latestAttendance && (
+        <Panel
+          title="การมาปฏิบัติงานล่าสุด"
+          sub={periodLabel(latestAttendance.month, latestAttendance.buddhist_year)}
+          action={
+            <Link
+              href="/dashboard/attendance"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              ดูทั้งหมด <ArrowRight className="h-3 w-3" />
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <MiniStat label="วันทำงาน" value={latestAttendance.work_days} />
+            <MiniStat label="ไปราชการ" value={latestAttendance.travel_days} />
+            <MiniStat label="ลารวม" value={latestAttendance.leave_total} />
+            <MiniStat label="รวม" value={latestAttendance.total_days} strong />
+            <MiniStat
+              label="มาสาย"
+              value={latestAttendance.late_online_days}
+              warn={latestAttendance.late_online_days > 0}
+            />
+            <MiniStat
+              label="ไม่ลงออก"
+              value={latestAttendance.missing_checkout_count}
+              warn={latestAttendance.missing_checkout_count > 0}
+            />
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  strong,
+  warn,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  warn?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-center">
+      <div className="text-[0.7rem] text-muted-foreground leading-tight">{label}</div>
+      <div
+        className={`mt-0.5 tabular-nums ${strong ? "text-xl font-bold" : "text-lg font-semibold"} ${
+          warn ? "text-amber-600 dark:text-amber-400" : value > 0 ? "text-foreground" : "text-muted-foreground/40"
+        }`}
+      >
+        {value}
       </div>
     </div>
   );

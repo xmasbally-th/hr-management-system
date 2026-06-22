@@ -682,6 +682,179 @@ export interface Database {
         ];
       };
 
+      attendance_periods: {
+        Row: {
+          id: string;
+          department_id: string;
+          period_type: "monthly" | "annual";
+          buddhist_year: number;
+          month: number | null;
+          working_days: number | null;
+          start_date: string | null;
+          end_date: string | null;
+          title: string | null;
+          source_file_url: string | null;
+          status: "draft" | "published";
+          note: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          department_id: string;
+          period_type?: "monthly" | "annual";
+          buddhist_year: number;
+          month?: number | null;
+          working_days?: number | null;
+          start_date?: string | null;
+          end_date?: string | null;
+          title?: string | null;
+          source_file_url?: string | null;
+          status?: "draft" | "published";
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          department_id?: string;
+          period_type?: "monthly" | "annual";
+          buddhist_year?: number;
+          month?: number | null;
+          working_days?: number | null;
+          start_date?: string | null;
+          end_date?: string | null;
+          title?: string | null;
+          source_file_url?: string | null;
+          status?: "draft" | "published";
+          note?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attendance_periods_department_id_fkey";
+            columns: ["department_id"];
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_periods_created_by_fkey";
+            columns: ["created_by"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      attendance_entries: {
+        Row: {
+          id: string;
+          period_id: string;
+          profile_id: string;
+          raw_name: string | null;
+          staff_line: "academic" | "support" | "contract" | null;
+          row_order: number | null;
+          work_days: number;
+          travel_days: number;
+          leave_vacation: number;
+          leave_personal: number;
+          leave_sick: number;
+          leave_study: number;
+          leave_maternity: number;
+          leave_ordination: number;
+          leave_spouse_childbirth: number;
+          total_days: number;
+          late_online_days: number;
+          missing_checkout_count: number;
+          absent_days: number;
+          leave_sick_count: number;
+          leave_personal_count: number;
+          leave_vacation_count: number;
+          leave_maternity_count: number;
+          leave_ordination_count: number;
+          leave_spouse_childbirth_count: number;
+          remark: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          period_id: string;
+          profile_id: string;
+          raw_name?: string | null;
+          staff_line?: "academic" | "support" | "contract" | null;
+          row_order?: number | null;
+          work_days?: number;
+          travel_days?: number;
+          leave_vacation?: number;
+          leave_personal?: number;
+          leave_sick?: number;
+          leave_study?: number;
+          leave_maternity?: number;
+          leave_ordination?: number;
+          leave_spouse_childbirth?: number;
+          total_days?: number;
+          late_online_days?: number;
+          missing_checkout_count?: number;
+          absent_days?: number;
+          leave_sick_count?: number;
+          leave_personal_count?: number;
+          leave_vacation_count?: number;
+          leave_maternity_count?: number;
+          leave_ordination_count?: number;
+          leave_spouse_childbirth_count?: number;
+          remark?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          period_id?: string;
+          profile_id?: string;
+          raw_name?: string | null;
+          staff_line?: "academic" | "support" | "contract" | null;
+          row_order?: number | null;
+          work_days?: number;
+          travel_days?: number;
+          leave_vacation?: number;
+          leave_personal?: number;
+          leave_sick?: number;
+          leave_study?: number;
+          leave_maternity?: number;
+          leave_ordination?: number;
+          leave_spouse_childbirth?: number;
+          total_days?: number;
+          late_online_days?: number;
+          missing_checkout_count?: number;
+          absent_days?: number;
+          leave_sick_count?: number;
+          leave_personal_count?: number;
+          leave_vacation_count?: number;
+          leave_maternity_count?: number;
+          leave_ordination_count?: number;
+          leave_spouse_childbirth_count?: number;
+          remark?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attendance_entries_period_id_fkey";
+            columns: ["period_id"];
+            referencedRelation: "attendance_periods";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_entries_profile_id_fkey";
+            columns: ["profile_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       leave_types: {
         Row: {
           id: string;
@@ -1400,6 +1573,8 @@ export type TravelExpense = Tables<"travel_expenses">;
 export type DocumentTracking = Tables<"document_tracking">;
 export type EmployeeTraining = Tables<"employee_trainings">;
 export type Notification = Tables<"notifications">;
+export type AttendancePeriod = Tables<"attendance_periods">;
+export type AttendanceEntry = Tables<"attendance_entries">;
 
 // ─── Role type ───────────────────────────────────────────────────────
 export type UserRole = Profile["role"];
