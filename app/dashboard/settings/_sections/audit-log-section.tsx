@@ -481,6 +481,7 @@ export function AuditLogSection() {
             </span>
             <div className="flex gap-1">
               <Button
+                aria-label="หน้าก่อนหน้า"
                 size="icon"
                 variant="outline"
                 className="h-8 w-8"
@@ -490,6 +491,7 @@ export function AuditLogSection() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
+                aria-label="หน้าถัดไป"
                 size="icon"
                 variant="outline"
                 className="h-8 w-8"

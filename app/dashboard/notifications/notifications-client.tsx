@@ -93,11 +93,11 @@ export function NotificationsClient({ initialNotifications }: { initialNotificat
               </div>
               <div className="flex gap-1 shrink-0">
                 {!notif.is_read && (
-                  <Button variant="ghost" size="icon" onClick={() => handleMarkRead(notif.id)} disabled={isPending} className="h-8 w-8">
+                  <Button aria-label="ทำเครื่องหมายว่าอ่านแล้ว" variant="ghost" size="icon" onClick={() => handleMarkRead(notif.id)} disabled={isPending} className="h-8 w-8">
                     <Check className="h-4 w-4" />
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(notif.id)} disabled={isPending} className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                <Button aria-label="ลบการแจ้งเตือน" variant="ghost" size="icon" onClick={() => handleDelete(notif.id)} disabled={isPending} className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

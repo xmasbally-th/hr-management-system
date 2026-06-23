@@ -276,6 +276,7 @@ export function AttendanceListClient({ periods, canManage }: Props) {
                         )}
                         {canManage && (
                           <Button
+                            aria-label="ลบรายการ"
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 text-destructive"

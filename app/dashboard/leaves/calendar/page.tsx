@@ -185,6 +185,7 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
           <div className="flex items-center gap-1">
             <Link
               href={prevHref}
+              aria-label="เดือนก่อนหน้า"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -194,6 +195,7 @@ export default async function LeaveCalendarPage({ searchParams }: PageProps) {
             </div>
             <Link
               href={nextHref}
+              aria-label="เดือนถัดไป"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               <ChevronRight className="h-4 w-4" />

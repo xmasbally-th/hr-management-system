@@ -314,11 +314,11 @@ function EventCalendar({
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-sm">ปฏิทินการลา / เดินทาง</h3>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} disabled={isPending}>
+          <Button aria-label="เดือนก่อนหน้า" variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} disabled={isPending}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)} disabled={isPending}>
+          <Button aria-label="เดือนถัดไป" variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate(1)} disabled={isPending}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

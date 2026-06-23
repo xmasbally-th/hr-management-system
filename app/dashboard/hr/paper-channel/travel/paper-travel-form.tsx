@@ -249,6 +249,7 @@ export function PaperTravelForm({ employees, examPeriods = [], dutyPositions = [
             </div>
             {expenses.length > 1 && (
               <Button
+                aria-label="ลบรายการค่าใช้จ่าย"
                 type="button"
                 variant="ghost"
                 size="icon"

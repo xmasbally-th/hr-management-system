@@ -249,7 +249,7 @@ export function PositionsSection({
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 text-emerald-600"
-                              onClick={saveEdit}
+                              aria-label="บันทึก" onClick={saveEdit}
                               disabled={isPending}
                             >
                               {isPending ? (
@@ -262,7 +262,7 @@ export function PositionsSection({
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8"
-                              onClick={cancelEdit}
+                              aria-label="ยกเลิก" onClick={cancelEdit}
                               disabled={isPending}
                             >
                               <X className="h-3.5 w-3.5" />
@@ -274,7 +274,7 @@ export function PositionsSection({
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8"
-                              onClick={() => startEdit(row)}
+                              aria-label="แก้ไข" onClick={() => startEdit(row)}
                               disabled={isPending}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -283,7 +283,7 @@ export function PositionsSection({
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 text-destructive"
-                              onClick={() => setDeleteRow(row)}
+                              aria-label="ลบ" onClick={() => setDeleteRow(row)}
                               disabled={isPending}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

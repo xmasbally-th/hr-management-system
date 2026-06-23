@@ -165,7 +165,7 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 text-emerald-600"
-                              onClick={saveEdit}
+                              aria-label="บันทึก" onClick={saveEdit}
                               disabled={isPending}
                             >
                               {isPending ? (
@@ -178,7 +178,7 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8"
-                              onClick={cancelEdit}
+                              aria-label="ยกเลิก" onClick={cancelEdit}
                               disabled={isPending}
                             >
                               <X className="h-3.5 w-3.5" />
@@ -189,7 +189,7 @@ export function LeaveTypesSection({ rows }: { rows: LeaveTypeRow[] }) {
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8"
-                            onClick={() => startEdit(row)}
+                            aria-label="แก้ไข" onClick={() => startEdit(row)}
                             disabled={isPending}
                           >
                             <Pencil className="h-3.5 w-3.5" />

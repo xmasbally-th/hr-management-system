@@ -565,6 +565,7 @@ export function HrDocumentsClient({
                   {!readOnly && (
                     <TableCell>
                       <Button
+                        aria-label="ลบรายการติดตามเอกสาร"
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"

@@ -209,6 +209,18 @@
   --sidebar-ring: oklch(0.7 0.18 264);
 }
 
+/* ============================================================================
+ * A11y: in dark mode, --primary is tuned as a button FILL (white text on it
+ * clears AA), but as small TEXT/links on the dark background it only hit
+ * 3.86:1. Brighten primary-as-text in dark so links/accents clear WCAG AA
+ * (~5.7:1). Button fills use --primary-foreground, so they're unaffected.
+ * ============================================================================ */
+.dark .text-primary,
+:root[data-theme="dark"] .text-primary {
+  /* Civic Indigo tonal-ramp step from .impeccable/design.json (~6.2:1 on dark bg) */
+  color: oklch(0.72 0.14 264);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

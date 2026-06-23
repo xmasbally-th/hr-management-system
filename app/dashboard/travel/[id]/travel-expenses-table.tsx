@@ -104,6 +104,7 @@ export function TravelExpensesTable({ expenses, canEditActual }: Props) {
                   {isEditing ? (
                     <div className="flex gap-1 justify-end">
                       <Button
+                        aria-label="บันทึกค่าใช้จ่ายจริง"
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8"
@@ -113,6 +114,7 @@ export function TravelExpensesTable({ expenses, canEditActual }: Props) {
                         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}
                       </Button>
                       <Button
+                        aria-label="ยกเลิก"
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8"
@@ -124,6 +126,7 @@ export function TravelExpensesTable({ expenses, canEditActual }: Props) {
                     </div>
                   ) : (
                     <Button
+                      aria-label="แก้ไขค่าใช้จ่ายจริง"
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 ml-auto block"

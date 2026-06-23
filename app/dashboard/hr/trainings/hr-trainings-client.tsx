@@ -61,6 +61,7 @@ export function HrTrainingsClient({ trainings }: { trainings: (TrainingRow | Rec
                   <p className="text-xs text-muted-foreground truncate font-mono">{t.employee?.email}</p>
                 </div>
                 <Button
+                  aria-label="ลบประวัติการอบรม"
                   size="icon"
                   variant="ghost"
                   onClick={() => setDeleteTarget({
@@ -144,6 +145,7 @@ export function HrTrainingsClient({ trainings }: { trainings: (TrainingRow | Rec
                   </TableCell>
                   <TableCell>
                     <Button
+                      aria-label="ลบประวัติการอบรม"
                       size="icon"
                       variant="ghost"
                       onClick={() => setDeleteTarget({

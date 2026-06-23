@@ -271,6 +271,7 @@ export function ExamPeriodsSection({
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8"
+                    aria-label="แก้ไข"
                     onClick={() => openEdit(row)}
                     disabled={isPending}
                   >
@@ -280,7 +281,7 @@ export function ExamPeriodsSection({
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8 text-destructive"
-                    onClick={() => setDeleteRow(row)}
+                    aria-label="ลบ" onClick={() => setDeleteRow(row)}
                     disabled={isPending}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

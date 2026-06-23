@@ -193,19 +193,19 @@ export function EducationLevelsSection({ rows }: { rows: Row[] }) {
                       <TableCell className="text-right">
                         {isEditing ? (
                           <div className="inline-flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={saveEdit} disabled={isPending}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" aria-label="บันทึก" onClick={saveEdit} disabled={isPending}>
                               {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit} disabled={isPending}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="ยกเลิก" onClick={cancelEdit} disabled={isPending}>
                               <X className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         ) : (
                           <div className="inline-flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(row)} disabled={isPending}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="แก้ไข" onClick={() => startEdit(row)} disabled={isPending}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setDeleteRow(row)} disabled={isPending}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" aria-label="ลบ" onClick={() => setDeleteRow(row)} disabled={isPending}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
