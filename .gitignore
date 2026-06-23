@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Local-only DB introspection tool (uses SUPABASE_DB_URL)
 scripts/db.mjs
+
+# generated .docx output from leave/template test scripts
+scripts/out/
